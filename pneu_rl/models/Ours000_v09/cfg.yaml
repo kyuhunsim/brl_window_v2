@@ -1,0 +1,66 @@
+env:
+  neg_pred_rnd_offset_range: 0
+  num_act: 5
+  num_pred: 15
+  num_prev: 10
+  pos_pred_rnd_offset_range: 0
+  rwd_kwargs:
+    neg_curr_rwd_coeff: 0.3
+    neg_diff_rwd_coeff: 0.0
+    neg_fut_rwd_coeff: 0.01
+    neg_pred_rwd_coeff: 0.25
+    neg_prev_rwd_coeff: 0.0
+    pos_curr_rwd_coeff: 0.3
+    pos_diff_rwd_coeff: 0.0
+    pos_fut_rwd_coeff: 0.01
+    pos_pred_rwd_coeff: 0.25
+    pos_prev_rwd_coeff: 0.0
+epi: 1000
+model:
+  alpha: 0.5
+  automatic_entropy_tunning: true
+  batch_size: 128
+  buffer_size: 500000.0
+  epoch: 1
+  gamma: 0.9
+  hidden_dim: 256
+  horizon: 512
+  learning_rate: 0.0003
+  log_std_max: 1
+  log_std_min: -10
+  max_grad_norm: 0.5
+  noise_std: 1.5
+  spatial_weight: 0.4
+  start_epi: 10
+  tau: 0.005
+  temporal_weight: 1
+obs:
+  delay: 0.1
+  freq: 50
+  noise: false
+  scale: true
+pid:
+  Ka: 1
+  Kd_neg: 0.0
+  Kd_pos: 0.0
+  Ki_neg: 0.01
+  Ki_pos: 0.01
+  Kp_neg: 0.0
+  Kp_pos: 0.0
+pred:
+  delay: 0
+  freq: 50
+  noise: false
+  noise_std: 0
+  scale: true
+rnd_ref:
+  neg_max_amp: 5
+  neg_max_off: 35
+  neg_max_per: 10
+  neg_max_ts: 5
+  neg_min_off: 15
+  pos_max_amp: 20
+  pos_max_off: 240
+  pos_max_per: 10
+  pos_max_ts: 5
+  pos_min_off: 145
