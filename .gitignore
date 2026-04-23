@@ -169,3 +169,4 @@ pneu_pid/test
 pneu_env/ref
 pneu_env/data
 pneu_env/test
+/pneu_rl/models/**

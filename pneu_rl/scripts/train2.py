@@ -6,19 +6,10 @@ from pneu_rl.sac_with_loss import SAC
 
 from pneu_ref.random_ref import RandomRef
 from pneu_env.env import PneuEnv
-from pneu_env.sim import PneuSim
+from pneu_env.sim2 import PneuSim
 from pneu_env.real.real import PneuReal
-from pneu_env.pred import PneuPred
+from pneu_env.pred2 import PneuPred
 from pneu_utils.utils import checker, save_yaml, load_yaml, color, delete_lines
-
-
-def _print_runtime_bindings() -> None:
-    print("[ DBG] Runtime bindings")
-    print(f"[ DBG] train.py: {Path(__file__).resolve()}")
-    print(f"[ DBG] PneuEnv module: {inspect.getfile(PneuEnv)}")
-    print(f"[ DBG] PneuSim module: {inspect.getfile(PneuSim)}")
-    print(f"[ DBG] PneuPred module: {inspect.getfile(PneuPred)}")
-    print(f"[ DBG] sys.path[:5]: {sys.path[:5]}")
 
 
 model_name = input('\033[94m' + '[INPUT] pneu_rl <==  model name: ' + '\033[0m')
@@ -52,9 +43,9 @@ if train_mode == '1':
         # pred = None,
         rnd_ref = dict(
             pos_min_off = 145,
-            pos_max_off = 240,
+            pos_max_off = 210,
             neg_min_off = 15,
-            neg_max_off = 35,
+            neg_max_off = 55,
             pos_max_ts = 5,
             neg_max_ts = 5,
             pos_max_amp = 20,
@@ -101,15 +92,16 @@ if train_mode == '1':
             noise_std = 1.5
         ),
         epi = 1500,
-        pid = dict(
-            Kp_pos = 0.0,
-            Ki_pos = 0.01,
-            Kd_pos = 0.0,
-            Kp_neg = 0.0,
-            Ki_neg = 0.01,
-            Kd_neg = 0.0,
-            Ka = 1
-        )
+        # pid = dict(
+        #     Kp_pos = 0.0,
+        #     Ki_pos = 0.01,
+        #     Kd_pos = 0.0,
+        #     Kp_neg = 0.0,
+        #     Ki_neg = 0.01,
+        #     Kd_neg = 0.0,
+        #     Ka = 1
+        # )
+        pid = None
     )
     print(f'[ INFO] Train mode: Ours')
 
@@ -321,7 +313,6 @@ elif train_mode == '4':
     )
     print(f'[ INFO] Train mode: SAC + CAPS')
 
-_print_runtime_bindings()
 
 obs = PneuSim(**kwargs['obs'])
 print(f"[ DBG] Loaded obs simulator library: {obs.lib._name}")

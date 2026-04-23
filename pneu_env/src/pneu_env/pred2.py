@@ -12,14 +12,14 @@ from gymnasium.spaces import Box
 from pneu_utils.utils import get_pkg_path, color
 from pneu_env.pid import PID
 
-class PneuSim():
+class PneuPred():
     def __init__(
         self,
         freq: float = 50,
         volume1: float = 0.75,
         volume2: float = 0.4,
-        init_pos_press: float = 101.325,
-        init_neg_press: float = 101.325,
+        init_pos_press: float = 120,
+        init_neg_press: float = 80,
         delay: float = 0,
         noise: bool = False,
         noise_std: float = 0.2,
@@ -28,21 +28,20 @@ class PneuSim():
         scale: bool = False,
     ):
         env_pkg_path = Path(get_pkg_path('pneu_env'))
-        preferred_lib = "lib"
-        # preferred_lib = "lib2"
+        # preferred_lib = "lib"
+        preferred_lib = "lib2"
         other_lib = "lib2" if preferred_lib == "lib" else "lib"
         lib_candidates = [
-            env_pkg_path / f"src/pneu_env/{preferred_lib}/pneumatic_simulator.so",
-            env_pkg_path / f"src/pneu_env/{other_lib}/pneumatic_simulator.so",
+            env_pkg_path / f"src/pneu_env/{preferred_lib}/pneumatic_simulator_pred.so",
+            env_pkg_path / f"src/pneu_env/{other_lib}/pneumatic_simulator_pred.so",
         ]
         for lib_path in lib_candidates:
             if lib_path.is_file():
                 self.lib = CDLL(str(lib_path))
-                print(f'[ INFO] Loaded pneumatic simulator library from: {lib_path}')
                 break
         else:
             raise FileNotFoundError(
-                "Could not find pneumatic_simulator.so in lib or lib2 directory."
+                "Could not find pneumatic_simulator_pred.so in lib or lib2 directory."
             )
 
         self.lib.set_init_env.argtypes = [c_double, c_double]
@@ -107,7 +106,7 @@ class PneuSim():
             ctrl = 0.3*0.5*(ctrl + 1) + 0.7
         else:
             ctrl = 0.5*ctrl + 0.5
-
+        
         time_step = 1/self.freq
         next_obs = np.array(
             list(self.lib.step((c_double*2)(*list(ctrl)), time_step)[0:3]),
@@ -158,9 +157,6 @@ class PneuSim():
             init_pos_press,
             init_neg_press
         )
-        self.obs = np.array([
-            init_pos_press, init_neg_press
-        ], dtype=np.float32)
     
     def set_volume(self, vol1, vol2):
         self.lib.set_volume(vol1, vol2)
@@ -227,9 +223,9 @@ class PneuSim():
 
     
 if __name__ == '__main__':
-    env = PneuSim()
-    ctrl = np.array([0.9, 0.9], dtype=np.float64)
-    for n in range(10):
+    env = PneuPred()
+    ctrl = np.array([0.0, 0.0], dtype=np.float64)
+    for n in range(100):
         obs, _ = env.observe(ctrl)
 
         print(obs)

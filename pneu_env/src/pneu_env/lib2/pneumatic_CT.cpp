@@ -1,5 +1,79 @@
 #include "pneumatic_simulator.h"
+#include <algorithm>
 #include <cmath>
+
+namespace
+{
+struct ValveModelParams
+{
+    double A_max;
+    double k_shape;
+    double C_k;
+    double C_p;
+    double C_z;
+    double A_bw;
+    double beta_bw;
+    double gamma_bw;
+    double alpha_shape;
+    double wn_up;
+    double zeta_up;
+    double wn_down;
+    double zeta_down;
+};
+
+constexpr double STD_RHO = 1.20411831637462;
+constexpr double I_MAX = 0.30;
+constexpr double VALVE_DT = TS / 4.0;
+constexpr int VALVE_SUB_STEPS = 20;
+constexpr double STATE_EPS = 1e-4;
+constexpr double FORCE_LIMIT = 500.0;
+constexpr double LOG_GUARD = 700.0;
+constexpr double Z_LIMIT = 1e6;
+
+const ValveModelParams POS_PARAMS = {
+    0.177485, 24.9354, 0.0918, 0.000251, 0.00000,
+    363318.0739, 1.6334, 0.1516, 83.5718,
+    2.3474, 0.9792, 3.6058, 1.5719
+};
+
+const ValveModelParams NEG_PARAMS = {
+    0.252364, 49.2420, 0.0821, 0.000124, -0.00002,
+    77568.1783, 753.6405, 0.1452, 11752.9849,
+    4.5513, 2.0892, 2.4077, 0.7968
+};
+
+double clamp01(double value)
+{
+    return std::min(1.0, std::max(0.0, value));
+}
+
+double logaddexp_c(double x, double y)
+{
+    if (x == y) return x + 0.6931471805599453; // log(2)
+    const double diff = x - y;
+    if (diff > 0.0) return x + std::log1p(std::exp(-diff));
+    return y + std::log1p(std::exp(diff));
+}
+
+double compressible_phi(double p_in_abs_kpa, double p_out_abs_kpa)
+{
+    const double pin = std::max(p_in_abs_kpa, 1e-9);
+    const double pout = std::max(p_out_abs_kpa, 0.0);
+    const double pr = clamp01(pout / pin);
+    const double pcr = std::pow(2.0 / (K + 1.0), K / (K - 1.0));
+
+    if (pr <= pcr) {
+        return std::sqrt(K * std::pow(2.0 / (K + 1.0), (K + 1.0) / (K - 1.0)));
+    }
+
+    if (pr <= 1.0) {
+        const double term = std::pow(pr, 2.0 / K) - std::pow(pr, (K + 1.0) / K);
+        return std::sqrt(2.0 * K / (K - 1.0)) * std::sqrt(std::max(term, 0.0));
+    }
+
+    return 0.0;
+}
+} // namespace
 
 PneumaticCT::PneumaticCT()
 {
@@ -40,6 +114,22 @@ PneumaticCT::PneumaticCT()
 
     dxdt = new double[6];
     mass_flowrate = new double[6];
+    reset_valve_states();
+}
+
+void PneumaticCT::reset_valve_state(ValveRuntimeState* state)
+{
+    state->z = 0.0;
+    state->x1 = 0.0;
+    state->x2 = 0.0;
+    state->I_prev = 0.0;
+    state->state_prev = 0.0;
+}
+
+void PneumaticCT::reset_valve_states()
+{
+    reset_valve_state(&valve_state_pos);
+    reset_valve_state(&valve_state_neg);
 }
 
 void PneumaticCT::set_volume(double volume1, double volume2)
@@ -182,70 +272,65 @@ double PneumaticCT::pressure(double P, double V, double dVdt, double dmdt)
 
 double PneumaticCT::solenoid_valve(double P_inlet, double P_outlet, double signal, double type, double num)
 {
-    // type means that valve is postive or negative
-    // type 1: positive
-    // type 2: negative
+    const bool is_pos = (type == 1.0);
+    ValveRuntimeState* state = is_pos ? &valve_state_pos : &valve_state_neg;
+    const ValveModelParams& params = is_pos ? POS_PARAMS : NEG_PARAMS;
 
-    // double dmdt;
+    const double signal_clipped = clamp01(signal);
+    const double u_eff = clamp01((signal_clipped - 0.5) * 2.0);
+    const double current = I_MAX * u_eff;
 
-    double _R = 1000*R;
-    
-    double D = SV_D*0.01;
-    double d = SV_G*0.01;
-    double S = 0.25*PI*D*D;
-
-    double current = 0.165*signal;
-
-    double Pin = 1000*P_inlet;
-    double Pout = 1000*P_outlet;
-    double Patm = 1000*ATM;
-
-    double Phi;
-    double Pcr = pow(2/(K + 1), K/(K - 1));
-    if (Pin >= Pout) 
-    {
-        if (Pout/Pin <= Pcr) {
-            Phi = (Pin/sqrt(_R*T_OUT)) * sqrt(K*pow(2/(K + 1), (K + 1)/(K - 1)));
-        } else {
-            Phi = (Pin/sqrt(_R*T_OUT)) * sqrt(2*K/(K - 1)) * sqrt(pow(Pout/Pin, 2/K) - pow(Pout/Pin, (K + 1)/K));
-        }
-    } else {
-        Phi = 0;
+    double state_curr = state->state_prev;
+    if (current > state->I_prev + STATE_EPS) {
+        state_curr = 1.0;
+    } else if (current < state->I_prev - STATE_EPS) {
+        state_curr = 0.0;
     }
 
-    double Cdkx;
-    if (type == 1) {
-        // Three valve
-        // double Cpos1 = 0.00112413533696979;
-        // double Cpos2 = 0.000169651700761525;
-        // double Cpos3 = 2.27440482592866e-7;
-        // One valve
-        // double Cpos1 = 0.000590126854331190;
-        // double Cpos2 = 8.90726972374690e-05;
-        // double Cpos3 = 6.05278829960062e-08;
-        // Updated values on 2026-01-10
-        double Cpos1 = 0.001114363881476042;
-        double Cpos2 = 0.00015932275143274647;
-        double Cpos3 = 0;
+    const double abs_dI = std::abs(current - state->I_prev);
+    const double dI = abs_dI * (2.0 * state_curr - 1.0);
 
-        Cdkx = Cpos1*current - Cpos2 + Cpos3*(Pin - Patm)*S > 0 ? Cpos1*current - Cpos2 + Cpos3*(Pin - Patm)*S : 0;
-    } else {
-        // Three valve
-        // double Cneg1 = 0.000675536259277645;
-        // double Cneg2 = 9.78352859637934e-5;
-        // One valve
-        // double Cneg1 = 0.000966211405733290;
-        // double Cneg2 = 0.000145744566455925;
-        // Updated values on 2026-01-10
-        double Cpos1 = 0.001133425704176126;
-        double Cpos2 = 0.0001655487332160521;
-        double Cpos3 = 3.6481684199321504e-08;
+    const double dz = (
+        params.A_bw * dI
+        - params.beta_bw * std::abs(dI) * state->z
+        - params.gamma_bw * dI * std::abs(state->z)
+    );
+    state->z += dz;
+    state->z = std::min(Z_LIMIT, std::max(-Z_LIMIT, state->z));
 
-        // Cdkx = Cneg1*current - Cneg2 > 0 ? Cneg1*current - Cneg2 : 0;
-        Cdkx = Cpos1*current - Cpos2 + Cpos3*(Patm - Pin)*S > 0 ? Cpos1*current - Cpos2 + Cpos3*(Patm - Pin)*S : 0;
+    double force_net = current + params.C_z * state->z + params.C_p * P_inlet - params.C_k;
+    force_net = std::min(FORCE_LIMIT, std::max(-FORCE_LIMIT, force_net));
+
+    const double exp_arg = -params.k_shape * force_net;
+    const double log_denom = params.alpha_shape * logaddexp_c(0.0, exp_arg);
+
+    double area_eff = 0.0;
+    if (log_denom <= LOG_GUARD) {
+        area_eff = params.A_max * std::exp(-log_denom);
     }
 
-    return num*Cdkx*D*PI*Phi;
+    const double phi = compressible_phi(P_inlet, P_outlet);
+    const double q_static_lpm = area_eff * P_inlet * phi;
+
+    const double wn = (state_curr >= 0.5) ? params.wn_up : params.wn_down;
+    const double zeta = (state_curr >= 0.5) ? params.zeta_up : params.zeta_down;
+    const double dt_sub = VALVE_DT / static_cast<double>(VALVE_SUB_STEPS);
+
+    for (int i = 0; i < VALVE_SUB_STEPS; i++) {
+        const double dx1 = state->x2;
+        const double dx2 = wn * wn * (q_static_lpm - state->x1) - 2.0 * zeta * wn * state->x2;
+        state->x1 += dt_sub * dx1;
+        state->x2 += dt_sub * dx2;
+    }
+
+    state->I_prev = current;
+    state->state_prev = state_curr;
+
+    const double q_pred_lpm = std::max(state->x1, 0.0);
+    const double mdot = q_pred_lpm * STD_RHO / 60000.0;
+    if (!std::isfinite(mdot)) return 0.0;
+
+    return std::max(num * mdot, 0.0);
 }
 
 double PneumaticCT::chamber(double dmdt, double V)

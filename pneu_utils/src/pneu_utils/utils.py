@@ -64,27 +64,30 @@ def load_yaml(
     
     return data
     
-def save_yaml2(
-    folder_name: str,
-    kwargs: Dict[str, Any],
-    file_name: str = 'cfg.yaml'
-):
-    model_path = f'{get_pkg_path("pneu_rl2")}/models/{folder_name}'
-    with open(f'{model_path}/{file_name}', 'w') as f:
-        yaml.dump(kwargs, f)
-
-def load_yaml2(
-    folder_name: str
-) -> Dict[str, Any]:
-    model_path = f'{get_pkg_path("pneu_rl2")}/models/{folder_name}'
-    with open(f'{model_path}/cfg.yaml', 'r') as f:
-        data = yaml.safe_load(f)
-    
-    return data
-
 def save_kwargs(
     path: str,
     kwargs: Dict[str, Any]
 ) -> None:
     with open(path, "w") as f:
         yaml.dump(kwargs, f)
+
+def setup_plot_style(overrides: Optional[Dict[str, Any]] = None) -> None:
+    style = {
+        "font.family": "serif",
+        "font.serif": ["Times New Roman", "Times", "DejaVu Serif"],
+        "font.weight": "bold",
+        "axes.labelweight": "bold",
+        "axes.titleweight": "bold",
+        "axes.titlesize": 18,
+        "axes.labelsize": 20,
+        "xtick.labelsize": 14,
+        "ytick.labelsize": 15,
+        "legend.fontsize": 12,
+        "figure.titlesize": 22,
+    }
+    if overrides:
+        style.update(overrides)
+
+    import matplotlib.pyplot as plt
+
+    plt.rcParams.update(style)

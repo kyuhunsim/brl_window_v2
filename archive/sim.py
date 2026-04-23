@@ -1,15 +1,16 @@
 import sys
+#import rospy
 from pathlib import Path
 
-from ctypes import CDLL, c_double, POINTER
+from ctypes import CDLL, c_double, POINTER, c_bool
 
 import numpy as np
 import math
-from typing import Tuple
+from typing import Tuple, Optional
 from collections import deque
 
 from gymnasium.spaces import Box
-from pneu_utils.utils import get_pkg_path, color
+from pneu_utils.utils import color
 from pneu_env.pid import PID
 
 class PneuSim():
@@ -18,6 +19,8 @@ class PneuSim():
         freq: float = 50,
         volume1: float = 0.75,
         volume2: float = 0.4,
+        # init_pos_press: float = 120,
+        # init_neg_press: float = 80,
         init_pos_press: float = 101.325,
         init_neg_press: float = 101.325,
         delay: float = 0,
@@ -26,25 +29,25 @@ class PneuSim():
         offset_pos: float = 0,
         offset_neg: float = 0,
         scale: bool = False,
+        lib_path: Optional[str] = None,
     ):
-        env_pkg_path = Path(get_pkg_path('pneu_env'))
-        preferred_lib = "lib"
-        # preferred_lib = "lib2"
-        other_lib = "lib2" if preferred_lib == "lib" else "lib"
-        lib_candidates = [
-            env_pkg_path / f"src/pneu_env/{preferred_lib}/pneumatic_simulator.so",
-            env_pkg_path / f"src/pneu_env/{other_lib}/pneumatic_simulator.so",
-        ]
-        for lib_path in lib_candidates:
-            if lib_path.is_file():
-                self.lib = CDLL(str(lib_path))
-                print(f'[ INFO] Loaded pneumatic simulator library from: {lib_path}')
-                break
-        else:
-            raise FileNotFoundError(
-                "Could not find pneumatic_simulator.so in lib or lib2 directory."
-            )
-
+        if lib_path is None:
+            base_dir = Path(__file__).resolve().parent
+            candidate_paths = [
+                base_dir / "lib" / "pneumatic_simulator.so",
+                base_dir / "pneumatic_simulator.so",
+            ]
+            for candidate in candidate_paths:
+                if candidate.is_file():
+                    lib_path = str(candidate)
+                    break
+            else:
+                raise FileNotFoundError(
+                    "Could not find pneumatic_simulator.so. Tried: "
+                    + ", ".join(str(p) for p in candidate_paths)
+                )
+            print(f"[ INFO] Loaded simulator library from: {lib_path}")
+        self.lib = CDLL(lib_path)
         self.lib.set_init_env.argtypes = [c_double, c_double]
         self.lib.set_volume.argtypes = [c_double, c_double]
         self.lib.get_time.restype = c_double
@@ -56,6 +59,10 @@ class PneuSim():
         self.lib.solenoid_valve_test.argtypes = [c_double for _ in range(5)]
         self.lib.solenoid_valve_test.restype = c_double
         self.lib.get_mean_mass_flowrate.restype = POINTER(c_double)
+        try:
+            self.lib.set_logging_c.argtypes = [c_bool]
+        except AttributeError:
+            pass
         
         self.init_pos_press = init_pos_press
         self.init_neg_press = init_neg_press
@@ -88,25 +95,28 @@ class PneuSim():
         ctrl: np.ndarray,
         goal: np.ndarray = np.array([101.325, 101.325])
     ) -> np.ndarray:
+        ctrl = np.asarray(ctrl, dtype=np.float64)
         if self.is_pid:
             err = self.pid.get_action(self.obs, goal)
             ctrl += err
             if self.is_anti_windup:
-                original_ctrl = ctrl
-    
-        ctrl = np.clip(ctrl, -1, 1)
+                original_ctrl = ctrl.copy()
+
+        # Keep action convention consistent with env/predictor.
+        ctrl = np.clip(ctrl, -1.0, 1.0)
 
         if self.is_anti_windup:
-            sat_ctrl = ctrl
             self.pid.anti_windup(
-                ctrl = original_ctrl,
-                sat_ctrl = sat_ctrl
+                ctrl=original_ctrl,
+                sat_ctrl=ctrl
             )
-        
+
         if self.scale:
-            ctrl = 0.3*0.5*(ctrl + 1) + 0.7
+            # [-1, 1] -> [0.7, 1.0]
+            ctrl = 0.3 * 0.5 * (ctrl + 1.0) + 0.7
         else:
-            ctrl = 0.5*ctrl + 0.5
+            # [-1, 1] -> [0, 1]
+            ctrl = 0.5 * ctrl + 0.5
 
         time_step = 1/self.freq
         next_obs = np.array(
@@ -214,6 +224,13 @@ class PneuSim():
             valve_neg = mf[3]
         )
 
+    def set_logging(self, enable: bool) -> None:
+        try:
+            self.lib.set_logging_c(enable)
+            print(f"[INFO] simulator logging set to: {enable}")
+        except AttributeError:
+            print(color("[경고] set_logging_c 함수를 찾을 수 없습니다.", "yellow"))
+
     
     def solenoid_valve(
         self,
@@ -230,8 +247,9 @@ if __name__ == '__main__':
     env = PneuSim()
     ctrl = np.array([0.9, 0.9], dtype=np.float64)
     for n in range(10):
-        obs, _ = env.observe(ctrl)
+        # obs, _ = env.get_obs(ctrl)
 
+        obs, info = env.observe(ctrl)
         print(obs)
 
         

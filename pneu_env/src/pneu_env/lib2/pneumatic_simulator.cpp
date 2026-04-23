@@ -1,7 +1,6 @@
 #include "pneumatic_simulator.h"
 #include <cmath>
 
-
 static PneumaticSimulator pneumatic_simulator;
 
 PneumaticSimulator::PneumaticSimulator() 
@@ -51,6 +50,8 @@ PneumaticSimulator& PneumaticSimulator::get_instance() { return pneumatic_simula
 
 void PneumaticSimulator::set_init_env(double pos_press, double neg_press)
 {
+    pneumaticCT -> reset_valve_states();
+
     xk0[1] = pos_press;
     xk0[2] = neg_press;
     // xk0[4] = pos_press;
@@ -66,14 +67,9 @@ void PneumaticSimulator::set_init_env(double pos_press, double neg_press)
     // Three valve
     // xk0[4] = 0.99093*pos_press + 0.23533*neg_press + -0.1149; // Max
     // xk0[5] = 0.023618*pos_press + 0.017134*neg_press + 0.4792; // Min
-
     // One valve
-    // xk0[4] = 0.98947*pos_press + 0.27407*neg_press - 0.30175; // Max
-    // xk0[5] = 0.023686*pos_press + 0.017746*neg_press + 0.47436; // Min
-
-    //250306
-    xk0[4] = 0.99434*pos_press + 0.15624*neg_press - 0.46317; // Max
-    xk0[5] = 0.023837*pos_press + 0.010501*neg_press + 0.47519; // Min
+    xk0[4] = 0.98947*pos_press + 0.27407*neg_press - 0.30175; // Max
+    xk0[5] = 0.023686*pos_press + 0.017746*neg_press + 0.47436; // Min
     		
     // std::cout << "[ INFO] Pneumatic Simulator ==> Env initialized: POS " << xk0[1] << " NEG " << xk0[2] << std::endl; 
 }
@@ -155,6 +151,7 @@ void PneumaticSimulator::pneumaticDT(double* xk, double* uk, double Ts, double* 
     // outFile << k1[4] << ",";
     // outFile << k1[5] << std::endl;
     // outFile.close();
+
 
     delete[] k1;
     delete[] k2;
@@ -251,6 +248,7 @@ double* PneumaticSimulator::get_mean_mass_flowrate() {
 
 void PneumaticSimulator::time_reset() { 
     xk0[0] = 0; 
+    pneumaticCT -> reset_valve_states();
 }
 
 double PneumaticSimulator::solenoid_valve_test(double P_inlet, double P_outlet, double signal, double type, double num) {

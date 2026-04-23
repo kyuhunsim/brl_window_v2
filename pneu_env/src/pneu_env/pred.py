@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 
 from ctypes import CDLL, c_double, POINTER
 
@@ -26,8 +27,23 @@ class PneuPred():
         offset_neg: float = 0,
         scale: bool = False,
     ):
-        env_pkg_path = get_pkg_path('pneu_env')
-        self.lib = CDLL(f'{env_pkg_path}/src/pneu_env/lib2/pneumatic_simulator_pred.so')        
+        env_pkg_path = Path(get_pkg_path('pneu_env'))
+        preferred_lib = "lib"
+        # preferred_lib = "lib2"
+        other_lib = "lib2" if preferred_lib == "lib" else "lib"
+        lib_candidates = [
+            env_pkg_path / f"src/pneu_env/{preferred_lib}/pneumatic_simulator_pred.so",
+            env_pkg_path / f"src/pneu_env/{other_lib}/pneumatic_simulator_pred.so",
+        ]
+        for lib_path in lib_candidates:
+            if lib_path.is_file():
+                self.lib = CDLL(str(lib_path))
+                break
+        else:
+            raise FileNotFoundError(
+                "Could not find pneumatic_simulator_pred.so in lib or lib2 directory."
+            )
+
         self.lib.set_init_env.argtypes = [c_double, c_double]
         self.lib.set_volume.argtypes = [c_double, c_double]
         self.lib.get_time.restype = c_double
@@ -91,17 +107,6 @@ class PneuPred():
         else:
             ctrl = 0.5*ctrl + 0.5
         
-        # # lib
-        # pos_coeff = 16.23565473
-        # pos_ctrl = ctrl[0]
-        # pos_ctrl = pos_ctrl**pos_coeff
-
-        # neg_coeff = 18.61464263
-        # neg_ctrl = ctrl[1]
-        # neg_ctrl = neg_ctrl**neg_coeff
-
-        # ctrl = [pos_ctrl, neg_ctrl]
-
         time_step = 1/self.freq
         next_obs = np.array(
             list(self.lib.step((c_double*2)(*list(ctrl)), time_step)[0:3]),
@@ -152,9 +157,6 @@ class PneuPred():
             init_pos_press,
             init_neg_press
         )
-        # self.obs = np.array([
-        #     init_pos_press, init_neg_press
-        # ], dtype=np.float32)
     
     def set_volume(self, vol1, vol2):
         self.lib.set_volume(vol1, vol2)

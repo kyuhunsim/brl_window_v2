@@ -15,8 +15,7 @@ from pneu_ref.sine_ref import SineRef, DynamicOscillatorRef, CenterStepOscillati
 from pneu_ref.traj_ref import TrajRef
 from pneu_env.env import PneuEnv
 from pneu_env.sim import PneuSim
-# from pneu_env.simulator import PneuSim
-from pneu_env.real import PneuReal
+from pneu_env.real.real import PneuReal
 from pneu_env.pred import PneuPred
 from pneu_rl.sac import SAC
 from pneu_utils.utils import (

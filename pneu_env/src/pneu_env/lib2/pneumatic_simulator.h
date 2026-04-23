@@ -29,21 +29,24 @@
 // #define C2OUT_ 0.023304388618618336
 // #define C2IN_ 1.0150850183877944
 
-// Paper version
 // #define CIN_ 1.464271612858397
 // #define COUT_ 33.47453817004828
 
-// //20250306
-// #define CIN_ 0.85306188
-// #define COUT_ 32.87060296
-
-//20260110
-#define CIN_ 1.1256394620423595
-#define COUT_ 5.401279325612009
+#define COUT_ 1.41382298
+#define CIN_ 5.15
 
 struct PneumaticCT
 {
 private:
+    struct ValveRuntimeState
+    {
+        double z;
+        double x1;
+        double x2;
+        double I_prev;
+        double state_prev;
+    };
+
     double M_W_RPM;
     double SC_R, SC_L;
     double V_D, V_S, V_DV, V_MAX_V;
@@ -54,6 +57,10 @@ private:
     double C1OUT, C1IN, C2OUT, C2IN;
     double* dxdt;
     double* mass_flowrate;
+    ValveRuntimeState valve_state_pos;
+    ValveRuntimeState valve_state_neg;
+
+    void reset_valve_state(ValveRuntimeState* state);
     void slider_crank(double angle, double angular_velocity, double phase, double* piston);
     void volume(double piston_pos, double piston_vel, double* V_dVdt);
     double orifice(double P_inlet, double P_outlet, double Cd);
@@ -63,6 +70,7 @@ private:
 public:
     double volume_ratio;
     PneumaticCT();
+    void reset_valve_states();
     void set_volume(double volume1, double volume2);
     void set_discharge_coeff(
         double Cd1IN,

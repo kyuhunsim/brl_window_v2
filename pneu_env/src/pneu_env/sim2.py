@@ -28,8 +28,8 @@ class PneuSim():
         scale: bool = False,
     ):
         env_pkg_path = Path(get_pkg_path('pneu_env'))
-        preferred_lib = "lib"
-        # preferred_lib = "lib2"
+        # preferred_lib = "lib"
+        preferred_lib = "lib2"
         other_lib = "lib2" if preferred_lib == "lib" else "lib"
         lib_candidates = [
             env_pkg_path / f"src/pneu_env/{preferred_lib}/pneumatic_simulator.so",
