@@ -4,9 +4,8 @@
 """
 real_act_flowrate_6ctrl.py
 
-- real_act(PneuRealAct) 실행 루프에 랜덤 입력을 합친 스크립트(6개 제어).
-- 메인 챔버 제어 2개(pos/neg)는 CtrlRandom으로 [-1,1] 랜덤 입력.
-- 액추에이터 제어 4개는 zero/const/random/stair 모드로 제어 가능(0~1 범위).
+- JSON 브리지를 직접 구동하는 6채널 실험 러너.
+- 6개 제어를 하나의 모드로 다룸: random / const.
 - tcpip 브리지(tcpip_connect_act*.py)와 함께 쓰면 obs_act.json에
   flowrate1~flowrate6가 들어오고, 이를 exp CSV로 저장한다.
 
@@ -14,19 +13,21 @@ real_act_flowrate_6ctrl.py
   curr_time, ctrl_pos, ctrl_neg, press_pos, press_neg, flowrate1~flowrate6, ...
 """
 
-import json
 import os
+import json
 import time
 from collections import deque
 from datetime import datetime
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-
-from env.real.real_act import PneuRealAct
 from utils.utils import get_pkg_path
+
+try:
+    from .flowrate_profiles import read_flowrate_from_obs_json
+except ImportError:
+    from flowrate_profiles import read_flowrate_from_obs_json
 
 
 ATM = 101.325
@@ -36,9 +37,8 @@ ATM = 101.325
 # Manual runtime config
 # Edit this block directly.
 # ==============================
-MAIN_MODE = "stair"    # "zero" | "const" | "random" | "stair" (main chamber 2ch)
-ACT_MODE = "stair"     # "zero" | "const" | "random" | "stair" (actuator 4ch)
-USE_SCALE = False       # True: [0.8,1.0] scaling, False: [0,1]
+CTRL_MODE = "random"    # "random" | "const"
+CONST_CTRLS = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
 # Random mode params
 RAND_HOLD_MIN = 1      # sec (inclusive)
@@ -46,133 +46,189 @@ RAND_HOLD_MAX = 10     # sec (inclusive)
 RAND_MIN = 0.8
 RAND_MAX = 1.0
 
-# Stair mode params (directional step-up/down with hold)
-# List를 직접 쓰지 않고 step으로 자동 생성:
-# start -> ... -> peak 까지 STEP_DELTA만큼 증가 후,
-# peak -> ... -> end 까지 STEP_DELTA만큼 감소
-STAIR_START = 0.75
-STAIR_PEAK = 1.00
-STAIR_END = 0.70
-STAIR_DELTA = 0.02
-STAIR_HOLD_SEC = 5.0          # 각 스텝 레벨 유지 시간
-STAIR_TRANSITION_SEC = 0.2      # 레벨 간 선형 이동 시간
-# Positive phase means that channel runs earlier in time.
-MAIN_STAIR_PHASE_SEC = [0.0, 0.0]
-ACT_STAIR_PHASE_SEC = [0.0, 0.5, 1.0, 1.5]
+
+def _initial_obs_state() -> dict[str, float]:
+    return dict(
+        time=0.0,
+        pos_press=101.325,
+        neg_press=101.325,
+        pos_ref=101.325,
+        neg_ref=101.325,
+        pos_ctrl=1.0,
+        neg_ctrl=1.0,
+        act_pos_press=101.325,
+        act_neg_press=101.325,
+        act_pos_ref=0.0,
+        act_neg_ref=0.0,
+        act_pos_ctrl1=0.0,
+        act_pos_ctrl2=0.0,
+        act_neg_ctrl1=0.0,
+        act_neg_ctrl2=0.0,
+        angle=0.0,
+        angle_reference=0.0,
+        angular_vel=0.0,
+        len1=float("nan"),
+        vel1=float("nan"),
+        flowrate1=0.0,
+        flowrate2=0.0,
+        flowrate3=0.0,
+        flowrate4=0.0,
+        flowrate5=0.0,
+        flowrate6=0.0,
+    )
 
 
-def _make_stair_levels(start: float, peak: float, end: float, delta: float) -> list[float]:
-    d = float(abs(delta))
-    if d <= 0.0:
-        raise ValueError("STAIR_DELTA must be > 0")
-
-    lo = float(np.clip(start, 0.0, 1.0))
-    hi = float(np.clip(peak, 0.0, 1.0))
-    last = float(np.clip(end, 0.0, 1.0))
-
-    if hi < lo:
-        lo, hi = hi, lo
-
-    up = [lo]
-    v = lo
-    while v + d < hi - 1e-12:
-        v += d
-        up.append(round(v, 10))
-    if abs(up[-1] - hi) > 1e-12:
-        up.append(hi)
-
-    down = []
-    v = hi
-    while v - d > last + 1e-12:
-        v -= d
-        down.append(round(v, 10))
-    if not down or abs(down[-1] - last) > 1e-12:
-        down.append(last)
-
-    levels = up + down
-    return [float(np.clip(x, 0.0, 1.0)) for x in levels]
+def _write_json_atomic(path: str, payload: dict[str, float]) -> None:
+    directory = os.path.dirname(path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    tmp_path = path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f)
+    os.replace(tmp_path, path)
 
 
-def _stair_value(
-    elapsed_s: float,
+def _make_unit_ctrls(
+    ctrl_mode: str,
     *,
-    levels: list[float] | tuple[float, ...],
-    hold_s: float,
-    transition_s: float,
-) -> float:
-    """
-    Piecewise profile:
-      level0 hold -> transition -> level1 hold -> ... -> levelN hold, then keep levelN.
-    """
-    t = float(max(0.0, elapsed_s))
-    vals = [float(v) for v in levels]
-    hold = float(max(0.0, hold_s))
-
-    if len(vals) == 0:
-        return 0.0
-    if len(vals) == 1:
-        return float(np.clip(vals[0], 0.0, 1.0))
-
-    # First level hold
-    if t < hold:
-        return float(np.clip(vals[0], 0.0, 1.0))
-    t -= hold
-
-    tr = float(max(0.0, transition_s))
-    for i in range(1, len(vals)):
-        v_prev = vals[i - 1]
-        v_curr = vals[i]
-        if tr > 0.0:
-            if t < tr:
-                a = t / tr
-                return float(np.clip(v_prev + (v_curr - v_prev) * a, 0.0, 1.0))
-            t -= tr
-        if t < hold:
-            return float(np.clip(v_curr, 0.0, 1.0))
-        t -= hold
-
-    return float(np.clip(vals[-1], 0.0, 1.0))
+    curr_time: float,
+    rand_min: float,
+    rand_max: float,
+    rand_hold_min: int,
+    rand_hold_max: int,
+    next_change_time: float,
+    current_ctrls: np.ndarray,
+    const_ctrls: np.ndarray,
+) -> tuple[np.ndarray, float]:
+    if ctrl_mode == "random":
+        if curr_time >= next_change_time:
+            ctrl_unit = np.random.uniform(
+                low=rand_min,
+                high=rand_max,
+                size=6,
+            ).astype(np.float64)
+            hold_sec = float(np.random.randint(rand_hold_min, rand_hold_max + 1))
+            next_change_time = curr_time + hold_sec
+            return np.clip(ctrl_unit, 0.0, 1.0), next_change_time
+        return current_ctrls.copy(), next_change_time
+    if ctrl_mode == "const":
+        return np.clip(const_ctrls.astype(np.float64), 0.0, 1.0), next_change_time
+    raise ValueError(f"CTRL_MODE must be random|const, got: {ctrl_mode}")
 
 
-def _build_stair_ctrl(
-    elapsed_s: float,
+def _build_ctrl_payload(
     *,
-    n_ctrl: int,
-    levels: list[float] | tuple[float, ...],
-    hold_s: float,
-    transition_s: float,
-    phase_offsets_s: list[float] | tuple[float, ...],
-) -> np.ndarray:
-    if len(phase_offsets_s) != n_ctrl:
-        raise ValueError(
-            f"phase_offsets_s length must be {n_ctrl}, got {len(phase_offsets_s)}"
-        )
-    out = np.zeros(n_ctrl, dtype=np.float64)
-    for i in range(n_ctrl):
-        out[i] = _stair_value(
-            elapsed_s + float(phase_offsets_s[i]),
-            levels=levels,
-            hold_s=hold_s,
-            transition_s=transition_s,
-        )
-    return np.clip(out, 0.0, 1.0)
+    obs_state: dict[str, float],
+    goal: np.ndarray,
+    ctrl_unit: np.ndarray,
+    act_unit: np.ndarray,
+    start_time: float,
+) -> dict[str, float]:
+    payload = dict(
+        time=float(time.time() - start_time),
+        pos_press=float(obs_state["pos_press"]),
+        neg_press=float(obs_state["neg_press"]),
+        pos_ref=float(goal[0]),
+        neg_ref=float(goal[1]),
+        pos_ctrl=float(ctrl_unit[0]),
+        neg_ctrl=float(ctrl_unit[1]),
+        act_pos_press=float(obs_state["act_pos_press"]),
+        act_neg_press=float(obs_state["act_neg_press"]),
+        act_pos_ref=float(goal[0]),
+        act_neg_ref=float(goal[1]),
+        act_pos_ctrl1=float(act_unit[0]),
+        act_pos_ctrl2=float(act_unit[1]),
+        act_neg_ctrl1=float(act_unit[2]),
+        act_neg_ctrl2=float(act_unit[3]),
+        angle=float(obs_state["angle"]),
+        angle_reference=float(obs_state["angle_reference"]),
+        angular_vel=float(obs_state["angular_vel"]),
+        flowrate1=float(obs_state["flowrate1"]),
+        flowrate2=float(obs_state["flowrate2"]),
+        flowrate3=float(obs_state["flowrate3"]),
+        flowrate4=float(obs_state["flowrate4"]),
+        flowrate5=float(obs_state["flowrate5"]),
+        flowrate6=float(obs_state["flowrate6"]),
+    )
+    return payload
 
 
-def read_flowrate_from_obs_json(obs_json_path: str) -> tuple[float, float, float, float, float, float]:
-    """obs_act.json에서 flowrate1~6을 읽는다. 없으면 NaN 반환."""
-    try:
-        with open(obs_json_path, "r", encoding="utf-8") as f:
-            obs = json.load(f)
-        fr1 = float(obs.get("flowrate1", float("nan")))
-        fr2 = float(obs.get("flowrate2", float("nan")))
-        fr3 = float(obs.get("flowrate3", float("nan")))
-        fr4 = float(obs.get("flowrate4", float("nan")))
-        fr5 = float(obs.get("flowrate5", float("nan")))
-        fr6 = float(obs.get("flowrate6", float("nan")))
-        return fr1, fr2, fr3, fr4, fr5, fr6
-    except Exception:
-        nan = float("nan")
-        return nan, nan, nan, nan, nan, nan
+def _read_obs_state(
+    *,
+    obs_json_path: str,
+    prev_state: dict[str, float],
+    sen_period: float,
+) -> dict[str, float]:
+    prev_time = float(prev_state["time"])
+    deadline = time.time() + max(0.03, 3.0 * sen_period)
+
+    def _get_float(data: dict, key: str, default: float) -> float:
+        value = data.get(key, default)
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    def _get_any_float(data: dict, keys: tuple[str, ...], default: float) -> float:
+        for key in keys:
+            if key in data:
+                return _get_float(data, key, default)
+        return default
+
+    while True:
+        try:
+            with open(obs_json_path, "r", encoding="utf-8") as f:
+                obs = json.load(f)
+            obs_time = _get_float(obs, "time", prev_state["time"])
+            if obs_time <= prev_time + 1e-9 and time.time() < deadline:
+                time.sleep(min(0.002, 0.2 * sen_period))
+                continue
+
+            state = dict(prev_state)
+            state["time"] = obs_time
+            state["pos_press"] = _get_float(obs, "pos_press", state["pos_press"])
+            state["neg_press"] = _get_float(obs, "neg_press", state["neg_press"])
+            state["pos_ref"] = _get_float(obs, "pos_ref", state["pos_ref"])
+            state["neg_ref"] = _get_float(obs, "neg_ref", state["neg_ref"])
+            state["pos_ctrl"] = _get_float(obs, "pos_ctrl", state["pos_ctrl"])
+            state["neg_ctrl"] = _get_float(obs, "neg_ctrl", state["neg_ctrl"])
+            state["act_pos_press"] = _get_float(obs, "act_pos_press", state["act_pos_press"])
+            state["act_neg_press"] = _get_float(obs, "act_neg_press", state["act_neg_press"])
+            state["act_pos_ref"] = _get_float(obs, "act_pos_ref", state["act_pos_ref"])
+            state["act_neg_ref"] = _get_float(obs, "act_neg_ref", state["act_neg_ref"])
+            state["act_pos_ctrl1"] = _get_float(obs, "act_pos_ctrl1", state["act_pos_ctrl1"])
+            state["act_pos_ctrl2"] = _get_float(obs, "act_pos_ctrl2", state["act_pos_ctrl2"])
+            state["act_neg_ctrl1"] = _get_float(obs, "act_neg_ctrl1", state["act_neg_ctrl1"])
+            state["act_neg_ctrl2"] = _get_float(obs, "act_neg_ctrl2", state["act_neg_ctrl2"])
+            state["angle"] = _get_float(obs, "angle", state["angle"])
+            state["angle_reference"] = _get_float(obs, "angle_reference", state["angle_reference"])
+            state["angular_vel"] = _get_float(obs, "angular_vel", state["angular_vel"])
+            state["len1"] = _get_any_float(
+                obs,
+                ("len1", "length", "length_m", "disp", "displacement"),
+                state["len1"],
+            )
+            state["vel1"] = _get_any_float(
+                obs,
+                ("vel1", "velocity", "vel_ms", "length_velocity"),
+                state["vel1"],
+            )
+            state["flowrate1"] = _get_float(obs, "flowrate1", state["flowrate1"])
+            state["flowrate2"] = _get_float(obs, "flowrate2", state["flowrate2"])
+            state["flowrate3"] = _get_float(obs, "flowrate3", state["flowrate3"])
+            state["flowrate4"] = _get_float(obs, "flowrate4", state["flowrate4"])
+            state["flowrate5"] = _get_float(obs, "flowrate5", state["flowrate5"])
+            state["flowrate6"] = _get_float(obs, "flowrate6", state["flowrate6"])
+            return state
+        except FileNotFoundError:
+            if time.time() >= deadline:
+                return dict(prev_state)
+        except json.JSONDecodeError:
+            if time.time() >= deadline:
+                return dict(prev_state)
+        except Exception:
+            if time.time() >= deadline:
+                return dict(prev_state)
 
 
 def main():
@@ -183,77 +239,42 @@ def main():
     duration = 500.0            # experiment duration [sec]
     tag = ""                    # filename tag suffix
 
-    # main chamber control mode: "zero" | "const" | "random" (0~1 range, same distribution as actuator)
-    main_mode = MAIN_MODE
-    main_ctrls = [0.0, 0.0]     # used when main_mode == "const" (0~1)
-
-    # actuator control mode: "zero" | "const" | "random"  (0~1 range)
-    act_mode = ACT_MODE
-    act_ctrls = [0.0, 0.0, 0.0, 0.0]   # used when act_mode == "const"
-
-    # random mode settings (shared distribution)
+    ctrl_mode = CTRL_MODE
     rand_hold_min = int(RAND_HOLD_MIN)   # hold time range [sec] (inclusive)
     rand_hold_max = int(RAND_HOLD_MAX)
     rand_min = float(RAND_MIN)
     rand_max = float(RAND_MAX)
 
-    if main_mode not in ("zero", "const", "random", "stair"):
-        raise ValueError(f"MAIN_MODE must be zero|const|random|stair, got: {main_mode}")
-    if act_mode not in ("zero", "const", "random", "stair"):
-        raise ValueError(f"ACT_MODE must be zero|const|random|stair, got: {act_mode}")
+    if ctrl_mode not in ("random", "const"):
+        raise ValueError(f"CTRL_MODE must be random|const, got: {ctrl_mode}")
     if rand_hold_min < 1 or rand_hold_max < rand_hold_min:
         raise ValueError("RAND_HOLD_MIN/MAX must satisfy 1 <= min <= max")
     if not (0.0 <= rand_min <= 1.0 and 0.0 <= rand_max <= 1.0):
         raise ValueError("RAND_MIN/RAND_MAX must be in [0,1]")
     if rand_min > rand_max:
         raise ValueError("RAND_MIN must be <= RAND_MAX")
-    if STAIR_HOLD_SEC < 0.0:
-        raise ValueError("STAIR_HOLD_SEC must be >= 0")
-    if STAIR_TRANSITION_SEC < 0.0:
-        raise ValueError("STAIR_TRANSITION_SEC must be >= 0")
-    if not (0.0 <= STAIR_START <= 1.0 and 0.0 <= STAIR_PEAK <= 1.0 and 0.0 <= STAIR_END <= 1.0):
-        raise ValueError("STAIR_START/PEAK/END must be in [0,1]")
-    if STAIR_DELTA <= 0.0:
-        raise ValueError("STAIR_DELTA must be > 0")
-    if len(MAIN_STAIR_PHASE_SEC) != 2:
-        raise ValueError("MAIN_STAIR_PHASE_SEC must have 2 values")
-    if len(ACT_STAIR_PHASE_SEC) != 4:
-        raise ValueError("ACT_STAIR_PHASE_SEC must have 4 values")
-    stair_levels = _make_stair_levels(STAIR_START, STAIR_PEAK, STAIR_END, STAIR_DELTA)
 
     tag = f"_{tag}" if tag else ""
     now = datetime.now()
     formatted_time = now.strftime("%y%m%d_%H_%M_%S")
-    save_file_name = f"{formatted_time}_Flowrate_RND6_{main_mode}_{act_mode}{tag}"
+    save_file_name = f"{formatted_time}_Flowrate_RND6_{ctrl_mode}{tag}"
 
-    use_scale = bool(USE_SCALE)
-    env = PneuRealAct(freq=freq, scale=use_scale)
     print(
-        f"[INFO] mode: main={main_mode}, act={act_mode}, "
-        f"rand_hold=[{rand_hold_min},{rand_hold_max}]s, rand_range=[{rand_min},{rand_max}], "
-        f"stair(start={STAIR_START}, peak={STAIR_PEAK}, end={STAIR_END}, "
-        f"delta={STAIR_DELTA}, levels={stair_levels}, "
-        f"hold={STAIR_HOLD_SEC}s, trans={STAIR_TRANSITION_SEC}s, "
-        f"main_phase={MAIN_STAIR_PHASE_SEC}, act_phase={ACT_STAIR_PHASE_SEC}), "
-        f"scale={use_scale}"
+        f"[INFO] mode={ctrl_mode}, rand_hold=[{rand_hold_min},{rand_hold_max}]s, "
+        f"rand_range=[{rand_min},{rand_max}]"
     )
 
-    dummy_goal = np.array([ATM, 0.0], dtype=np.float64)
-    if main_mode == "const":
-        main_ctrls = np.array(main_ctrls, dtype=np.float64)
-    else:
-        main_ctrls = np.zeros(2, dtype=np.float64)
-    main_ctrls = np.clip(main_ctrls, 0.0, 1.0)
+    unit_ctrls = np.zeros(6, dtype=np.float64)
+    const_ctrls = np.asarray(CONST_CTRLS, dtype=np.float64)
+    if const_ctrls.shape != (6,):
+        raise ValueError(f"CONST_CTRLS must be shape (6,), got {const_ctrls.shape}")
+    const_ctrls = np.clip(const_ctrls, 0.0, 1.0)
+    next_change_time = 0.0
 
-    if act_mode == "const":
-        act_ctrls = np.array(act_ctrls, dtype=np.float64)
-    else:
-        act_ctrls = np.zeros(4, dtype=np.float64)
-    act_ctrls = np.clip(act_ctrls, 0.0, 1.0)
-    next_main_change = 0.0
-    next_act_change = 0.0
-
+    ctrl_json_path = os.path.join(get_pkg_path("pneu_env"), "tcpip/ctrl_act.json")
     obs_json_path = os.path.join(get_pkg_path("pneu_env"), "tcpip/obs_act.json")
+    obs_state = _initial_obs_state()
+    goal = np.array([ATM, 0.0], dtype=np.float64)
 
     data = dict(
         time=deque(),
@@ -278,69 +299,66 @@ def main():
     )
 
     try:
-        curr_time = 0.0
+        script_start_time = time.time()
+        flag_time = time.time()
+        curr_time = float(obs_state["time"])
         prev_time = None
         started = False
-        start_obs_time = None
         wait_print_next_wall = 0.0
 
+        _write_json_atomic(
+            ctrl_json_path,
+            _build_ctrl_payload(
+                obs_state=obs_state,
+                goal=goal,
+                ctrl_unit=unit_ctrls[:2],
+                act_unit=unit_ctrls[2:],
+                start_time=script_start_time,
+            ),
+        )
+
         while True:
-            elapsed = 0.0 if (not started or start_obs_time is None) else max(0.0, curr_time - start_obs_time)
             if started:
-                if main_mode == "random":
-                    if curr_time >= next_main_change:
-                        main_ctrls = np.random.uniform(
-                            low=rand_min,
-                            high=rand_max,
-                            size=2,
-                        ).astype(np.float64)
-                        main_ctrls = np.clip(main_ctrls, 0.0, 1.0)
-                        hold = float(np.random.randint(rand_hold_min, rand_hold_max + 1))
-                        next_main_change = curr_time + hold
-                elif main_mode == "zero":
-                    main_ctrls = np.zeros(2, dtype=np.float64)
-                elif main_mode == "stair":
-                    main_ctrls = _build_stair_ctrl(
-                        elapsed,
-                        n_ctrl=2,
-                        levels=stair_levels,
-                        hold_s=float(STAIR_HOLD_SEC),
-                        transition_s=float(STAIR_TRANSITION_SEC),
-                        phase_offsets_s=MAIN_STAIR_PHASE_SEC,
-                    )
+                unit_ctrls, next_change_time = _make_unit_ctrls(
+                    ctrl_mode,
+                    curr_time=curr_time,
+                    rand_min=rand_min,
+                    rand_max=rand_max,
+                    rand_hold_min=rand_hold_min,
+                    rand_hold_max=rand_hold_max,
+                    next_change_time=next_change_time,
+                    current_ctrls=unit_ctrls,
+                    const_ctrls=const_ctrls,
+                )
             else:
-                # time reset/fresh start 확인 전에는 랜덤 제어를 막고 정지 입력만 송신
-                main_ctrls = np.zeros(2, dtype=np.float64)
+                unit_ctrls = np.zeros(6, dtype=np.float64)
 
-            # PneuRealAct expects ctrl in [-1,1]; scale back so final valve cmd is main_ctrls (0~1)
-            curr_ctrl = 2.0 * np.asarray(main_ctrls, dtype=np.float64) - 1.0
+            ctrl_unit = np.asarray(unit_ctrls, dtype=np.float64)
+            act_unit = ctrl_unit[2:]
+            _write_json_atomic(
+                ctrl_json_path,
+                _build_ctrl_payload(
+                    obs_state=obs_state,
+                    goal=goal,
+                    ctrl_unit=ctrl_unit[:2],
+                    act_unit=act_unit,
+                    start_time=script_start_time,
+                ),
+            )
 
-            if started:
-                if act_mode == "random":
-                    if curr_time >= next_act_change:
-                        act_ctrls = np.random.uniform(
-                            low=rand_min,
-                            high=rand_max,
-                            size=4,
-                        ).astype(np.float64)
-                        act_ctrls = np.clip(act_ctrls, 0.0, 1.0)
-                        hold = float(np.random.randint(rand_hold_min, rand_hold_max + 1))
-                        next_act_change = curr_time + hold
-                elif act_mode == "zero":
-                    act_ctrls = np.zeros(4, dtype=np.float64)
-                elif act_mode == "stair":
-                    act_ctrls = _build_stair_ctrl(
-                        elapsed,
-                        n_ctrl=4,
-                        levels=stair_levels,
-                        hold_s=float(STAIR_HOLD_SEC),
-                        transition_s=float(STAIR_TRANSITION_SEC),
-                        phase_offsets_s=ACT_STAIR_PHASE_SEC,
-                    )
-            else:
-                act_ctrls = np.zeros(4, dtype=np.float64)
-            obs, info = env.observe(ctrl=curr_ctrl, goal=dummy_goal, act_ctrls=act_ctrls)
+            elapsed = time.time() - flag_time
+            sleep_time = max((1.0 / freq) - elapsed - 0.004, 0.0)
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+            flag_time = time.time()
 
+            obs_state = _read_obs_state(
+                obs_json_path=obs_json_path,
+                prev_state=obs_state,
+                sen_period=1.0 / max(freq, 1e-6),
+            )
+            obs = obs_state.copy()
+            info = {"Observation": obs}
             o = info["Observation"]
             obs_time = float(o["time"])
 
@@ -352,22 +370,18 @@ def main():
                 prev_time = obs_time
                 if 0.0 <= obs_time <= 1.0:
                     started = True
-                    start_obs_time = obs_time
                     for k in data.keys():
                         data[k].clear()
-                    next_main_change = obs_time
-                    next_act_change = obs_time
+                    next_change_time = obs_time
                     print(f"[INFO] fresh start detected (time={obs_time:.3f}), start logging.")
             else:
                 if not started:
                     if obs_time < prev_time - 1e-3:
                         started = True
-                        start_obs_time = obs_time
                         for k in data.keys():
                             data[k].clear()
                         # time reset -> restart random schedule
-                        next_main_change = obs_time
-                        next_act_change = obs_time
+                        next_change_time = obs_time
                         print(f"[INFO] time reset detected ({prev_time:.3f} -> {obs_time:.3f}), start logging.")
                     elif (
                         0.0 <= prev_time <= 1.0
@@ -375,11 +389,9 @@ def main():
                         and obs_time <= 2.0
                     ):
                         started = True
-                        start_obs_time = prev_time
                         for k in data.keys():
                             data[k].clear()
-                        next_main_change = obs_time
-                        next_act_change = obs_time
+                        next_change_time = obs_time
                         print(
                             f"[INFO] monotonic fresh time detected "
                             f"({prev_time:.3f} -> {obs_time:.3f}), start logging."
@@ -432,7 +444,7 @@ def main():
                     )
                     wait_print_next_wall = now_wall + 1.0
 
-            curr_time = float(obs[0])
+            curr_time = float(o["time"])
 
     except KeyboardInterrupt:
         print("\n[INFO] KeyboardInterrupt: stopping experiment")
@@ -440,10 +452,16 @@ def main():
     finally:
         # 안전하게 밸브를 열어 놓고 종료
         try:
-            env.observe(
-                ctrl=np.array([1.0, 1.0], dtype=np.float64),
-                goal=dummy_goal,
-                act_ctrls=np.zeros(4, dtype=np.float64),
+            safe_ctrls = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0], dtype=np.float64)
+            _write_json_atomic(
+                ctrl_json_path,
+                _build_ctrl_payload(
+                    obs_state=obs_state,
+                    goal=goal,
+                    ctrl_unit=safe_ctrls[:2],
+                    act_unit=safe_ctrls[2:],
+                    start_time=script_start_time,
+                ),
             )
             time.sleep(0.1)
         except Exception:

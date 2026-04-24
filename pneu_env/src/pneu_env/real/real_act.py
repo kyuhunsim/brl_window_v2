@@ -7,7 +7,6 @@ import time
 import threading
 import json
 import os
-from pathlib import Path
 
 
 from utils.utils import get_pkg_path, color
@@ -19,12 +18,8 @@ class PneuRealAct:
     실험용 Soft Actuator + Main Chamber Real 환경 래퍼.
 
     - ctrl:
-      - 길이 2: 메인 챔버 제어 (pos, neg), [-1,1]
-      - 길이 6: 전체 밸브 제어 (main 2 + actuator 4), 모두 [-1,1]
+      - 길이 6: main 2 + actuator 4, 모두 [-1,1]
     - goal: 길이 2, [pos_ref, neg_ref] 목표 압력
-    - act_ctrls (optional): 길이 4, [act_pos_ctrl1, act_pos_ctrl2, act_neg_ctrl1, act_neg_ctrl2] (0~1)
-      - 제공 시: 기존 호환 경로(메인 2 + actuator 4)
-      - 미제공 시 ctrl 길이에 따라 자동 해석
     - scale=True일 때 최종 출력은 main/actuator 모두 [0.8,1.0]로 스케일링.
 
     파일 인터페이스:
@@ -267,66 +262,30 @@ class PneuRealAct:
         self,
         ctrl: np.ndarray,
         goal: np.ndarray,
-        act_ctrls: Optional[np.ndarray] = None,
     ) -> tuple[np.ndarray, Dict]:
         """
         한 스텝 진행:
-          1) 입력(ctrl / act_ctrls) 해석
+          1) 6채널 입력 해석
           2) (옵션) PID로 actuator 4밸브 명령 생성
           3) main/actuator 모두 최종 밸브 명령으로 스케일링
-          3) ctrl_act.json 기록
-          4) 주기 맞춰 대기
-          5) obs_act.json 읽기
-          6) [time, pos_press, neg_press, angle, angular_vel] 반환
+          4) ctrl_act.json 기록
+          5) 주기 맞춰 대기
+          6) obs_act.json 읽기
+          7) [time, pos_press, neg_press, angle, angular_vel] 반환
         """
         ctrl_arr = np.asarray(ctrl, dtype=np.float64).reshape(-1)
         goal = np.asarray(goal, dtype=np.float64).reshape(-1)
         if goal.shape != (2,):
             raise ValueError(f"goal must be shape (2,), got {goal.shape}")
-
-        # Resolve input into:
-        # - main_ctrl_bipolar: shape (2,), [-1,1]
-        # - act_ctrls_unit: shape (4,), [0,1]
-        is_rl_6ch_ctrl = False
-        if act_ctrls is None:
-            if ctrl_arr.size == 6:
-                is_rl_6ch_ctrl = True
-                if not np.all(np.isfinite(ctrl_arr)):
-                    ctrl_arr = np.nan_to_num(ctrl_arr, nan=0.0, posinf=1.0, neginf=-1.0)
-                ctrl_arr = np.clip(ctrl_arr, -1.0, 1.0)
-                main_ctrl_bipolar = ctrl_arr[:2]
-                # Interpret actuator channels in bipolar domain when 6ch ctrl is provided.
-                act_ctrls_unit = 0.5 * ctrl_arr[2:] + 0.5
-            elif ctrl_arr.size == 2:
-                if not np.all(np.isfinite(ctrl_arr)):
-                    ctrl_arr = np.nan_to_num(ctrl_arr, nan=0.0, posinf=1.0, neginf=-1.0)
-                main_ctrl_bipolar = np.clip(ctrl_arr, -1.0, 1.0)
-                act_ctrls_unit = np.full(4, 0.5, dtype=np.float64)
-            else:
-                raise ValueError(
-                    f"ctrl must be length 2 or 6 when act_ctrls is omitted, got {ctrl_arr.size}"
-                )
-        else:
-            act_arr = np.asarray(act_ctrls, dtype=np.float64).reshape(-1)
-            if ctrl_arr.size != 2:
-                raise ValueError(
-                    f"ctrl must be length 2 when act_ctrls is provided, got {ctrl_arr.size}"
-                )
-            if act_arr.size != 4:
-                raise ValueError(f"act_ctrls must be shape (4,), got {act_arr.shape}")
-            if not np.all(np.isfinite(ctrl_arr)):
-                ctrl_arr = np.nan_to_num(ctrl_arr, nan=0.0, posinf=1.0, neginf=-1.0)
-            if not np.all(np.isfinite(act_arr)):
-                act_arr = np.nan_to_num(act_arr, nan=0.0, posinf=1.0, neginf=0.0)
-            main_ctrl_bipolar = np.clip(ctrl_arr, -1.0, 1.0)
-            act_ctrls_unit = np.clip(act_arr, 0.0, 1.0)
-
-        # main 2채널은 입력을 그대로 사용한다.
-        main_ctrl_bipolar = np.clip(main_ctrl_bipolar, -1.0, 1.0)
+        if ctrl_arr.size != 6:
+            raise ValueError(f"ctrl must be length 6, got {ctrl_arr.size}")
+        if not np.all(np.isfinite(ctrl_arr)):
+            ctrl_arr = np.nan_to_num(ctrl_arr, nan=0.0, posinf=1.0, neginf=-1.0)
+        ctrl_arr = np.clip(ctrl_arr, -1.0, 1.0)
+        main_ctrl_bipolar = ctrl_arr[:2]
+        act_ctrls_unit = 0.5 * ctrl_arr[2:] + 0.5
 
         # PID ON이면 actuator 밸브를 PID/입력 혼합으로 생성한다.
-        # u_pos>0: actuator pos in(ctrl3), u_pos<0: actuator pos out(ctrl4)
-        # u_neg>0: actuator neg in(ctrl5), u_neg<0: actuator neg out(ctrl6)
         if self.is_pid:
             pid_out = self.pid.get_action(self.obs, goal)  # [2]
             # PID class는 legacy sign을 사용하므로 pos축만 부호를 뒤집어 actuator 방향으로 맞춤.
@@ -345,50 +304,38 @@ class PneuRealAct:
                 dtype=np.float64,
             )
             act_sat = np.clip(act_unsat, 0.0, 1.0)
+            rl_pos_in = float(np.clip(act_ctrls_unit[0], 0.0, 1.0))
+            rl_pos_out = float(np.clip(act_ctrls_unit[1], 0.0, 1.0))
+            rl_neg_in = float(np.clip(act_ctrls_unit[2], 0.0, 1.0))
+            rl_neg_out = float(np.clip(act_ctrls_unit[3], 0.0, 1.0))
 
-            if is_rl_6ch_ctrl:
-                # Hybrid mode (6ch RL + PID):
-                # - ctrl3~ctrl6 (all actuator valves): RL + PID (directional split)
-                rl_pos_in = float(np.clip(act_ctrls_unit[0], 0.0, 1.0))
-                rl_pos_out = float(np.clip(act_ctrls_unit[1], 0.0, 1.0))
-                rl_neg_in = float(np.clip(act_ctrls_unit[2], 0.0, 1.0))
-                rl_neg_out = float(np.clip(act_ctrls_unit[3], 0.0, 1.0))
-
-                pos_in_mix = float(np.clip(rl_pos_in + act_sat[0], 0.0, 1.0))
-                pos_out_mix = float(np.clip(rl_pos_out + act_sat[1], 0.0, 1.0))
-                neg_in_mix = float(np.clip(rl_neg_in + act_sat[2], 0.0, 1.0))
-                neg_out_mix = float(np.clip(rl_neg_out + act_sat[3], 0.0, 1.0))
-                act_ctrls_unit = np.array(
-                    [
-                        pos_in_mix,
-                        pos_out_mix,
-                        neg_in_mix,
-                        neg_out_mix,
-                    ],
-                    dtype=np.float64,
-                )
-                # 합성 이후 실제 PID 기여분(포화 반영)만 anti-windup에 전달.
-                pid_pos_in_sat = float(np.clip(pos_in_mix - rl_pos_in, 0.0, 1.0))
-                pid_pos_out_sat = float(np.clip(pos_out_mix - rl_pos_out, 0.0, 1.0))
-                pid_neg_in_sat = float(np.clip(neg_in_mix - rl_neg_in, 0.0, 1.0))
-                pid_neg_out_sat = float(np.clip(neg_out_mix - rl_neg_out, 0.0, 1.0))
-                u_pos_sat = float(pid_pos_in_sat - pid_pos_out_sat)
-                u_neg_sat = float(pid_neg_in_sat - pid_neg_out_sat)
-
-                # print("PID_POS_IN_SAT: ", pid_pos_in_sat, "PID_NEG_OUT_SAT: ", pid_neg_out_sat)
-
-            else:
-                # Legacy PID-only path: actuator 4채널 모두 PID로 생성.
-                act_ctrls_unit = act_sat
-                u_pos_sat = float(act_sat[0] - act_sat[1])
-                u_neg_sat = float(act_sat[2] - act_sat[3])
+            pos_in_mix = float(np.clip(rl_pos_in + act_sat[0], 0.0, 1.0))
+            pos_out_mix = float(np.clip(rl_pos_out + act_sat[1], 0.0, 1.0))
+            neg_in_mix = float(np.clip(rl_neg_in + act_sat[2], 0.0, 1.0))
+            neg_out_mix = float(np.clip(rl_neg_out + act_sat[3], 0.0, 1.0))
+            act_ctrls_unit = np.array(
+                [
+                    pos_in_mix,
+                    pos_out_mix,
+                    neg_in_mix,
+                    neg_out_mix,
+                ],
+                dtype=np.float64,
+            )
+            # 합성 이후 실제 PID 기여분(포화 반영)만 anti-windup에 전달.
+            pid_pos_in_sat = float(np.clip(pos_in_mix - rl_pos_in, 0.0, 1.0))
+            pid_pos_out_sat = float(np.clip(pos_out_mix - rl_pos_out, 0.0, 1.0))
+            pid_neg_in_sat = float(np.clip(neg_in_mix - rl_neg_in, 0.0, 1.0))
+            pid_neg_out_sat = float(np.clip(neg_out_mix - rl_neg_out, 0.0, 1.0))
+            u_pos_sat = float(pid_pos_in_sat - pid_pos_out_sat)
+            u_neg_sat = float(pid_neg_in_sat - pid_neg_out_sat)
 
             if self.is_anti_windup:
                 # 유효 signed command를 PID 출력 도메인으로 복원.
                 pid_out_sat = np.array([-u_pos_sat, u_neg_sat], dtype=np.float64)
                 self.pid.anti_windup(ctrl=pid_out, sat_ctrl=pid_out_sat)
         else:
-            # PID OFF일 때는 입력 actuator 명령(RL/명시 act_ctrls)을 그대로 사용.
+            # PID OFF일 때는 입력 actuator 명령(RL 6ch)을 그대로 사용.
             act_ctrls_unit = np.clip(act_ctrls_unit, 0.0, 1.0)
 
         # main: [-1,1] -> [0,1]
@@ -495,9 +442,8 @@ if __name__ == "__main__":
     env = PneuRealAct(freq=200.0, scale=False)
 
     for i in range(2000):
-        ctrl = np.array([1.0, 1.0], dtype=np.float64)        # 메인 챔버 제어 ([-1,1])
+        ctrl = np.array([1.0, 1.0, -1.0, -1.0, -1.0, -1.0], dtype=np.float64)
         goal = np.array([110.0, 110.0], dtype=np.float64)     # 목표 압력
-        act_ctrls = np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float64)  # 액추에이터 제어
 
-        obs, info = env.observe(ctrl=ctrl, goal=goal, act_ctrls=act_ctrls)
+        obs, info = env.observe(ctrl=ctrl, goal=goal)
         print(f"[Step {i+1}] obs = {obs}")
