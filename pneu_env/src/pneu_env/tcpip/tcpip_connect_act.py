@@ -158,7 +158,12 @@ def main():
                 # -------------------------------
                 # 3) RT에서 수신 (float PACK_COUNT개)
                 # -------------------------------
-                encoded_obs = recv_packet(client)
+                encoded_obs = recv_packet(
+                    client,
+                    payload_bytes=4 * PACK_COUNT,
+                    use_length_prefix=USE_LENGTH_PREFIX,
+                    length_fmt=LENGTH_FMT,
+                )
                 t_recv = time.monotonic_ns()
                 if encoded_obs is None:
                     print("서버 연결 끊김 (recv_all 반환 None)")

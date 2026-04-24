@@ -22,12 +22,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
-from utils.utils import get_pkg_path
-
-try:
-    from .flowrate_profiles import read_flowrate_from_obs_json
-except ImportError:
-    from flowrate_profiles import read_flowrate_from_obs_json
+from pneu_utils.utils import get_pkg_path
 
 
 ATM = 101.325
@@ -43,8 +38,47 @@ CONST_CTRLS = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 # Random mode params
 RAND_HOLD_MIN = 1      # sec (inclusive)
 RAND_HOLD_MAX = 10     # sec (inclusive)
-RAND_MIN = 0.8
+RAND_MIN = 0.85
 RAND_MAX = 1.0
+
+
+def _resolve_tcpip_dir() -> str:
+    candidates: list[str] = []
+
+    env_dir = os.getenv("PNEU_TCPIP_DIR", "").strip()
+    if env_dir:
+        candidates.append(os.path.abspath(env_dir))
+
+    # Source-tree default (this script lives in .../src/pneu_env/real).
+    candidates.append(
+        os.path.normpath(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tcpip")
+        )
+    )
+
+    try:
+        pkg_root = get_pkg_path("pneu_env")
+        candidates.append(os.path.join(pkg_root, "src", "pneu_env", "tcpip"))
+        candidates.append(os.path.join(pkg_root, "tcpip"))
+    except Exception:
+        pass
+
+    unique_candidates: list[str] = []
+    seen: set[str] = set()
+    for path in candidates:
+        norm = os.path.abspath(path)
+        if norm not in seen:
+            unique_candidates.append(norm)
+            seen.add(norm)
+
+    for tcpip_dir in unique_candidates:
+        if os.path.isfile(os.path.join(tcpip_dir, "tcpip_connect_act.py")):
+            return tcpip_dir
+    for tcpip_dir in unique_candidates:
+        if os.path.isdir(tcpip_dir):
+            return tcpip_dir
+
+    return unique_candidates[0]
 
 
 def _initial_obs_state() -> dict[str, float]:
@@ -158,9 +192,12 @@ def _read_obs_state(
     obs_json_path: str,
     prev_state: dict[str, float],
     sen_period: float,
+    max_wait_s: float | None = None,
 ) -> dict[str, float]:
     prev_time = float(prev_state["time"])
-    deadline = time.time() + max(0.03, 3.0 * sen_period)
+    wait_budget = max_wait_s if max_wait_s is not None else max(0.03, 3.0 * sen_period)
+    wait_budget = max(0.0, float(wait_budget))
+    deadline = time.perf_counter() + wait_budget
 
     def _get_float(data: dict, key: str, default: float) -> float:
         value = data.get(key, default)
@@ -180,8 +217,10 @@ def _read_obs_state(
             with open(obs_json_path, "r", encoding="utf-8") as f:
                 obs = json.load(f)
             obs_time = _get_float(obs, "time", prev_state["time"])
-            if obs_time <= prev_time + 1e-9 and time.time() < deadline:
-                time.sleep(min(0.002, 0.2 * sen_period))
+            now = time.perf_counter()
+            if obs_time <= prev_time + 1e-9 and now < deadline:
+                remain = max(0.0, deadline - now)
+                time.sleep(min(0.001, 0.2 * sen_period, remain))
                 continue
 
             state = dict(prev_state)
@@ -221,22 +260,25 @@ def _read_obs_state(
             state["flowrate6"] = _get_float(obs, "flowrate6", state["flowrate6"])
             return state
         except FileNotFoundError:
-            if time.time() >= deadline:
+            if time.perf_counter() >= deadline:
                 return dict(prev_state)
+            time.sleep(min(0.001, 0.2 * sen_period))
         except json.JSONDecodeError:
-            if time.time() >= deadline:
+            if time.perf_counter() >= deadline:
                 return dict(prev_state)
+            time.sleep(min(0.001, 0.2 * sen_period))
         except Exception:
-            if time.time() >= deadline:
+            if time.perf_counter() >= deadline:
                 return dict(prev_state)
+            time.sleep(min(0.001, 0.2 * sen_period))
 
 
 def main():
     # -----------------------------
     # 설정 (필요 시 여기만 수정)
     # -----------------------------
-    freq = 200.0                 # control freq [Hz]
-    duration = 500.0            # experiment duration [sec]
+    freq = 50.0                 # control freq [Hz]
+    duration = 1000.0            # experiment duration [sec]
     tag = ""                    # filename tag suffix
 
     ctrl_mode = CTRL_MODE
@@ -263,6 +305,8 @@ def main():
         f"[INFO] mode={ctrl_mode}, rand_hold=[{rand_hold_min},{rand_hold_max}]s, "
         f"rand_range=[{rand_min},{rand_max}]"
     )
+    period = 1.0 / max(freq, 1e-9)
+    print(f"[INFO] target control loop: {freq:.1f}Hz ({period * 1000.0:.3f}ms)")
 
     unit_ctrls = np.zeros(6, dtype=np.float64)
     const_ctrls = np.asarray(CONST_CTRLS, dtype=np.float64)
@@ -271,8 +315,10 @@ def main():
     const_ctrls = np.clip(const_ctrls, 0.0, 1.0)
     next_change_time = 0.0
 
-    ctrl_json_path = os.path.join(get_pkg_path("pneu_env"), "tcpip/ctrl_act.json")
-    obs_json_path = os.path.join(get_pkg_path("pneu_env"), "tcpip/obs_act.json")
+    tcpip_dir = _resolve_tcpip_dir()
+    ctrl_json_path = os.path.join(tcpip_dir, "ctrl_act.json")
+    obs_json_path = os.path.join(tcpip_dir, "obs_act.json")
+    print(f"[INFO] tcpip dir: {tcpip_dir}")
     obs_state = _initial_obs_state()
     goal = np.array([ATM, 0.0], dtype=np.float64)
 
@@ -300,11 +346,16 @@ def main():
 
     try:
         script_start_time = time.time()
-        flag_time = time.time()
         curr_time = float(obs_state["time"])
         prev_time = None
         started = False
         wait_print_next_wall = 0.0
+        next_tick = time.perf_counter()
+        last_tick = None
+        timing_window = max(int(freq), 1)
+        loop_dt_ms_hist: deque[float] = deque(maxlen=timing_window)
+        obs_wait_ms_hist: deque[float] = deque(maxlen=timing_window)
+        stale_obs_count = 0
 
         _write_json_atomic(
             ctrl_json_path,
@@ -318,6 +369,19 @@ def main():
         )
 
         while True:
+            now_tick = time.perf_counter()
+            if now_tick < next_tick:
+                time.sleep(next_tick - now_tick)
+                now_tick = time.perf_counter()
+            elif now_tick - next_tick > 2.0 * period:
+                # If we are too late, resync to avoid drift accumulation.
+                next_tick = now_tick
+            next_tick += period
+
+            if last_tick is not None:
+                loop_dt_ms_hist.append((now_tick - last_tick) * 1000.0)
+            last_tick = now_tick
+
             if started:
                 unit_ctrls, next_change_time = _make_unit_ctrls(
                     ctrl_mode,
@@ -346,21 +410,21 @@ def main():
                 ),
             )
 
-            elapsed = time.time() - flag_time
-            sleep_time = max((1.0 / freq) - elapsed - 0.004, 0.0)
-            if sleep_time > 0:
-                time.sleep(sleep_time)
-            flag_time = time.time()
-
+            prev_obs_time = float(obs_state["time"])
+            obs_read_start = time.perf_counter()
             obs_state = _read_obs_state(
                 obs_json_path=obs_json_path,
                 prev_state=obs_state,
                 sen_period=1.0 / max(freq, 1e-6),
+                max_wait_s=0.6 * period,
             )
+            obs_wait_ms_hist.append((time.perf_counter() - obs_read_start) * 1000.0)
             obs = obs_state.copy()
             info = {"Observation": obs}
             o = info["Observation"]
             obs_time = float(o["time"])
+            if obs_time <= prev_obs_time + 1e-9:
+                stale_obs_count += 1
 
             # obs_act.json이 이전 run의 time을 들고 있을 수 있음.
             # 우선순위:
@@ -400,7 +464,12 @@ def main():
             prev_time = obs_time
 
             if started:
-                fr1, fr2, fr3, fr4, fr5, fr6 = read_flowrate_from_obs_json(obs_json_path)
+                fr1 = float(o["flowrate1"])
+                fr2 = float(o["flowrate2"])
+                fr3 = float(o["flowrate3"])
+                fr4 = float(o["flowrate4"])
+                fr5 = float(o["flowrate5"])
+                fr6 = float(o["flowrate6"])
 
                 data["time"].append(obs_time)
                 data["press_pos"].append(float(o["pos_press"]))
@@ -423,6 +492,9 @@ def main():
                 data["angle_vel"].append(float(o["angular_vel"]))
 
                 if len(data["time"]) % int(freq) == 0:
+                    loop_dt_ms = float(np.mean(loop_dt_ms_hist)) if loop_dt_ms_hist else float("nan")
+                    loop_hz = (1000.0 / loop_dt_ms) if loop_dt_ms > 0.0 else float("nan")
+                    obs_wait_ms = float(np.mean(obs_wait_ms_hist)) if obs_wait_ms_hist else float("nan")
                     print(
                         f"[INFO] t={obs_time:.2f}s "
                         f"ctrl=({o['pos_ctrl']:.3f},{o['neg_ctrl']:.3f},"
@@ -430,18 +502,27 @@ def main():
                         f"{o['act_neg_ctrl1']:.3f},{o['act_neg_ctrl2']:.3f}) "
                         f"P=({o['pos_press']:.1f},{o['neg_press']:.1f},"
                         f"{o['act_pos_press']:.1f},{o['act_neg_press']:.1f}) "
-                        f"FR=({fr1:.3f},{fr2:.3f},{fr3:.3f},{fr4:.3f},{fr5:.3f},{fr6:.3f})"
+                        f"FR=({fr1:.3f},{fr2:.3f},{fr3:.3f},{fr4:.3f},{fr5:.3f},{fr6:.3f}) "
+                        f"| loop={loop_hz:.1f}Hz dt={loop_dt_ms:.3f}ms "
+                        f"obs_wait={obs_wait_ms:.3f}ms stale={stale_obs_count}"
                     )
+                    stale_obs_count = 0
 
                 if obs_time >= float(duration):
                     break
             else:
                 now_wall = time.time()
                 if now_wall >= wait_print_next_wall:
+                    loop_dt_ms = float(np.mean(loop_dt_ms_hist)) if loop_dt_ms_hist else float("nan")
+                    loop_hz = (1000.0 / loop_dt_ms) if loop_dt_ms > 0.0 else float("nan")
+                    obs_wait_ms = float(np.mean(obs_wait_ms_hist)) if obs_wait_ms_hist else float("nan")
                     print(
                         f"[WAIT] waiting for fresh start signal "
-                        f"(obs_time={obs_time:.3f}, prev_time={prev_time:.3f})"
+                        f"(obs_time={obs_time:.3f}, prev_time={prev_time:.3f}) "
+                        f"| loop={loop_hz:.1f}Hz dt={loop_dt_ms:.3f}ms "
+                        f"obs_wait={obs_wait_ms:.3f}ms stale={stale_obs_count}"
                     )
+                    stale_obs_count = 0
                     wait_print_next_wall = now_wall + 1.0
 
             curr_time = float(o["time"])
