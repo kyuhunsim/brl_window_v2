@@ -233,6 +233,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sim", required=True, help="sim csv path")
     ap.add_argument("--real", required=True, help="real csv path")
+    ap.add_argument("--sim-start", type=float, default=START_TIME, help="sim csv start time filter")
+    ap.add_argument("--sim-end", type=float, default=END_TIME, help="sim csv end time filter")
+    ap.add_argument("--real-start", type=float, default=START_TIME, help="real csv start time filter")
+    ap.add_argument("--real-end", type=float, default=END_TIME, help="real csv end time filter")
     args = ap.parse_args()
 
     sim_csv = args.sim
@@ -256,15 +260,15 @@ def main():
     df_sim = _load_csv(
         sim_csv,
         required_cols=sim_required,
-        start=START_TIME,
-        end=END_TIME,
+        start=args.sim_start,
+        end=args.sim_end,
         rebase_time=REBASE_TIME,
     )
     df_real = _load_csv(
         real_csv,
         required_cols=real_required,
-        start=START_TIME,
-        end=END_TIME,
+        start=args.real_start,
+        end=args.real_end,
         rebase_time=REBASE_TIME,
     )
 

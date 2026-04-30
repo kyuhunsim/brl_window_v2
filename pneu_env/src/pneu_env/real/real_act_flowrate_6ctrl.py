@@ -5,7 +5,7 @@
 real_act_flowrate_6ctrl.py
 
 - JSON 브리지를 직접 구동하는 6채널 실험 러너.
-- 6개 제어를 하나의 모드로 다룸: random / const.
+- 6개 제어를 하나의 모드로 다룸: random / const / suite.
 - tcpip 브리지(tcpip_connect_act*.py)와 함께 쓰면 obs_act.json에
   flowrate1~flowrate6가 들어오고, 이를 exp CSV로 저장한다.
 
@@ -32,14 +32,89 @@ ATM = 101.325
 # Manual runtime config
 # Edit this block directly.
 # ==============================
-CTRL_MODE = "random"    # "random" | "const"
-CONST_CTRLS = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+CTRL_MODE = "suite"    # "random" | "const" | "suite"
+CONST_CTRLS = [0.85, 1.0, 1.0, 1.0, 1.0, 1.0]
+
+# Only the first two channels are actively excited by default:
+#   ctrl1: pos_ctrl
+#   ctrl2: neg_ctrl
+# The other actuator channels are held fixed unless you edit FIXED_TAIL_CTRLS.
+ACTIVE_CTRL_COUNT = 2
+FIXED_TAIL_CTRLS = [0.0, 0.0, 0.0, 0.0]
 
 # Random mode params
 RAND_HOLD_MIN = 1      # sec (inclusive)
-RAND_HOLD_MAX = 10     # sec (inclusive)
+RAND_HOLD_MAX = 5     # sec (inclusive)
 RAND_MIN = 0.85
 RAND_MAX = 1.0
+
+# Suite mode runs several profiles in one recording.
+# Durations are intentionally editable here instead of CLI arguments.
+SUITE_PROFILES = [
+    dict(
+        name="random_2ctrl",
+        mode="random",
+        duration=300.0,
+        hold_min=1,
+        hold_max=5,
+        min=0.85,
+        max=1.0,
+    ),
+    dict(
+        name="step_2ctrl",
+        mode="step",
+        duration=180.0,
+        time_step=3.0,
+        ctrl1_values=[0.85, 1.0, 0.9, 0.98, 0.87, 0.95],
+        ctrl2_values=[1.0, 0.85, 0.95, 0.88, 0.98, 0.9],
+    ),
+    dict(
+        name="sin_2ctrl",
+        mode="sin",
+        duration=180.0,
+        ctrl1_offset=0.925,
+        ctrl1_amp=0.075,
+        ctrl1_period=10.0,
+        ctrl1_phase=0.0,
+        ctrl2_offset=0.925,
+        ctrl2_amp=0.075,
+        ctrl2_period=10.0,
+        ctrl2_phase=np.pi,
+    ),
+    dict(
+        name="bangbang_pos_only",
+        mode="bangbang",
+        duration=120.0,
+        periods=[10.0, 5.0, 3.0, 2.0, 1.0],
+        ctrl1=dict(mode="bangbang", min=0.85, max=1.0, phase="normal"),
+        ctrl2=dict(mode="fixed", fixed=1.0),
+    ),
+    dict(
+        name="bangbang_neg_only",
+        mode="bangbang",
+        duration=120.0,
+        periods=[10.0, 5.0, 3.0, 2.0, 1.0],
+        ctrl1=dict(mode="fixed", fixed=0.85),
+        ctrl2=dict(mode="bangbang", min=0.85, max=1.0, phase="normal"),
+    ),
+    dict(
+        name="bangbang_both_inverse",
+        mode="bangbang",
+        duration=120.0,
+        periods=[10.0, 5.0, 3.0, 2.0, 1.0],
+        ctrl1=dict(mode="bangbang", min=0.85, max=1.0, phase="normal"),
+        ctrl2=dict(mode="bangbang", min=0.85, max=1.0, phase="inverse"),
+    ),
+]
+
+PROFILE_MODE_IDS = dict(
+    idle=0,
+    random=1,
+    step=2,
+    bangbang=3,
+    const=4,
+    sin=5,
+)
 
 
 def _resolve_tcpip_dir() -> str:
@@ -122,6 +197,134 @@ def _write_json_atomic(path: str, payload: dict[str, float]) -> None:
     os.replace(tmp_path, path)
 
 
+def _tail_ctrls() -> np.ndarray:
+    tail = np.asarray(FIXED_TAIL_CTRLS, dtype=np.float64)
+    expected = 6 - int(ACTIVE_CTRL_COUNT)
+    if tail.shape != (expected,):
+        raise ValueError(f"FIXED_TAIL_CTRLS must be shape ({expected},), got {tail.shape}")
+    return np.clip(tail, 0.0, 1.0)
+
+
+def _compose_6ctrl(active_ctrls: np.ndarray) -> np.ndarray:
+    active_ctrls = np.asarray(active_ctrls, dtype=np.float64)
+    if active_ctrls.shape != (int(ACTIVE_CTRL_COUNT),):
+        raise ValueError(
+            f"active_ctrls must be shape ({ACTIVE_CTRL_COUNT},), got {active_ctrls.shape}"
+        )
+    return np.clip(np.concatenate([active_ctrls, _tail_ctrls()]), 0.0, 1.0)
+
+
+def _suite_profile_at(suite_time: float):
+    elapsed = 0.0
+    for idx, profile in enumerate(SUITE_PROFILES):
+        profile_duration = float(profile["duration"])
+        if suite_time < elapsed + profile_duration:
+            return idx, profile, suite_time - elapsed
+        elapsed += profile_duration
+    return len(SUITE_PROFILES), None, 0.0
+
+
+def _bangbang_channel(local_time: float, period: float, cfg: dict) -> float:
+    mode = cfg.get("mode", "fixed")
+    if mode == "fixed":
+        return float(cfg["fixed"])
+    if mode != "bangbang":
+        raise ValueError(f"Unknown bangbang channel mode: {mode}")
+
+    first_half = (local_time % period) < (0.5 * period)
+    phase = cfg.get("phase", "normal")
+    if phase == "inverse":
+        first_half = not first_half
+    elif phase != "normal":
+        raise ValueError(f"Unknown bangbang phase: {phase}")
+
+    return float(cfg["min"] if first_half else cfg["max"])
+
+
+def _bangbang_period_at(local_time: float, profile: dict) -> tuple[float, float]:
+    periods = [float(p) for p in profile["periods"]]
+    cycles_per_period = float(profile.get("cycles_per_period", 2.0))
+    schedule_duration = sum(period * cycles_per_period for period in periods)
+    if schedule_duration <= 0.0:
+        raise ValueError("bangbang schedule duration must be positive")
+
+    t = local_time % schedule_duration
+    elapsed = 0.0
+    for period in periods:
+        segment_duration = period * cycles_per_period
+        if t < elapsed + segment_duration:
+            return period, t - elapsed
+        elapsed += segment_duration
+    return periods[-1], 0.0
+
+
+def _make_suite_ctrls(
+    *,
+    suite_time: float,
+    current_ctrls: np.ndarray,
+    next_change_time: float,
+) -> tuple[np.ndarray, float, int, int, float, float]:
+    profile_idx, profile, local_time = _suite_profile_at(suite_time)
+    if profile is None:
+        return _compose_6ctrl(np.array([1.0, 1.0], dtype=np.float64)), next_change_time, profile_idx, 0, local_time, 0.0
+
+    mode = profile["mode"]
+    mode_id = int(PROFILE_MODE_IDS[mode])
+    period = 0.0
+
+    if mode == "random":
+        if local_time >= next_change_time:
+            active_ctrls = np.random.uniform(
+                low=float(profile["min"]),
+                high=float(profile["max"]),
+                size=int(ACTIVE_CTRL_COUNT),
+            ).astype(np.float64)
+            hold_sec = float(np.random.randint(int(profile["hold_min"]), int(profile["hold_max"]) + 1))
+            next_change_time = local_time + hold_sec
+            return _compose_6ctrl(active_ctrls), next_change_time, profile_idx, mode_id, local_time, period
+        return current_ctrls.copy(), next_change_time, profile_idx, mode_id, local_time, period
+
+    if mode == "step":
+        time_step = float(profile["time_step"])
+        if time_step <= 0.0:
+            raise ValueError("step time_step must be positive")
+        ctrl1_values = profile["ctrl1_values"]
+        ctrl2_values = profile["ctrl2_values"]
+        if len(ctrl1_values) != len(ctrl2_values):
+            raise ValueError("ctrl1_values and ctrl2_values must have the same length")
+        idx = int(local_time // time_step) % len(ctrl1_values)
+        active_ctrls = np.array([ctrl1_values[idx], ctrl2_values[idx]], dtype=np.float64)
+        return _compose_6ctrl(active_ctrls), next_change_time, profile_idx, mode_id, local_time, time_step
+
+    if mode == "sin":
+        ctrl1_period = float(profile["ctrl1_period"])
+        ctrl2_period = float(profile["ctrl2_period"])
+        if ctrl1_period <= 0.0 or ctrl2_period <= 0.0:
+            raise ValueError("sin periods must be positive")
+        ctrl1 = float(profile["ctrl1_offset"]) + float(profile["ctrl1_amp"]) * np.sin(
+            2.0 * np.pi * local_time / ctrl1_period + float(profile["ctrl1_phase"])
+        )
+        ctrl2 = float(profile["ctrl2_offset"]) + float(profile["ctrl2_amp"]) * np.sin(
+            2.0 * np.pi * local_time / ctrl2_period + float(profile["ctrl2_phase"])
+        )
+        period = min(ctrl1_period, ctrl2_period)
+        active_ctrls = np.array([ctrl1, ctrl2], dtype=np.float64)
+        return _compose_6ctrl(active_ctrls), next_change_time, profile_idx, mode_id, local_time, period
+
+    if mode == "bangbang":
+        period, period_time = _bangbang_period_at(local_time, profile)
+        active_ctrls = np.array(
+            [
+                _bangbang_channel(period_time, period, profile["ctrl1"]),
+                _bangbang_channel(period_time, period, profile["ctrl2"]),
+            ],
+            dtype=np.float64,
+        )
+        return _compose_6ctrl(active_ctrls), next_change_time, profile_idx, mode_id, local_time, period
+
+    raise ValueError(f"Unknown suite profile mode: {mode}")
+
+
 def _make_unit_ctrls(
     ctrl_mode: str,
     *,
@@ -136,18 +339,24 @@ def _make_unit_ctrls(
 ) -> tuple[np.ndarray, float]:
     if ctrl_mode == "random":
         if curr_time >= next_change_time:
+            active_ctrls = np.random.uniform(
+                low=rand_min,
+                high=rand_max,
+                size=int(ACTIVE_CTRL_COUNT),
+            ).astype(np.float64)
             ctrl_unit = np.random.uniform(
                 low=rand_min,
                 high=rand_max,
                 size=6,
             ).astype(np.float64)
+            ctrl_unit = _compose_6ctrl(active_ctrls)
             hold_sec = float(np.random.randint(rand_hold_min, rand_hold_max + 1))
             next_change_time = curr_time + hold_sec
             return np.clip(ctrl_unit, 0.0, 1.0), next_change_time
         return current_ctrls.copy(), next_change_time
     if ctrl_mode == "const":
         return np.clip(const_ctrls.astype(np.float64), 0.0, 1.0), next_change_time
-    raise ValueError(f"CTRL_MODE must be random|const, got: {ctrl_mode}")
+    raise ValueError(f"CTRL_MODE must be random|const|suite, got: {ctrl_mode}")
 
 
 def _build_ctrl_payload(
@@ -278,7 +487,7 @@ def main():
     # 설정 (필요 시 여기만 수정)
     # -----------------------------
     freq = 50.0                 # control freq [Hz]
-    duration = 1000.0            # experiment duration [sec]
+    duration = 1000.0            # experiment duration [sec], ignored by suite mode
     tag = ""                    # filename tag suffix
 
     ctrl_mode = CTRL_MODE
@@ -287,8 +496,8 @@ def main():
     rand_min = float(RAND_MIN)
     rand_max = float(RAND_MAX)
 
-    if ctrl_mode not in ("random", "const"):
-        raise ValueError(f"CTRL_MODE must be random|const, got: {ctrl_mode}")
+    if ctrl_mode not in ("random", "const", "suite"):
+        raise ValueError(f"CTRL_MODE must be random|const|suite, got: {ctrl_mode}")
     if rand_hold_min < 1 or rand_hold_max < rand_hold_min:
         raise ValueError("RAND_HOLD_MIN/MAX must satisfy 1 <= min <= max")
     if not (0.0 <= rand_min <= 1.0 and 0.0 <= rand_max <= 1.0):
@@ -296,14 +505,18 @@ def main():
     if rand_min > rand_max:
         raise ValueError("RAND_MIN must be <= RAND_MAX")
 
+    if ctrl_mode == "suite":
+        duration = sum(float(profile["duration"]) for profile in SUITE_PROFILES)
+
     tag = f"_{tag}" if tag else ""
     now = datetime.now()
     formatted_time = now.strftime("%y%m%d_%H_%M_%S")
     save_file_name = f"{formatted_time}_Flowrate_RND6_{ctrl_mode}{tag}"
 
     print(
-        f"[INFO] mode={ctrl_mode}, rand_hold=[{rand_hold_min},{rand_hold_max}]s, "
-        f"rand_range=[{rand_min},{rand_max}]"
+        f"[INFO] mode={ctrl_mode}, duration={duration:.1f}s, "
+        f"active_ctrl_count={ACTIVE_CTRL_COUNT}, fixed_tail={FIXED_TAIL_CTRLS}, "
+        f"rand_hold=[{rand_hold_min},{rand_hold_max}]s, rand_range=[{rand_min},{rand_max}]"
     )
     period = 1.0 / max(freq, 1e-9)
     print(f"[INFO] target control loop: {freq:.1f}Hz ({period * 1000.0:.3f}ms)")
@@ -342,6 +555,10 @@ def main():
         flow6=deque(),
         anlge=deque(),
         angle_vel=deque(),
+        profile_idx=deque(),
+        profile_mode=deque(),
+        profile_time=deque(),
+        profile_period=deque(),
     )
 
     try:
@@ -349,6 +566,11 @@ def main():
         curr_time = float(obs_state["time"])
         prev_time = None
         started = False
+        suite_start_time = 0.0
+        profile_idx = -1
+        profile_mode = 0
+        profile_time = 0.0
+        profile_period = 0.0
         wait_print_next_wall = 0.0
         next_tick = time.perf_counter()
         last_tick = None
@@ -383,17 +605,36 @@ def main():
             last_tick = now_tick
 
             if started:
-                unit_ctrls, next_change_time = _make_unit_ctrls(
-                    ctrl_mode,
-                    curr_time=curr_time,
-                    rand_min=rand_min,
-                    rand_max=rand_max,
-                    rand_hold_min=rand_hold_min,
-                    rand_hold_max=rand_hold_max,
-                    next_change_time=next_change_time,
-                    current_ctrls=unit_ctrls,
-                    const_ctrls=const_ctrls,
-                )
+                if ctrl_mode == "suite":
+                    suite_time = max(0.0, curr_time - suite_start_time)
+                    (
+                        unit_ctrls,
+                        next_change_time,
+                        profile_idx,
+                        profile_mode,
+                        profile_time,
+                        profile_period,
+                    ) = _make_suite_ctrls(
+                        suite_time=suite_time,
+                        current_ctrls=unit_ctrls,
+                        next_change_time=next_change_time,
+                    )
+                else:
+                    unit_ctrls, next_change_time = _make_unit_ctrls(
+                        ctrl_mode,
+                        curr_time=curr_time,
+                        rand_min=rand_min,
+                        rand_max=rand_max,
+                        rand_hold_min=rand_hold_min,
+                        rand_hold_max=rand_hold_max,
+                        next_change_time=next_change_time,
+                        current_ctrls=unit_ctrls,
+                        const_ctrls=const_ctrls,
+                    )
+                    profile_idx = 0
+                    profile_mode = int(PROFILE_MODE_IDS[ctrl_mode])
+                    profile_time = curr_time
+                    profile_period = 0.0
             else:
                 unit_ctrls = np.zeros(6, dtype=np.float64)
 
@@ -437,6 +678,7 @@ def main():
                     for k in data.keys():
                         data[k].clear()
                     next_change_time = obs_time
+                    suite_start_time = obs_time
                     print(f"[INFO] fresh start detected (time={obs_time:.3f}), start logging.")
             else:
                 if not started:
@@ -446,6 +688,7 @@ def main():
                             data[k].clear()
                         # time reset -> restart random schedule
                         next_change_time = obs_time
+                        suite_start_time = obs_time
                         print(f"[INFO] time reset detected ({prev_time:.3f} -> {obs_time:.3f}), start logging.")
                     elif (
                         0.0 <= prev_time <= 1.0
@@ -456,6 +699,7 @@ def main():
                         for k in data.keys():
                             data[k].clear()
                         next_change_time = obs_time
+                        suite_start_time = obs_time
                         print(
                             f"[INFO] monotonic fresh time detected "
                             f"({prev_time:.3f} -> {obs_time:.3f}), start logging."
@@ -490,6 +734,10 @@ def main():
                 data["flow6"].append(fr6)
                 data["anlge"].append(float(o["angle"]))
                 data["angle_vel"].append(float(o["angular_vel"]))
+                data["profile_idx"].append(float(profile_idx))
+                data["profile_mode"].append(float(profile_mode))
+                data["profile_time"].append(float(profile_time))
+                data["profile_period"].append(float(profile_period))
 
                 if len(data["time"]) % int(freq) == 0:
                     loop_dt_ms = float(np.mean(loop_dt_ms_hist)) if loop_dt_ms_hist else float("nan")
@@ -497,6 +745,7 @@ def main():
                     obs_wait_ms = float(np.mean(obs_wait_ms_hist)) if obs_wait_ms_hist else float("nan")
                     print(
                         f"[INFO] t={obs_time:.2f}s "
+                        f"profile=({profile_idx},{profile_mode}) "
                         f"ctrl=({o['pos_ctrl']:.3f},{o['neg_ctrl']:.3f},"
                         f"{o['act_pos_ctrl1']:.3f},{o['act_pos_ctrl2']:.3f},"
                         f"{o['act_neg_ctrl1']:.3f},{o['act_neg_ctrl2']:.3f}) "

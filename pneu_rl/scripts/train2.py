@@ -45,7 +45,7 @@ if train_mode == '1':
             pos_min_off = 145,
             pos_max_off = 210,
             neg_min_off = 15,
-            neg_max_off = 55,
+            neg_max_off = 35,
             pos_max_ts = 5,
             neg_max_ts = 5,
             pos_max_amp = 20,
@@ -92,15 +92,15 @@ if train_mode == '1':
             noise_std = 1.5
         ),
         epi = 1500,
-        # pid = dict(
-        #     Kp_pos = 0.0,
-        #     Ki_pos = 0.01,
-        #     Kd_pos = 0.0,
-        #     Kp_neg = 0.0,
-        #     Ki_neg = 0.01,
-        #     Kd_neg = 0.0,
-        #     Ka = 1
-        # )
+        pid_cfg = dict(
+            Kp_pos = 0.0,
+            Ki_pos = 0.01,
+            Kd_pos = 0.0,
+            Kp_neg = 0.0,
+            Ki_neg = 0.01,
+            Kd_neg = 0.0,
+            Ka = 1
+        ),
         pid = None
     )
     print(f'[ INFO] Train mode: Ours')
@@ -168,7 +168,7 @@ elif train_mode == '2':
             spatial_weight = 0.0,
             noise_std = 0.0
         ),
-        epi = 1200,
+        epi = 1500,
         pid = None
     )
     print(f'[ INFO] Train mode: SAC')

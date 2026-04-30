@@ -14,9 +14,9 @@ from pneu_ref.step_ref import StepCasesRef, StepRef
 from pneu_ref.sine_ref import SineRef, DynamicOscillatorRef, CenterStepOscillationRef
 from pneu_ref.traj_ref import TrajRef
 from pneu_env.env import PneuEnv
-from pneu_env.sim import PneuSim
+from pneu_env.sim2 import PneuSim
 from pneu_env.real.real import PneuReal
-from pneu_env.pred import PneuPred
+from pneu_env.pred2 import PneuPred
 from pneu_rl.sac import SAC
 from pneu_utils.utils import (
     delete_lines, 
@@ -75,8 +75,8 @@ viz_kwargs = dict(
             time_step = 5,
             ref_pos_max = 180,
             ref_pos_min = 160,
-            ref_neg_max = 55,
-            ref_neg_min = 40
+            ref_neg_max = 45,
+            ref_neg_min = 15
         ),
         traj = dict(
             # file = "Pos_Neg_MPC_w_SH_v12_24_07_02",
@@ -88,23 +88,23 @@ viz_kwargs = dict(
             file = "241113_16_09_05_PID_Real"
         ),
         random = dict(
-            pos_max_off = 200,
-            pos_min_off = 150,
-            neg_max_off = 70,
-            neg_min_off = 40,
-            pos_max_ts = 7,
-            neg_max_ts = 7,
+            pos_max_off = 300,
+            pos_min_off = 160,
+            neg_max_off = 30,
+            neg_min_off = 15,
+            pos_max_ts = 10,
+            neg_max_ts = 10,
             pos_max_amp = 10,
             neg_max_amp = 10,
             seed = 61098
         ),
         sine = dict(
             pos_amp = 10,
-            pos_per = 5,
-            pos_off = 60 + ATM,
-            neg_amp = 7,
-            neg_per = 7,
-            neg_off = - 50 + ATM,
+            pos_per = 10,
+            pos_off = 80 + ATM,
+            neg_amp = 10,
+            neg_per = 10,
+            neg_off = - 80 + ATM,
             iter = 2
         ),
         dynamic = dict(
@@ -158,6 +158,22 @@ def infos_to_datas(infos: deque):
             datas[key].append(value)
     return datas
 
+def calc_metrics(datas):
+    ref_pos = np.asarray(datas['ref_pos'], dtype=np.float64)
+    sen_pos = np.asarray(datas['sen_pos'], dtype=np.float64)
+    ref_neg = np.asarray(datas['ref_neg'], dtype=np.float64)
+    sen_neg = np.asarray(datas['sen_neg'], dtype=np.float64)
+
+    pos_err = ref_pos - sen_pos
+    neg_err = ref_neg - sen_neg
+
+    return dict(
+        rmse_pos = float(np.sqrt(np.mean(pos_err * pos_err))),
+        rmse_neg = float(np.sqrt(np.mean(neg_err * neg_err))),
+        mae_pos = float(np.mean(np.abs(pos_err))),
+        mae_neg = float(np.mean(np.abs(neg_err))),
+    )
+
 def save_datas(datas, model_name, obs_mode, ref_mode, save_name=None, kwargs=None):
     if save_name is not None:
         print('[ INFO] Saving data starts ...')
@@ -173,6 +189,7 @@ def save_datas(datas, model_name, obs_mode, ref_mode, save_name=None, kwargs=Non
     kwargs["model_name"] = model_name
     kwargs["obs_mode"] = obs_mode
     kwargs["ref_mode"] = ref_mode
+    kwargs["metrics"] = calc_metrics(datas)
 
     if save_name is not None:
         with open(f'{get_pkg_path("pneu_rl")}/exp/{save_name}/cfg.yaml', 'w') as f:

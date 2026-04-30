@@ -25,7 +25,7 @@ class PneuSim():
         noise_std: float = 0.2,
         offset_pos: float = 0,
         offset_neg: float = 0,
-        scale: bool = False,
+        scale: bool = True,
     ):
         env_pkg_path = Path(get_pkg_path('pneu_env'))
         # preferred_lib = "lib"

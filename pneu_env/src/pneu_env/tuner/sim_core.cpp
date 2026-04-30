@@ -77,8 +77,9 @@ double simulate_core(
             x2 += dt_sub * dx2;
         }
         
-        Q_pred_out[k] = x1;
-        double diff = Q_actual[k] - x1;
+        double q_pred = std::max(x1, 0.0);
+        Q_pred_out[k] = q_pred;
+        double diff = Q_actual[k] - q_pred;
         total_error += diff * diff;
     }
     

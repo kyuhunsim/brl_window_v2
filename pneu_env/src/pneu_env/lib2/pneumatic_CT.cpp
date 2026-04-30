@@ -30,16 +30,17 @@ constexpr double FORCE_LIMIT = 500.0;
 constexpr double LOG_GUARD = 700.0;
 constexpr double Z_LIMIT = 1e6;
 
-const ValveModelParams POS_PARAMS = {
-    0.177485, 24.9354, 0.0918, 0.000251, 0.00000,
-    363318.0739, 1.6334, 0.1516, 83.5718,
-    2.3474, 0.9792, 3.6058, 1.5719
+const ValveModelParams CHAMBER_POS_PARAMS = {
+    0.173765782728, 30.9289402344, 0.116436719311, 5.46783479371e-05, 1.03479472071e-06,
+    374001.449832, 1.41144546597, 0.166872715454, 61.6216292581,
+    2.84730702687, 1.22289656724, 1.9018360436, 0.344906637713
 };
 
-const ValveModelParams NEG_PARAMS = {
-    0.252364, 49.2420, 0.0821, 0.000124, -0.00002,
-    77568.1783, 753.6405, 0.1452, 11752.9849,
-    4.5513, 2.0892, 2.4077, 0.7968
+
+const ValveModelParams CHAMBER_NEG_PARAMS = {
+    0.242692402717, 47.8401510535, 0.0847812469387, 0.000229289814369, 9.77560733274e-11,
+    29699.940435, 320.125442332, 0.0566339612952, 11464.8641164,
+    14.6808864961, 7.41271437975, 25.42294934, 0.466540190699
 };
 
 double clamp01(double value)
@@ -274,7 +275,7 @@ double PneumaticCT::solenoid_valve(double P_inlet, double P_outlet, double signa
 {
     const bool is_pos = (type == 1.0);
     ValveRuntimeState* state = is_pos ? &valve_state_pos : &valve_state_neg;
-    const ValveModelParams& params = is_pos ? POS_PARAMS : NEG_PARAMS;
+    const ValveModelParams& params = is_pos ? CHAMBER_POS_PARAMS : CHAMBER_NEG_PARAMS;
 
     const double signal_clipped = clamp01(signal);
     const double u_eff = clamp01((signal_clipped - 0.5) * 2.0);

@@ -264,7 +264,21 @@ def compute_global_error(
     return float(total_error)
 
 
-def load_and_preprocess(csv_path, config, start_time_sec=200.0, I_MAX=0.30, window_size=20):
+def load_and_preprocess(
+    csv_path,
+    config,
+    start_time_sec=100.0,
+    end_time_sec=None,
+    tail_cut_sec=0.0,
+    drop_incomplete_last_command=False,
+    settle_sec=2.0,
+    flow_delay_samples=0,
+    flow_delay_sec=None,
+    I_MAX=0.30,
+    window_size=1,
+    input_window_size=None,
+    flow_window_size=None,
+):
     df = pd.read_csv(csv_path)
     if 'time' not in df.columns:
         if 'curr_time' in df.columns:
@@ -275,21 +289,78 @@ def load_and_preprocess(csv_path, config, start_time_sec=200.0, I_MAX=0.30, wind
     if not valid_idx.any():
         valid_idx = df['time'] >= 0
     df = df[valid_idx].reset_index(drop=True)
+    if end_time_sec is not None:
+        df = df[df['time'] <= float(end_time_sec)].reset_index(drop=True)
+    if tail_cut_sec and float(tail_cut_sec) > 0.0:
+        tail_end = float(df['time'].iloc[-1]) - float(tail_cut_sec)
+        df = df[df['time'] <= tail_end].reset_index(drop=True)
+    if len(df) < 2:
+        raise ValueError(
+            f"유효 데이터가 너무 적습니다: {len(df)} rows "
+            f"(start={start_time_sec}, end={end_time_sec}, tail_cut={tail_cut_sec})"
+        )
+    if drop_incomplete_last_command:
+        u_for_segment = df[config['u_col']].to_numpy(dtype=np.float64)
+        t_for_segment = df['time'].to_numpy(dtype=np.float64)
+        change_idx = np.flatnonzero(np.abs(np.diff(u_for_segment)) > 1e-9) + 1
+        if change_idx.size > 0:
+            last_idx = int(change_idx[-1])
+            remaining = float(t_for_segment[-1] - t_for_segment[last_idx])
+            if remaining < float(settle_sec):
+                df = df.iloc[:last_idx].reset_index(drop=True)
+                if len(df) < 2:
+                    raise ValueError(
+                        f"마지막 incomplete command 제거 후 데이터가 너무 적습니다: {len(df)} rows "
+                        f"(valve={config['idx']}, settle_sec={settle_sec})"
+                    )
+
+    flow_delay_samples = int(flow_delay_samples)
+    if flow_delay_sec is not None:
+        dt_median = float(np.median(np.diff(df['time'].to_numpy(dtype=np.float64))))
+        if dt_median <= 0.0:
+            raise ValueError(f"flow-delay-sec 변환 실패: median dt={dt_median}")
+        flow_delay_samples += int(round(float(flow_delay_sec) / dt_median))
+    effective_flow_delay_samples = flow_delay_samples
+    q_values = df[config['Q_col']].to_numpy(dtype=np.float64)
+    if flow_delay_samples > 0:
+        if len(df) <= flow_delay_samples + 1:
+            raise ValueError(
+                f"flow delay 적용 후 데이터가 너무 적습니다: rows={len(df)}, "
+                f"delay_samples={flow_delay_samples}"
+            )
+        # Measured flow is assumed to lag command/pressure by delay_samples.
+        # Pair command/pressure at k with measured flow at k + delay.
+        q_values = q_values[flow_delay_samples:]
+        df = df.iloc[:-flow_delay_samples].reset_index(drop=True)
+    elif flow_delay_samples < 0:
+        lead_samples = abs(flow_delay_samples)
+        if len(df) <= lead_samples + 1:
+            raise ValueError(
+                f"flow delay 적용 후 데이터가 너무 적습니다: rows={len(df)}, "
+                f"delay_samples={flow_delay_samples}"
+            )
+        q_values = q_values[:-lead_samples]
+        df = df.iloc[lead_samples:].reset_index(drop=True)
 
     data = {'name': config['name']}
+    data['flow_delay_samples'] = effective_flow_delay_samples
     data['Time'] = df['time'].values
     data['dt'] = np.mean(np.diff(data['Time']))
+    input_window = int(window_size if input_window_size is None else input_window_size)
+    flow_window = int(window_size if flow_window_size is None else flow_window_size)
+    data['input_window_size'] = input_window
+    data['flow_window_size'] = flow_window
 
     u_raw = df[config['u_col']].values
     data['u'] = np.clip((u_raw - 0.5) * 2.0, 0.0, 1.0)
-    data['I'] = np.ascontiguousarray(maybe_smooth(data['u'] * I_MAX, window_size), dtype=np.float64)
+    data['I'] = np.ascontiguousarray(maybe_smooth(data['u'] * I_MAX, input_window), dtype=np.float64)
 
     P_in = np.full(len(df), 101.325) if config['P_in_col'] == 'ATM' else df[config['P_in_col']].values
     P_out = np.full(len(df), 101.325) if config['P_out_col'] == 'ATM' else df[config['P_out_col']].values
 
     data['P_in_abs'] = np.ascontiguousarray(P_in, dtype=np.float64)
     data['P_out_abs'] = np.ascontiguousarray(P_out, dtype=np.float64)
-    data['Q'] = np.ascontiguousarray(maybe_smooth(df[config['Q_col']].values, window_size), dtype=np.float64)
+    data['Q'] = np.ascontiguousarray(maybe_smooth(q_values, flow_window), dtype=np.float64)
     data['Phi'] = np.ascontiguousarray(get_phi(data['P_in_abs'], data['P_out_abs'], 1.4), dtype=np.float64)
 
     N = len(data['I'])
@@ -325,45 +396,137 @@ def sanitize_params(opt_p):
     }
 
 
+def format_param_value(value):
+    return f"{float(value):.12g}"
+
+
 def format_cpp_block(cfg, params_dict):
+    const_names = {
+        'chamber_pos': 'CHAMBER_POS_PARAMS',
+        'chamber_neg': 'CHAMBER_NEG_PARAMS',
+        'act_pos_in': 'ACT_POS_IN_PARAMS',
+        'act_pos_out': 'ACT_POS_OUT_PARAMS',
+        'act_neg_in': 'ACT_NEG_IN_PARAMS',
+        'act_neg_out': 'ACT_NEG_OUT_PARAMS',
+    }
+    const_name = const_names.get(cfg['func_name'], f"{cfg['func_name'].upper()}_PARAMS")
     lines = [
-        f"ValveModelParams {cfg['func_name']}()",
-        "{",
-        "    return make_params(",
-        f"        {cfg['flow_multiplier_token']},",
-        f"        {params_dict['a_max']:.6f},",
-        f"        {params_dict['k_shape']:.4f},",
-        f"        {params_dict['c_k']:.4f},",
-        f"        {params_dict['c_p']:.6f},",
-        f"        {params_dict['c_z']:.5f},",
-        f"        {params_dict['a_bw']:.4f},",
-        f"        {params_dict['beta_bw']:.4f},",
-        f"        {params_dict['gamma_bw']:.4f},",
-        f"        {params_dict['alpha_shape']:.4f},",
-        f"        {params_dict['wn_up']:.4f},",
-        f"        {params_dict['zeta_up']:.4f},",
-        f"        {params_dict['wn_down']:.4f},",
-        f"        {params_dict['zeta_down']:.4f}",
-        "    );",
-        "}",
+        f"const ValveModelParams {const_name} = {{",
+        f"    {format_param_value(params_dict['a_max'])}, {format_param_value(params_dict['k_shape'])}, "
+        f"{format_param_value(params_dict['c_k'])}, {format_param_value(params_dict['c_p'])}, "
+        f"{format_param_value(params_dict['c_z'])},",
+        f"    {format_param_value(params_dict['a_bw'])}, {format_param_value(params_dict['beta_bw'])}, "
+        f"{format_param_value(params_dict['gamma_bw'])}, {format_param_value(params_dict['alpha_shape'])},",
+        f"    {format_param_value(params_dict['wn_up'])}, {format_param_value(params_dict['zeta_up'])}, "
+        f"{format_param_value(params_dict['wn_down'])}, {format_param_value(params_dict['zeta_down'])}",
+        "};",
     ]
     return "\n".join(lines)
 
 
-def write_cpp_output(results, output_path):
+def write_cpp_output(results, output_path, header_text=None):
     ordered = sorted(results, key=lambda x: x['cfg']['output_order'])
     blocks = [format_cpp_block(item['cfg'], item['params_dict']) for item in ordered]
+    output_dir = os.path.dirname(os.path.abspath(output_path))
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
     with open(output_path, 'w', encoding='utf-8') as f:
+        if header_text:
+            f.write(header_text.rstrip() + "\n\n")
         f.write("\n\n\n".join(blocks) + "\n")
+
+
+def build_output_header(args, selected_valves, results):
+    input_window = args.input_window_size if args.input_window_size is not None else args.window_size
+    flow_window = args.flow_window_size if args.flow_window_size is not None else args.window_size
+    lines = [
+        "// Optimizer metadata",
+        f"// data: {args.data}",
+        f"// valves: {sorted(selected_valves)}",
+        f"// start: {args.start}",
+        f"// end: {args.end if args.end is not None else 'file_end'}",
+        f"// tail_cut: {args.tail_cut}",
+        f"// drop_incomplete_last_command: {args.drop_incomplete_last_command}",
+        f"// settle_sec: {args.settle_sec}",
+        f"// window_size_compat: {args.window_size}",
+        f"// input_window_size: {input_window}",
+        f"// flow_window_size: {flow_window}",
+        f"// flow_delay_samples_arg: {args.flow_delay_samples}",
+        f"// flow_delay_sec_arg: {args.flow_delay_sec if args.flow_delay_sec is not None else 'none'}",
+        f"// tune_mode: {args.tune_mode}",
+        f"// dynamic_valves: {args.dynamic_valves}",
+        f"// samples: {args.samples}",
+        f"// seed: {args.seed}",
+        f"// hf_weight: {args.hf_weight}",
+        f"// hf_target: {args.hf_target}",
+        f"// hf_valves: {args.hf_valves}",
+        f"// r2_floor: {args.r2_floor}",
+        f"// r2_weight: {args.r2_weight}",
+        f"// wn_range: [{args.wn_min}, {args.wn_max}]",
+        f"// zeta_range: [{args.zeta_min}, {args.zeta_max}]",
+    ]
+    for item in sorted(results, key=lambda x: x['cfg']['output_order']):
+        lines.append(
+            f"// valve{item['cfg']['idx']}: best_error={item['best_error']:.12g}, "
+            f"effective_flow_delay_samples={item.get('flow_delay_samples', 'unknown')}, "
+            f"input_window_size={item.get('input_window_size', input_window)}, "
+            f"flow_window_size={item.get('flow_window_size', flow_window)}"
+        )
+    return "\n".join(lines)
+
+
+def resolve_result_paths(output_name, result_dir="tune_result"):
+    raw_name = str(output_name).strip() if output_name is not None else ""
+    if not raw_name:
+        raw_name = "output.txt"
+
+    base_name = os.path.basename(raw_name)
+    stem, _ = os.path.splitext(base_name)
+    if not stem:
+        stem = "output"
+
+    os.makedirs(result_dir, exist_ok=True)
+    idx = 0
+    while True:
+        suffix = "" if idx == 0 else f"_{idx}"
+        txt_path = os.path.join(result_dir, f"{stem}{suffix}.txt")
+        image_path = os.path.join(result_dir, f"{stem}{suffix}.png")
+        if not os.path.exists(txt_path) and not os.path.exists(image_path):
+            return txt_path, image_path
+        idx += 1
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("data", help="데이터 CSV 파일 경로")
-    parser.add_argument("--start", type=float, default=200.0)
+    parser.add_argument("--start", type=float, default=0.0)
+    parser.add_argument("--end", type=float, default=None, help="사용할 마지막 절대 time [s]. 생략하면 파일 끝까지 사용")
+    parser.add_argument("--tail-cut", type=float, default=0.0, help="필터링 후 마지막 N초를 버림")
+    parser.add_argument(
+        "--drop-incomplete-last-command",
+        action="store_true",
+        help="마지막 ctrl 변화 이후 settle-sec 만큼 데이터가 없으면 해당 마지막 command 구간을 버림",
+    )
+    parser.add_argument("--settle-sec", type=float, default=2.0, help="마지막 command 완료 판단에 필요한 최소 후속 시간 [s]")
+    parser.add_argument(
+        "--flow-delay-samples",
+        type=int,
+        default=0,
+        help="실측 flow가 ctrl/pressure보다 늦게 기록된 sample 수. 양수이면 Q[k+delay]를 ctrl[k]와 비교",
+    )
+    parser.add_argument(
+        "--flow-delay-sec",
+        type=float,
+        default=None,
+        help="실측 flow 지연 [s]. median dt로 sample 수를 계산해 --flow-delay-samples에 더함",
+    )
     parser.add_argument("--samples", type=int, default=50)
-    parser.add_argument("--window-size", type=int, default=20, help="입력 I와 유량 Q에 적용할 moving average window size (1이면 smoothing 없음)")
-    parser.add_argument("--output", default="output.txt", help="C++ make_params 형식으로 저장할 파일 경로")
+    parser.add_argument("--seed", type=int, default=0, help="랜덤 시작점 seed. 음수이면 매 실행마다 랜덤")
+    parser.add_argument("--window-size", type=int, default=1, help="호환용 공통 moving average window size (개별 옵션 생략 시 사용)")
+    parser.add_argument("--input-window-size", type=int, default=None, help="입력 I에만 적용할 moving average window size")
+    parser.add_argument("--flow-window-size", type=int, default=None, help="실측 유량 Q에만 적용할 moving average window size")
+    parser.add_argument("--output", default="output.txt", help="tune_result에 저장할 결과 파일 이름(.txt/.png는 같은 이름으로 저장)")
+    parser.add_argument("--result-dir", default="tune_result", help="txt와 image 결과를 저장할 폴더")
     parser.add_argument("--valves", default="all", help="최적화할 밸브 인덱스. 예) all, 3-6, 3,4,5,6")
     parser.add_argument(
         "--tune-mode",
@@ -413,6 +576,16 @@ def main():
 
     if args.window_size < 1:
         raise ValueError("--window-size 는 1 이상의 정수여야 합니다.")
+    if args.input_window_size is not None and args.input_window_size < 1:
+        raise ValueError("--input-window-size 는 1 이상의 정수여야 합니다.")
+    if args.flow_window_size is not None and args.flow_window_size < 1:
+        raise ValueError("--flow-window-size 는 1 이상의 정수여야 합니다.")
+    if args.end is not None and args.end <= args.start:
+        raise ValueError("--end 는 --start 보다 커야 합니다.")
+    if args.tail_cut < 0:
+        raise ValueError("--tail-cut 은 0 이상의 값이어야 합니다.")
+    if args.settle_sec < 0:
+        raise ValueError("--settle-sec 은 0 이상의 값이어야 합니다.")
     if args.samples < 1:
         raise ValueError("--samples 는 1 이상의 정수여야 합니다.")
     if args.hf_weight < 0:
@@ -427,6 +600,8 @@ def main():
         raise ValueError("--wn-min/--wn-max 는 0보다 커야 합니다.")
     if args.zeta_min < 0 or args.zeta_max <= 0:
         raise ValueError("--zeta-min/--zeta-max 범위를 확인하세요.")
+    if args.seed >= 0:
+        np.random.seed(args.seed)
 
     max_valve_idx = max(cfg["idx"] for cfg in CONFIGS)
     selected_valves = parse_valve_selection(args.valves, max_valve=max_valve_idx)
@@ -453,8 +628,14 @@ def main():
 
     fig.canvas.manager.set_window_title("Valve Optimization Fit")
     fig.suptitle(
-        f"Valve Fit Results | window_size={args.window_size} | valves={sorted(selected_valves)} | "
-        f"tune_mode={args.tune_mode} | hf_weight={args.hf_weight}",
+        f"Valve Fit Results | input_window={args.input_window_size if args.input_window_size is not None else args.window_size} | "
+        f"flow_window={args.flow_window_size if args.flow_window_size is not None else args.window_size} | "
+        f"valves={sorted(selected_valves)} | "
+        f"tune_mode={args.tune_mode} | hf_weight={args.hf_weight} | "
+        f"start={args.start} | end={args.end if args.end is not None else 'file'} | tail_cut={args.tail_cut} | "
+        f"drop_last={args.drop_incomplete_last_command}({args.settle_sec}s) | "
+        f"flow_delay={args.flow_delay_samples} samples"
+        f"{'' if args.flow_delay_sec is None else f' + {args.flow_delay_sec}s'}",
         fontsize=14,
     )
 
@@ -464,7 +645,8 @@ def main():
         print(f"\n=======================================================")
         print(f" ▶ [{cfg['idx']}번] 최적화 시작 : {cfg['name']} (C++ 가속 적용됨)")
         print(f"=======================================================")
-        print(f"   - window_size = {args.window_size}")
+        print(f"   - input_window_size = {args.input_window_size if args.input_window_size is not None else args.window_size}")
+        print(f"   - flow_window_size = {args.flow_window_size if args.flow_window_size is not None else args.window_size}")
         tune_dynamic = (args.tune_mode == "dynamic") and (cfg["idx"] in dynamic_valves)
         hf_weight_local = args.hf_weight if cfg["idx"] in hf_valves else 0.0
         r2_weight_local = args.r2_weight if cfg["idx"] in hf_valves else 0.0
@@ -477,13 +659,21 @@ def main():
             f"   - r2_floor_penalty = {r2_weight_local:.4f} "
             f"(floor={args.r2_floor:.3f}, 적용대상={'예' if cfg['idx'] in hf_valves else '아니오'})"
         )
-
         data = load_and_preprocess(
             args.data,
             cfg,
             start_time_sec=args.start,
+            end_time_sec=args.end,
+            tail_cut_sec=args.tail_cut,
+            drop_incomplete_last_command=args.drop_incomplete_last_command,
+            settle_sec=args.settle_sec,
+            flow_delay_samples=args.flow_delay_samples,
+            flow_delay_sec=args.flow_delay_sec,
             window_size=args.window_size,
+            input_window_size=args.input_window_size,
+            flow_window_size=args.flow_window_size,
         )
+        print(f"   - effective_flow_delay_samples = {data['flow_delay_samples']}")
         all_data = [data]
         base_initial = np.array(cfg['base'])
         dyn_indices = np.array([9, 10, 11, 12], dtype=np.int64)
@@ -518,6 +708,9 @@ def main():
                 zeta_max=args.zeta_max,
             )
 
+        best_error, best_params = np.inf, base_initial.copy()
+        opt_options = {'maxiter': 5000, 'maxfev': 15000, 'xatol': 1e-4, 'fatol': 1e-4, 'disp': False}
+
         sample_results = []
         for s in range(args.samples):
             if tune_dynamic:
@@ -539,9 +732,6 @@ def main():
 
         sample_results = np.array(sample_results)
         top_starts = sample_results[sample_results[:, -1].argsort()][:3, :-1]
-
-        best_error, best_params = np.inf, base_initial.copy()
-        opt_options = {'maxiter': 5000, 'maxfev': 15000, 'xatol': 1e-4, 'fatol': 1e-4, 'disp': False}
 
         for j, start_val in enumerate(top_starts):
             if tune_dynamic:
@@ -601,20 +791,31 @@ def main():
             'cfg': cfg,
             'params_dict': params_dict,
             'best_error': best_error,
+            'flow_delay_samples': data['flow_delay_samples'],
+            'input_window_size': data['input_window_size'],
+            'flow_window_size': data['flow_window_size'],
         })
 
         _, Q_pred = simulate_physics_model(data, best_params)
-        rmse = np.sqrt(np.mean((data['Q'] - Q_pred) ** 2))
+        q_plot = np.nan_to_num(Q_pred, nan=0.0, posinf=1e9, neginf=-1e9)
+        q_plot = np.clip(q_plot, -1e9, 1e9)
+        diff_plot = data['Q'] - q_plot
+        rmse = np.sqrt(np.mean(diff_plot ** 2))
         ss_tot = np.sum((data['Q'] - np.mean(data['Q'])) ** 2)
-        r_sq = 1 - (np.sum((data['Q'] - Q_pred) ** 2) / ss_tot) if ss_tot != 0 else 0.0
+        r_sq = 1 - (np.sum(diff_plot ** 2) / ss_tot) if ss_tot != 0 else 0.0
         hf_ratio_fit = high_freq_ratio(data['Q'], Q_pred)
         t_plot = data['Time'] - args.start
 
         ax = axes[i]
 
         ax.plot(t_plot, data['Q'], 'k-', linewidth=3, label='Actual Q')
-        ax.plot(t_plot, Q_pred, 'r--', linewidth=2.2, label='Fitted Q')
-        title_line1 = f"[{cfg['idx']}] {cfg['name']} | window={args.window_size}"
+        ax.plot(t_plot, q_plot, 'r--', linewidth=2.2, label='Fitted Q')
+        ax.set_yscale('linear')
+        title_line1 = (
+            f"[{cfg['idx']}] {cfg['name']} | "
+            f"Iwin={data['input_window_size']} | Qwin={data['flow_window_size']} | "
+            f"delay={data['flow_delay_samples']} samples"
+        )
         title_line2 = f"RMSE={rmse:.4f} | R²={r_sq * 100:.1f}% | HF ratio={hf_ratio_fit:.3f}"
         ax.set_title(
             f"{title_line1}\n{title_line2}",
@@ -630,8 +831,12 @@ def main():
         if row_idx == nrows - 1:
             axes[idx_ax].set_xlabel('Time [s]', fontsize=12)
 
-    write_cpp_output(optimization_results, args.output)
-    print(f"[INFO] C++ make_params 형식 저장 완료: {args.output}")
+    txt_output_path, image_output_path = resolve_result_paths(args.output, args.result_dir)
+    output_header = build_output_header(args, selected_valves, optimization_results)
+    write_cpp_output(optimization_results, txt_output_path, header_text=output_header)
+    fig.savefig(image_output_path, dpi=150)
+    print(f"[INFO] C++ make_params 형식 저장 완료: {txt_output_path}")
+    print(f"[INFO] fit image 저장 완료: {image_output_path}")
 
     plt.show()
 
