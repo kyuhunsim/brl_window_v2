@@ -32,7 +32,7 @@ ATM = 101.325
 # Manual runtime config
 # Edit this block directly.
 # ==============================
-CTRL_MODE = "suite"    # "random" | "const" | "suite"
+CTRL_MODE = "random"    # "random" | "const" | "suite"
 CONST_CTRLS = [0.85, 1.0, 1.0, 1.0, 1.0, 1.0]
 
 # Only the first two channels are actively excited by default:
@@ -43,8 +43,8 @@ ACTIVE_CTRL_COUNT = 2
 FIXED_TAIL_CTRLS = [0.0, 0.0, 0.0, 0.0]
 
 # Random mode params
-RAND_HOLD_MIN = 1      # sec (inclusive)
-RAND_HOLD_MAX = 5     # sec (inclusive)
+RAND_HOLD_MIN = 0.5      # sec (inclusive)
+RAND_HOLD_MAX = 3     # sec (inclusive)
 RAND_MIN = 0.85
 RAND_MAX = 1.0
 
@@ -54,7 +54,7 @@ SUITE_PROFILES = [
     dict(
         name="random_2ctrl",
         mode="random",
-        duration=300.0,
+        duration=200.0,
         hold_min=1,
         hold_max=5,
         min=0.85,
@@ -74,18 +74,18 @@ SUITE_PROFILES = [
         duration=180.0,
         ctrl1_offset=0.925,
         ctrl1_amp=0.075,
-        ctrl1_period=10.0,
+        ctrl1_period=5.0,
         ctrl1_phase=0.0,
         ctrl2_offset=0.925,
         ctrl2_amp=0.075,
-        ctrl2_period=10.0,
+        ctrl2_period=5.0,
         ctrl2_phase=np.pi,
     ),
     dict(
         name="bangbang_pos_only",
         mode="bangbang",
         duration=120.0,
-        periods=[10.0, 5.0, 3.0, 2.0, 1.0],
+        periods=[5.0, 3.0, 2.0, 1.0, 0.5],
         ctrl1=dict(mode="bangbang", min=0.85, max=1.0, phase="normal"),
         ctrl2=dict(mode="fixed", fixed=1.0),
     ),
@@ -93,7 +93,7 @@ SUITE_PROFILES = [
         name="bangbang_neg_only",
         mode="bangbang",
         duration=120.0,
-        periods=[10.0, 5.0, 3.0, 2.0, 1.0],
+        periods=[5.0, 3.0, 2.0, 1.0, 0.5],
         ctrl1=dict(mode="fixed", fixed=0.85),
         ctrl2=dict(mode="bangbang", min=0.85, max=1.0, phase="normal"),
     ),
@@ -487,19 +487,19 @@ def main():
     # 설정 (필요 시 여기만 수정)
     # -----------------------------
     freq = 50.0                 # control freq [Hz]
-    duration = 1000.0            # experiment duration [sec], ignored by suite mode
+    duration = 300.0            # experiment duration [sec], ignored by suite mode
     tag = ""                    # filename tag suffix
 
     ctrl_mode = CTRL_MODE
-    rand_hold_min = int(RAND_HOLD_MIN)   # hold time range [sec] (inclusive)
-    rand_hold_max = int(RAND_HOLD_MAX)
+    rand_hold_min = float(RAND_HOLD_MIN)   # hold time range [sec] (inclusive)
+    rand_hold_max = float(RAND_HOLD_MAX)
     rand_min = float(RAND_MIN)
     rand_max = float(RAND_MAX)
 
     if ctrl_mode not in ("random", "const", "suite"):
         raise ValueError(f"CTRL_MODE must be random|const|suite, got: {ctrl_mode}")
-    if rand_hold_min < 1 or rand_hold_max < rand_hold_min:
-        raise ValueError("RAND_HOLD_MIN/MAX must satisfy 1 <= min <= max")
+    # if rand_hold_min < 1 or rand_hold_max < rand_hold_min:
+    #     raise ValueError("RAND_HOLD_MIN/MAX must satisfy 1 <= min <= max")
     if not (0.0 <= rand_min <= 1.0 and 0.0 <= rand_max <= 1.0):
         raise ValueError("RAND_MIN/RAND_MAX must be in [0,1]")
     if rand_min > rand_max:
