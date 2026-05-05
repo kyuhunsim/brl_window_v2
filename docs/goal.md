@@ -1,10 +1,12 @@
-목표: 내 simulator (cpp, python based runge kutta simulator)가 sim real mismatch 가 없어야 하며, 이를 기반으로 reinforcement learning을 수행해서 soft actuator의 양/음압 제어 및 변위 제어를 하는 것
+목표: 내 simulator (cpp, python based runge kutta simulator)가 sim real mismatch 가 없어야 하며, 이를 기반으로 reinforcement learning을 수행해서 soft actuator의 양/음압 제어 및 변위 제어를 하는 것, 또한 soft actuator 의 수식을 넣어서 부피 및 변위 변화에 대한 수식을 넣을 것임. lib3의 고정 부피가 아닌 부피 변화를 고려할 것임.
 
 현재 내 문제점: rl flow 혹은 sim (cpp) 쪽에 문제가 있어서 rl 학습이 안되고, sim도 real과 matching이 잘 되는지 의문임.
 
 예상 원인: tuning 하는 데이터의 window size가 real 및 강화학습에 문제를 일으킨다. 혹은 rl, sim, pred, env, 쪽의 연결이나 코드 쪽에 문제가 있어서 강화학습이 안된다.
 
 참고 논문: https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=11027315, **Modeling and Reinforcement Learning-Based Control of Simultaneous Positive and Negative Pressure Generation in Pneumatic Systems**
+
+docs에 있는 문서들이 참고자료들임.
 
 실험 순서
 
