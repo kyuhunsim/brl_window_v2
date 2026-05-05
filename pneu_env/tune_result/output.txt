@@ -1,0 +1,39 @@
+// Optimizer metadata
+// data: exp/260430_17_48_27_Flowrate_RND6_suite.csv
+// valves: [1, 2]
+// start: 20.0
+// end: file_end
+// tail_cut: 0.0
+// drop_incomplete_last_command: False
+// settle_sec: 2.0
+// window_size_compat: 1
+// input_window_size: 1
+// flow_window_size: 1
+// flow_delay_samples_arg: 0
+// flow_delay_sec_arg: none
+// tune_mode: all
+// dynamic_valves: 3-6
+// samples: 50
+// seed: 0
+// hf_weight: 0.0
+// hf_target: 1.0
+// hf_valves: 3-6
+// r2_floor: 0.0
+// r2_weight: 0.0
+// wn_range: [0.2, 120.0]
+// zeta_range: [0.05, 30.0]
+// valve1: best_error=157062.913618, effective_flow_delay_samples=0, input_window_size=1, flow_window_size=1
+// valve2: best_error=398963.68418, effective_flow_delay_samples=0, input_window_size=1, flow_window_size=1
+
+const ValveModelParams CHAMBER_POS_PARAMS = {
+    0.127875230772, 13.568864699, 0.152919513234, 0.000445110650493, 0.070263002709,
+    227648.232254, 2.39369082851, 0.124753732773, 103.052337742,
+    2.45016796198, 0.766025755003, 2.10679822575, 0.923170783727
+};
+
+
+const ValveModelParams CHAMBER_NEG_PARAMS = {
+    0.192285247107, 45.4316620514, 0.0513322497116, 0.000142148012394, 0.00127458795654,
+    637.425906215, 305.555797595, 0.220040312352, 13920.6686754,
+    5.28296659624, 2.83789875833, 4.38984366719, 2.19118888052
+};

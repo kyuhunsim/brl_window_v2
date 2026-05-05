@@ -58,6 +58,7 @@ private:
     double C1OUT, C1IN, C2OUT, C2IN;
     double* dxdt;
     double* mass_flowrate;
+    double valve_debug[18];
     ValveRuntimeState valve_state_pos;
     ValveRuntimeState valve_state_neg;
 
@@ -81,6 +82,7 @@ public:
     );
     double* model(double* x, double* u);
     double* get_mass_flowrate();
+    double* get_valve_debug();
     
     double solenoid_valve(double P_inlet, double P_outlet, double signal, double type, double num);
 };
@@ -96,6 +98,7 @@ public:
     double get_time();
     double* get_mass_flowrate();
     double* get_mean_mass_flowrate();
+    double* get_valve_debug();
     double* step(double* control, double time_step);
     void set_volume(double volume1, double volume2);
     void set_discharge_coeff(

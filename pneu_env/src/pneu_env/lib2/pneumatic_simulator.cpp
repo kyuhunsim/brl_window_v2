@@ -246,6 +246,10 @@ double* PneumaticSimulator::get_mean_mass_flowrate() {
     return meanMassFlowrate;
 }
 
+double* PneumaticSimulator::get_valve_debug() {
+    return pneumaticCT -> get_valve_debug();
+}
+
 void PneumaticSimulator::time_reset() { 
     xk0[0] = 0; 
     pneumaticCT -> reset_valve_states();
@@ -274,4 +278,5 @@ extern "C" {
 
     double solenoid_valve_test(double P_inlet, double P_outlet, double signal, double type, double num) { return PneumaticSimulator::get_instance().solenoid_valve_test(P_inlet, P_outlet, signal, type, num); }
     double* get_mean_mass_flowrate() { return PneumaticSimulator::get_instance().get_mean_mass_flowrate(); }
+    double* get_valve_debug() { return PneumaticSimulator::get_instance().get_valve_debug(); }
 }

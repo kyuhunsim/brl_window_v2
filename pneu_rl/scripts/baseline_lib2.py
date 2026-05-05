@@ -47,10 +47,10 @@ SINE_REF_KWARGS = dict(
 
 COS_REF_KWARGS = dict(
     pos_amp = 10,
-    pos_per = 10,
+    pos_per = 3,
     pos_off = 80 + ATM,
     neg_amp = 7,
-    neg_per = 10,
+    neg_per = 3,
     neg_off = -80 + ATM,
     iter = 20,
     buf_time = 0,
@@ -76,14 +76,14 @@ REF_KWARGS = dict(
 
 PID_GAINS = dict(
     pos = dict(
-        p = 0.1,
+        p = 0.05,
         i = 0.0015,
         d = 0.0000,
         integral_limit = 200.0,
     ),
     neg = dict(
-        p = 0.1,
-        i = 0.01,
+        p = 0.05,
+        i = 0.0015,
         d = 0.0000,
         integral_limit = 200.0,
     ),

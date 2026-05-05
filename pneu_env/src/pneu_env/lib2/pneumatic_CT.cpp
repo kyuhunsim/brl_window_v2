@@ -115,6 +115,7 @@ PneumaticCT::PneumaticCT()
 
     dxdt = new double[6];
     mass_flowrate = new double[6];
+    for (int i = 0; i < 18; i++) valve_debug[i] = 0.0;
     reset_valve_states();
 }
 
@@ -329,6 +330,16 @@ double PneumaticCT::solenoid_valve(double P_inlet, double P_outlet, double signa
 
     const double q_pred_lpm = std::max(state->x1, 0.0);
     const double mdot = q_pred_lpm * STD_RHO / 60000.0;
+    const int debug_base = is_pos ? 0 : 9;
+    valve_debug[debug_base + 0] = u_eff;
+    valve_debug[debug_base + 1] = current;
+    valve_debug[debug_base + 2] = state_curr;
+    valve_debug[debug_base + 3] = state->z;
+    valve_debug[debug_base + 4] = force_net;
+    valve_debug[debug_base + 5] = area_eff;
+    valve_debug[debug_base + 6] = q_static_lpm;
+    valve_debug[debug_base + 7] = q_pred_lpm;
+    valve_debug[debug_base + 8] = mdot;
     if (!std::isfinite(mdot)) return 0.0;
 
     return std::max(num * mdot, 0.0);
@@ -342,3 +353,5 @@ double PneumaticCT::chamber(double dmdt, double V)
 }
 
 double* PneumaticCT::get_mass_flowrate() { return mass_flowrate; }
+
+double* PneumaticCT::get_valve_debug() { return valve_debug; }

@@ -39,8 +39,25 @@ BANGBANG_CFG = dict(
     end_period = 0.5,
     period_ratio = 0.5,
     cycles_per_period = 2.0,
+    valve_debug = True,
     save_name = None,
 )
+
+VALVE_DEBUG_COLUMNS = [
+    f"{side}_{name}"
+    for side in ("pos", "neg")
+    for name in (
+        "u_eff",
+        "current",
+        "state_curr",
+        "z",
+        "force_net",
+        "area_eff",
+        "q_static_lpm",
+        "q_pred_lpm",
+        "mdot",
+    )
+]
 
 
 def make_simulator(args: argparse.Namespace, sim_name: str):
@@ -115,6 +132,9 @@ def run_single(args: argparse.Namespace, sim_name: str) -> tuple[pd.DataFrame, l
 
     rows = []
     curr_time = 0.0
+    prev_time = None
+    prev_pos = None
+    prev_neg = None
     segment_start = 0.0
     dt = 1.0 / float(args.freq)
     goal = np.array([ATM, ATM], dtype=np.float64)
@@ -128,19 +148,45 @@ def run_single(args: argparse.Namespace, sim_name: str) -> tuple[pd.DataFrame, l
             obs, info = sim.observe(action, goal)
             o = info["Observation"]
             curr_time = float(obs[0])
+            sen_pos = float(o["sen_pos"])
+            sen_neg = float(o["sen_neg"])
+            flow = sim.get_mean_mass_flowrate()
+            if args.valve_debug and hasattr(sim, "get_valve_debug"):
+                valve_debug = sim.get_valve_debug()
+            else:
+                valve_debug = {name: np.nan for name in VALVE_DEBUG_COLUMNS}
 
-            rows.append(
-                dict(
-                    curr_time=o["curr_time"],
-                    period=period,
-                    sen_pos=o["sen_pos"],
-                    sen_neg=o["sen_neg"],
-                    action_pos=float(action[0]),
-                    action_neg=float(action[1]),
-                    ctrl_pos=o["ctrl_pos"],
-                    ctrl_neg=o["ctrl_neg"],
-                )
+            if prev_time is None or curr_time <= prev_time:
+                dposdt = 0.0
+                dnegdt = 0.0
+            else:
+                dt_obs = curr_time - prev_time
+                dposdt = (sen_pos - prev_pos) / dt_obs
+                dnegdt = (sen_neg - prev_neg) / dt_obs
+
+            prev_time = curr_time
+            prev_pos = sen_pos
+            prev_neg = sen_neg
+
+            row = dict(
+                sim_name=sim_name,
+                curr_time=o["curr_time"],
+                period=period,
+                sen_pos=sen_pos,
+                sen_neg=sen_neg,
+                dPpos_dt=dposdt,
+                dPneg_dt=dnegdt,
+                mean_pump_in=flow["pump_in"],
+                mean_pump_out=flow["pump_out"],
+                mean_valve_pos=flow["valve_pos"],
+                mean_valve_neg=flow["valve_neg"],
+                action_pos=float(action[0]),
+                action_neg=float(action[1]),
+                ctrl_pos=o["ctrl_pos"],
+                ctrl_neg=o["ctrl_neg"],
             )
+            row.update(valve_debug)
+            rows.append(row)
 
             if dt <= 0.0:
                 raise ValueError("freq must be positive")
@@ -167,11 +213,215 @@ def calc_summary(df: pd.DataFrame) -> dict:
         pos_max=float(df["sen_pos"].max()),
         neg_min=float(df["sen_neg"].min()),
         neg_max=float(df["sen_neg"].max()),
+        dPpos_dt_min=float(df["dPpos_dt"].min()),
+        dPpos_dt_max=float(df["dPpos_dt"].max()),
+        dPneg_dt_min=float(df["dPneg_dt"].min()),
+        dPneg_dt_max=float(df["dPneg_dt"].max()),
+        mean_pump_in_min=float(df["mean_pump_in"].min()),
+        mean_pump_in_max=float(df["mean_pump_in"].max()),
+        mean_pump_out_min=float(df["mean_pump_out"].min()),
+        mean_pump_out_max=float(df["mean_pump_out"].max()),
+        mean_valve_pos_min=float(df["mean_valve_pos"].min()),
+        mean_valve_pos_max=float(df["mean_valve_pos"].max()),
+        mean_valve_neg_min=float(df["mean_valve_neg"].min()),
+        mean_valve_neg_max=float(df["mean_valve_neg"].max()),
         ctrl_pos_min=float(df["ctrl_pos"].min()),
         ctrl_pos_max=float(df["ctrl_pos"].max()),
         ctrl_neg_min=float(df["ctrl_neg"].min()),
         ctrl_neg_max=float(df["ctrl_neg"].max()),
     )
+
+
+def has_finite_valve_debug(df: pd.DataFrame) -> bool:
+    if "pos_q_static_lpm" not in df.columns or "neg_q_static_lpm" not in df.columns:
+        return False
+    vals = df[["pos_q_static_lpm", "pos_q_pred_lpm", "neg_q_static_lpm", "neg_q_pred_lpm"]].to_numpy()
+    return bool(np.isfinite(vals).any())
+
+
+def add_period_lines(axes: list, df: pd.DataFrame, periods: list[float]) -> None:
+    for period in periods[1:]:
+        idx = df.index[df["period"] == period]
+        if len(idx) == 0:
+            continue
+        t0 = float(df.loc[idx[0], "curr_time"])
+        for ax in axes:
+            ax.axvline(t0, color="gray", linestyle="--", linewidth=0.8, alpha=0.7)
+
+
+def save_valve_debug_plot(
+    df: pd.DataFrame,
+    *,
+    sim_name: str,
+    out_dir: str,
+    save_name: str,
+    periods: list[float],
+) -> None:
+    if not has_finite_valve_debug(df):
+        return
+
+    fig, axes = plt.subplots(8, 1, figsize=(14, 18), sharex=True)
+    pos_color = "red"
+    neg_color = "blue"
+    time = df["curr_time"]
+
+    axes[0].plot(time, df["ctrl_pos"], color=pos_color, label="ctrl_pos")
+    axes[0].plot(time, df["ctrl_neg"], color=neg_color, label="ctrl_neg")
+    axes[0].plot(time, df["pos_u_eff"], color=pos_color, linestyle="--", label="pos_u_eff")
+    axes[0].plot(time, df["neg_u_eff"], color=neg_color, linestyle="--", label="neg_u_eff")
+    axes[0].set_ylabel("Command")
+
+    axes[1].plot(time, df["pos_current"], color=pos_color, label="pos_current")
+    axes[1].plot(time, df["neg_current"], color=neg_color, label="neg_current")
+    axes[1].set_ylabel("Current [A]")
+
+    axes[2].plot(time, df["pos_force_net"], color=pos_color, label="pos_force_net")
+    axes[2].plot(time, df["neg_force_net"], color=neg_color, label="neg_force_net")
+    axes[2].set_ylabel("Force Net")
+
+    axes[3].plot(time, df["pos_z"], color=pos_color, label="pos_z")
+    axes[3].plot(time, df["neg_z"], color=neg_color, label="neg_z")
+    axes[3].set_ylabel("Hysteresis z")
+
+    axes[4].plot(time, df["pos_area_eff"], color=pos_color, label="pos_area_eff")
+    axes[4].plot(time, df["neg_area_eff"], color=neg_color, label="neg_area_eff")
+    axes[4].set_ylabel("Area Eff")
+
+    axes[5].plot(time, df["pos_q_static_lpm"], color=pos_color, linestyle="--", label="pos_q_static_lpm")
+    axes[5].plot(time, df["pos_q_pred_lpm"], color=pos_color, label="pos_q_pred_lpm")
+    axes[5].plot(time, df["neg_q_static_lpm"], color=neg_color, linestyle="--", label="neg_q_static_lpm")
+    axes[5].plot(time, df["neg_q_pred_lpm"], color=neg_color, label="neg_q_pred_lpm")
+    axes[5].set_ylabel("Valve q [LPM]")
+
+    axes[6].plot(time, df["pos_mdot"], color=pos_color, label="pos_mdot")
+    axes[6].plot(time, df["neg_mdot"], color=neg_color, label="neg_mdot")
+    axes[6].set_ylabel("mdot")
+
+    axes[7].plot(time, df["mean_valve_pos"], color=pos_color, label="mean_valve_pos")
+    axes[7].plot(time, df["mean_valve_neg"], color=neg_color, label="mean_valve_neg")
+    axes[7].plot(time, df["dPpos_dt"], color=pos_color, linestyle="--", label="dPpos_dt")
+    axes[7].plot(time, df["dPneg_dt"], color=neg_color, linestyle="--", label="dPneg_dt")
+    axes[7].set_ylabel("Mean Flow / dPdt")
+    axes[7].set_xlabel("Time [sec]")
+
+    for ax in axes:
+        ax.grid(True)
+        ax.legend(loc="upper right", ncol=2)
+
+    add_period_lines(list(axes), df, periods)
+    fig.suptitle(f"{save_name} | {sim_name} valve debug")
+    fig.tight_layout()
+    fig.savefig(f"{out_dir}/{save_name}_{sim_name}_valve_debug.png", dpi=150)
+    plt.close(fig)
+
+
+def is_channel_active(channel: str) -> bool:
+    return BANGBANG_CFG[channel]["mode"] != "fixed"
+
+
+def legend_above(ax, *, ncol: int = 1) -> None:
+    ax.legend(
+        loc="lower center",
+        bbox_to_anchor=(0.5, 1.01),
+        borderaxespad=0.0,
+        ncol=ncol,
+        fontsize=8,
+    )
+
+
+def save_overview_plot(
+    df: pd.DataFrame,
+    *,
+    sim_name: str,
+    out_dir: str,
+    save_name: str,
+    periods: list[float],
+    args: argparse.Namespace,
+) -> None:
+    pos_active = is_channel_active("pos")
+    neg_active = is_channel_active("neg")
+    pos_color, neg_color = {
+        "sim2": ("red", "blue"),
+        "sim": ("darkorange", "deepskyblue"),
+    }.get(sim_name, ("red", "blue"))
+
+    fig, axes = plt.subplots(5, 1, figsize=(14, 11), sharex=True)
+    time = df["curr_time"]
+    show_valve_debug = args.valve_debug and has_finite_valve_debug(df)
+
+    axes[0].plot(time, df["sen_pos"], color=pos_color, label=f"{sim_name}_pos")
+    axes[0].set_ylabel(f"{sim_name} Pos [kPa]")
+
+    axes[1].plot(time, df["sen_neg"], color=neg_color, label=f"{sim_name}_neg")
+    axes[1].set_ylabel(f"{sim_name} Neg [kPa]")
+
+    if pos_active:
+        axes[2].plot(time, df["dPpos_dt"], color=pos_color, label=f"{sim_name}_dPpos_dt")
+    if neg_active:
+        axes[2].plot(time, df["dPneg_dt"], color=neg_color, label=f"{sim_name}_dPneg_dt")
+    if not pos_active and not neg_active:
+        axes[2].plot(time, df["dPpos_dt"], color=pos_color, label=f"{sim_name}_dPpos_dt")
+        axes[2].plot(time, df["dPneg_dt"], color=neg_color, label=f"{sim_name}_dPneg_dt")
+    axes[2].set_ylabel(f"{sim_name} dP/dt")
+
+    axes[3].plot(time, df["mean_pump_in"], color="purple", label=f"{sim_name}_pump_in")
+    axes[3].plot(time, df["mean_pump_out"], color="brown", label=f"{sim_name}_pump_out")
+    if pos_active:
+        axes[3].plot(time, df["mean_valve_pos"], color=pos_color, label=f"{sim_name}_valve_pos")
+    if neg_active:
+        axes[3].plot(time, df["mean_valve_neg"], color=neg_color, label=f"{sim_name}_valve_neg")
+
+    if show_valve_debug:
+        if pos_active:
+            axes[3].plot(
+                time,
+                df["pos_q_static_lpm"],
+                color=pos_color,
+                linestyle="--",
+                alpha=0.65,
+                label=f"{sim_name}_pos_q_static",
+            )
+            axes[3].plot(
+                time,
+                df["pos_q_pred_lpm"],
+                color=pos_color,
+                linestyle=":",
+                alpha=0.9,
+                label=f"{sim_name}_pos_q_pred",
+            )
+        if neg_active:
+            axes[3].plot(
+                time,
+                df["neg_q_static_lpm"],
+                color=neg_color,
+                linestyle="--",
+                alpha=0.65,
+                label=f"{sim_name}_neg_q_static",
+            )
+            axes[3].plot(
+                time,
+                df["neg_q_pred_lpm"],
+                color=neg_color,
+                linestyle=":",
+                alpha=0.9,
+                label=f"{sim_name}_neg_q_pred",
+            )
+    axes[3].set_ylabel(f"{sim_name} Flow")
+
+    axes[4].plot(time, df["ctrl_pos"], color=pos_color, label=f"{sim_name}_ctrl_pos")
+    axes[4].plot(time, df["ctrl_neg"], color=neg_color, label=f"{sim_name}_ctrl_neg")
+    axes[4].set_ylabel(f"{sim_name} Control")
+    axes[4].set_xlabel("Time [sec]")
+
+    for ax in axes:
+        ax.grid(True)
+        legend_above(ax, ncol=4)
+
+    add_period_lines(list(axes), df, periods)
+    fig.suptitle(f"{save_name} | {sim_name} | periods={periods}", y=0.995)
+    fig.tight_layout(rect=[0.0, 0.0, 1.0, 0.965], h_pad=2.0)
+    fig.savefig(f"{out_dir}/{save_name}_{sim_name}.png", dpi=150)
+    plt.close(fig)
 
 
 def save_outputs(dfs: dict[str, pd.DataFrame], periods: list[float], args: argparse.Namespace) -> None:
@@ -186,6 +436,22 @@ def save_outputs(dfs: dict[str, pd.DataFrame], periods: list[float], args: argpa
     os.makedirs(out_dir, exist_ok=True)
     for sim_name, df in dfs.items():
         df.to_csv(f"{out_dir}/{save_name}_{sim_name}.csv", index=False)
+        save_overview_plot(
+            df,
+            sim_name=sim_name,
+            out_dir=out_dir,
+            save_name=save_name,
+            periods=periods,
+            args=args,
+        )
+        if args.valve_debug:
+            save_valve_debug_plot(
+                df,
+                sim_name=sim_name,
+                out_dir=out_dir,
+                save_name=save_name,
+                periods=periods,
+            )
 
     cfg = dict(
         bangbang=BANGBANG_CFG,
@@ -198,62 +464,6 @@ def save_outputs(dfs: dict[str, pd.DataFrame], periods: list[float], args: argpa
     )
     with open(f"{out_dir}/cfg.yaml", "w") as f:
         yaml.dump(cfg, f)
-
-    fig = plt.figure(figsize=(12, max(8, 4 * len(dfs))))
-    gs = gridspec.GridSpec(3 * len(dfs), 1, figure=fig)
-
-    first_ax = None
-    axes = []
-    colors = dict(
-        sim2=("red", "blue"),
-        sim=("darkorange", "deepskyblue"),
-    )
-
-    for idx, (sim_name, df) in enumerate(dfs.items()):
-        base_idx = 3 * idx
-        if first_ax is None:
-            ax1 = fig.add_subplot(gs[base_idx, 0])
-            first_ax = ax1
-        else:
-            ax1 = fig.add_subplot(gs[base_idx, 0], sharex=first_ax)
-        ax2 = fig.add_subplot(gs[base_idx + 1, 0], sharex=first_ax)
-        ax3 = fig.add_subplot(gs[base_idx + 2, 0], sharex=first_ax)
-        axes.extend([ax1, ax2, ax3])
-
-        pos_color, neg_color = colors[sim_name]
-
-        ax1.plot(df["curr_time"], df["sen_pos"], color=pos_color, label=f"{sim_name}_pos")
-        ax1.grid(True)
-        ax1.legend(loc="upper right")
-        ax1.set_ylabel(f"{sim_name} Pos [kPa]")
-
-        ax2.plot(df["curr_time"], df["sen_neg"], color=neg_color, label=f"{sim_name}_neg")
-        ax2.grid(True)
-        ax2.legend(loc="upper right")
-        ax2.set_ylabel(f"{sim_name} Neg [kPa]")
-
-        ax3.plot(df["curr_time"], df["ctrl_pos"], color=pos_color, label=f"{sim_name}_ctrl_pos")
-        ax3.plot(df["curr_time"], df["ctrl_neg"], color=neg_color, label=f"{sim_name}_ctrl_neg")
-        ax3.grid(True)
-        ax3.legend(loc="upper right")
-        ax3.set_ylabel(f"{sim_name} Control")
-        if idx == len(dfs) - 1:
-            ax3.set_xlabel("Time [sec]")
-
-    for period in periods[1:]:
-        idx = df.index[df["period"] == period]
-        if len(idx) == 0:
-            continue
-        t0 = float(df.loc[idx[0], "curr_time"])
-        for ax in axes:
-            ax.axvline(t0, color="gray", linestyle="--", linewidth=0.8, alpha=0.7)
-
-    fig.suptitle(
-        f"{save_name} | periods={periods}"
-    )
-    fig.tight_layout()
-    fig.savefig(f"{out_dir}/{save_name}.png", dpi=150)
-    plt.close(fig)
 
     print(f"[INFO] Saved bang-bang result: {out_dir}")
 
@@ -269,6 +479,7 @@ def main() -> None:
         end_period=BANGBANG_CFG["end_period"],
         period_ratio=BANGBANG_CFG["period_ratio"],
         cycles_per_period=BANGBANG_CFG["cycles_per_period"],
+        valve_debug=BANGBANG_CFG["valve_debug"],
         save_name=BANGBANG_CFG["save_name"],
     )
 

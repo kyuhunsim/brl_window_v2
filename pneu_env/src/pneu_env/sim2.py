@@ -56,6 +56,11 @@ class PneuSim():
         self.lib.solenoid_valve_test.argtypes = [c_double for _ in range(5)]
         self.lib.solenoid_valve_test.restype = c_double
         self.lib.get_mean_mass_flowrate.restype = POINTER(c_double)
+        try:
+            self.lib.get_valve_debug.restype = POINTER(c_double)
+            self.has_valve_debug = True
+        except AttributeError:
+            self.has_valve_debug = False
         
         self.init_pos_press = init_pos_press
         self.init_neg_press = init_neg_press
@@ -213,6 +218,31 @@ class PneuSim():
             valve_pos = mf[2],
             valve_neg = mf[3]
         )
+
+    def get_valve_debug(self):
+        names = [
+            "u_eff",
+            "current",
+            "state_curr",
+            "z",
+            "force_net",
+            "area_eff",
+            "q_static_lpm",
+            "q_pred_lpm",
+            "mdot",
+        ]
+        if not self.has_valve_debug:
+            return {
+                f"{side}_{name}": float("nan")
+                for side in ("pos", "neg")
+                for name in names
+            }
+
+        values = list(self.lib.get_valve_debug()[0:18])
+        return {
+            **{f"pos_{name}": values[i] for i, name in enumerate(names)},
+            **{f"neg_{name}": values[i + 9] for i, name in enumerate(names)},
+        }
 
     
     def solenoid_valve(
