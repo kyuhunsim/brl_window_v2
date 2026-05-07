@@ -1,3 +1,3 @@
 {"enabled": true, 
-"chirp": {"offset": 0.95, "amp": 0.05, "f0": 0.05, "f1": 10.0, "duration": 180.0, "repeat": true, "phase": 0.0, "min": 0.85, "max": 1.0}, 
-"pid": {"measure_key": "pos_press", "ref": 300.0, "base": 0.925, "kp": 0.0095, "ki": 0.05, "kd": 0.02, "sign": -1.0, "min": 0.85, "max": 1.0, "integral_limit": 500.0, "reset_integral": false}}
+"chirp": {"offset": 0.925, "amp": 0.01, "f0": 0.05, "f1": 5.0, "duration": 300.0, "repeat": false, "phase": 0.0, "min": 0.85, "max": 1.0}, 
+"pid": {"measure_key": "pos_press", "ref": 310.0, "base": 0.925, "kp": 0.008, "ki": 0.005, "kd": 0.002, "sign": -1.0, "min": 0.85, "max": 1.0, "integral_limit": 500.0, "reset_integral": false}}

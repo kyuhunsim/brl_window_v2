@@ -40,7 +40,7 @@ from pneu_utils.utils import get_pkg_path
 # Manual runtime config
 # ==============================
 FREQ = 50.0
-DURATION = 240
+DURATION = 180
 TAG = "chirp_pid_2ctrl"
 
 # 1 means ctrl1/pos_ctrl, 2 means ctrl2/neg_ctrl.
@@ -58,7 +58,7 @@ LIVE_CONFIG_NAME = "chirp_pid_2ctrl_live.json"
 DEFAULT_LIVE_CONFIG = dict(
     enabled=True,
     # profile="chirp" or "stepped_sine".
-    profile="stepped_sine",
+    profile="chirp",
     # Chirp command: offset + amp * sin(2*pi*(f0*t + 0.5*k*t^2) + phase)
     chirp=dict(
         # offset=0.925,
