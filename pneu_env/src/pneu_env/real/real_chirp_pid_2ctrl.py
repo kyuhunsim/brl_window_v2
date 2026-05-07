@@ -7,13 +7,13 @@ real_chirp_pid_2ctrl.py
 2-channel valve identification runner.
 
 - Uses only ctrl1/ctrl2.
-- One channel applies a chirp command.
+- One channel applies a chirp or stepped-sine command.
 - The other channel applies PID to hold a pressure operating point.
 - Runtime ref/gain/chirp settings are reloaded from a JSON file every loop.
 
 Edit the config block below for defaults. While running, edit:
   <tcpip_dir>/chirp_pid_2ctrl_live.json
-to change PID ref/gains or chirp parameters without restarting.
+to change PID ref/gains or profile parameters without restarting.
 """
 
 import json
@@ -40,7 +40,7 @@ from pneu_utils.utils import get_pkg_path
 # Manual runtime config
 # ==============================
 FREQ = 50.0
-DURATION = 180
+DURATION = 240
 TAG = "chirp_pid_2ctrl"
 
 # 1 means ctrl1/pos_ctrl, 2 means ctrl2/neg_ctrl.
@@ -57,14 +57,46 @@ LIVE_CONFIG_NAME = "chirp_pid_2ctrl_live.json"
 
 DEFAULT_LIVE_CONFIG = dict(
     enabled=True,
+    # profile="chirp" or "stepped_sine".
+    profile="stepped_sine",
     # Chirp command: offset + amp * sin(2*pi*(f0*t + 0.5*k*t^2) + phase)
     chirp=dict(
+        # offset=0.925,
+        # amp=0.025,
+        # f0=0.05,
+        # f1=2.0,
+        # duration=180.0,
+        # repeat=True,
+        # phase=0.0,
+        # min=0.85,
+        # max=1.0,
         offset=0.925,
-        amp=0.025,
+        amp=0.01,
         f0=0.05,
         f1=2.0,
-        duration=180.0,
-        repeat=True,
+        duration=240.0,
+        repeat=False,
+        phase=0.0,
+        min=0.85,
+        max=1.0,
+        # offset=0.925,
+        # amp=0.01,
+        # f0=0.05,
+        # f1=5.0,
+        # duration=300
+    ),
+    # Stepped sine command:
+    #   offset + amp*sin(2*pi*freq*t_local + phase)
+    # Each frequency is held for max(cycles_per_freq / freq, min_hold_sec).
+    # The first discard_cycles cycles can be ignored later during analysis.
+    stepped_sine=dict(
+        offset=0.925,
+        amp=0.01,
+        freqs=[0.05, 0.1, 0.2, 0.4, 0.7, 1.0, 1.5, 2.0, 3.0],
+        cycles_per_freq=5.0,
+        discard_cycles=2.0,
+        min_hold_sec=5.0,
+        repeat=False,
         phase=0.0,
         min=0.85,
         max=1.0,
@@ -130,6 +162,94 @@ def _chirp_value(local_time, cfg):
     ctrl = float(cfg["offset"]) + float(cfg["amp"]) * np.sin(phase)
     inst_freq = f0 + k * t
     return float(np.clip(ctrl, float(cfg["min"]), float(cfg["max"]))), float(inst_freq)
+
+
+def _stepped_sine_schedule(cfg):
+    freqs = [float(freq) for freq in cfg.get("freqs", [])]
+    if not freqs:
+        raise ValueError("stepped_sine freqs must not be empty")
+    if any(freq <= 0.0 for freq in freqs):
+        raise ValueError("stepped_sine freqs must be positive")
+
+    cycles_per_freq = float(cfg.get("cycles_per_freq", 5.0))
+    min_hold_sec = float(cfg.get("min_hold_sec", 0.0))
+
+    schedule = []
+    start = 0.0
+    for idx, freq in enumerate(freqs):
+        hold_sec = max(cycles_per_freq / freq, min_hold_sec)
+        end = start + hold_sec
+        schedule.append(
+            dict(
+                idx=idx,
+                freq=freq,
+                start=start,
+                end=end,
+                hold_sec=hold_sec,
+            )
+        )
+        start = end
+    return schedule, start
+
+
+def _stepped_sine_value(local_time, cfg):
+    schedule, total_duration = _stepped_sine_schedule(cfg)
+    if bool(cfg.get("repeat", False)):
+        t = local_time % max(total_duration, 1e-9)
+    else:
+        t = min(local_time, max(total_duration - 1e-9, 0.0))
+
+    segment = schedule[-1]
+    for item in schedule:
+        if item["start"] <= t < item["end"]:
+            segment = item
+            break
+
+    freq = float(segment["freq"])
+    t_local = t - float(segment["start"])
+    phase = 2.0 * np.pi * freq * t_local + float(cfg.get("phase", 0.0))
+    ctrl = float(cfg["offset"]) + float(cfg["amp"]) * np.sin(phase)
+    ctrl = float(np.clip(ctrl, float(cfg["min"]), float(cfg["max"])))
+
+    discard_cycles = float(cfg.get("discard_cycles", 2.0))
+    discard_sec = discard_cycles / freq
+    usable = t_local >= discard_sec
+
+    return ctrl, freq, dict(
+        idx=float(segment["idx"]),
+        local_time=float(t_local),
+        hold_sec=float(segment["hold_sec"]),
+        discard_sec=float(discard_sec),
+        usable=float(usable),
+        total_duration=float(total_duration),
+    )
+
+
+def _profile_value(local_time, cfg):
+    profile = str(cfg.get("profile", "chirp")).lower()
+    if profile == "chirp":
+        ctrl, freq = _chirp_value(local_time, cfg["chirp"])
+        info = dict(
+            profile_mode=0.0,
+            profile_idx=float("nan"),
+            profile_local_time=float("nan"),
+            profile_hold_sec=float("nan"),
+            profile_discard_sec=float("nan"),
+            profile_usable=1.0,
+        )
+        return ctrl, freq, info
+    if profile == "stepped_sine":
+        ctrl, freq, sine_info = _stepped_sine_value(local_time, cfg["stepped_sine"])
+        info = dict(
+            profile_mode=1.0,
+            profile_idx=sine_info["idx"],
+            profile_local_time=sine_info["local_time"],
+            profile_hold_sec=sine_info["hold_sec"],
+            profile_discard_sec=sine_info["discard_sec"],
+            profile_usable=sine_info["usable"],
+        )
+        return ctrl, freq, info
+    raise ValueError(f"unknown profile: {profile}")
 
 
 class LivePID:
@@ -239,6 +359,12 @@ def main():
         angle_vel=deque(),
         chirp_ctrl=deque(),
         chirp_freq=deque(),
+        profile_mode=deque(),
+        profile_idx=deque(),
+        profile_local_time=deque(),
+        profile_hold_sec=deque(),
+        profile_discard_sec=deque(),
+        profile_usable=deque(),
         pid_ctrl=deque(),
         pid_ref=deque(),
         pid_measured=deque(),
@@ -286,9 +412,11 @@ def main():
             if changed:
                 print(
                     "[INFO] live config loaded: "
+                    f"profile={live_cfg.get('profile', 'chirp')}, "
                     f"pid_ref={live_cfg['pid']['ref']}, "
                     f"kp={live_cfg['pid']['kp']}, ki={live_cfg['pid']['ki']}, kd={live_cfg['pid']['kd']}, "
-                    f"chirp_amp={live_cfg['chirp']['amp']}, f0={live_cfg['chirp']['f0']}, f1={live_cfg['chirp']['f1']}"
+                    f"chirp_amp={live_cfg['chirp']['amp']}, f0={live_cfg['chirp']['f0']}, f1={live_cfg['chirp']['f1']}, "
+                    f"stepped_freqs={live_cfg['stepped_sine']['freqs']}"
                 )
                 if bool(live_cfg["pid"].get("reset_integral", False)):
                     pid.reset()
@@ -318,6 +446,14 @@ def main():
                 ctrl = safe_ctrls.copy()
                 chirp_ctrl = float("nan")
                 chirp_freq = float("nan")
+                profile_info = dict(
+                    profile_mode=float("nan"),
+                    profile_idx=float("nan"),
+                    profile_local_time=float("nan"),
+                    profile_hold_sec=float("nan"),
+                    profile_discard_sec=float("nan"),
+                    profile_usable=float("nan"),
+                )
                 pid_ctrl = float("nan")
                 pid_info = dict(
                     ref=float("nan"),
@@ -330,7 +466,7 @@ def main():
                     integral=pid.integral,
                 )
             else:
-                chirp_ctrl, chirp_freq = _chirp_value(elapsed, live_cfg["chirp"])
+                chirp_ctrl, chirp_freq, profile_info = _profile_value(elapsed, live_cfg)
                 measure_key = str(live_cfg["pid"]["measure_key"])
                 if measure_key not in obs_state:
                     raise KeyError(f"PID measure_key not found in obs_state: {measure_key}")
@@ -363,6 +499,12 @@ def main():
             data["angle_vel"].append(float(obs_state["angular_vel"]))
             data["chirp_ctrl"].append(float(chirp_ctrl))
             data["chirp_freq"].append(float(chirp_freq))
+            data["profile_mode"].append(float(profile_info["profile_mode"]))
+            data["profile_idx"].append(float(profile_info["profile_idx"]))
+            data["profile_local_time"].append(float(profile_info["profile_local_time"]))
+            data["profile_hold_sec"].append(float(profile_info["profile_hold_sec"]))
+            data["profile_discard_sec"].append(float(profile_info["profile_discard_sec"]))
+            data["profile_usable"].append(float(profile_info["profile_usable"]))
             data["pid_ctrl"].append(float(pid_ctrl))
             data["pid_ref"].append(float(pid_info["ref"]))
             data["pid_measured"].append(float(pid_info["measured"]))
@@ -378,7 +520,7 @@ def main():
                     f"[INFO] t={elapsed:.2f}s "
                     f"ctrl=({ctrl[0]:.3f},{ctrl[1]:.3f}) "
                     f"P=({obs_state['pos_press']:.1f},{obs_state['neg_press']:.1f}) "
-                    f"chirp=({chirp_ctrl:.3f}, {chirp_freq:.3f}Hz) "
+                    f"profile=({chirp_ctrl:.3f}, {chirp_freq:.3f}Hz) "
                     f"pid=(ref={pid_info['ref']:.1f}, meas={pid_info['measured']:.1f}, err={pid_info['err']:.2f})"
                 )
 

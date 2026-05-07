@@ -23,6 +23,7 @@ import argparse
 import json
 import os
 from datetime import datetime
+from typing import Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -142,7 +143,7 @@ def estimate_windows(
     return out
 
 
-def find_bandwidth(response: pd.DataFrame, threshold_db: float) -> float | None:
+def find_bandwidth(response: pd.DataFrame, threshold_db: float) -> Optional[float]:
     below = response[response["gain_db"] <= threshold_db]
     if below.empty:
         return None
@@ -209,7 +210,7 @@ def plot_results(
     input_col: str,
     output_col: str,
     freq_col: str,
-    bandwidth_hz: float | None,
+    bandwidth_hz: Optional[float],
     output_path: str,
 ) -> None:
     fig, axes = plt.subplots(4, 1, figsize=(12, 12))
