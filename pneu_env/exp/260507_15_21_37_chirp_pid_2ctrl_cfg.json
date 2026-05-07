@@ -1,0 +1,40 @@
+{
+  "freq": 50.0,
+  "duration": 180,
+  "chirp_channel": 1,
+  "pid_channel": 2,
+  "fixed_tail_ctrls": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "default_live_config": {
+    "enabled": true,
+    "chirp": {
+      "offset": 0.925,
+      "amp": 0.025,
+      "f0": 0.05,
+      "f1": 2.0,
+      "duration": 180.0,
+      "repeat": true,
+      "phase": 0.0,
+      "min": 0.85,
+      "max": 1.0
+    },
+    "pid": {
+      "measure_key": "pos_press",
+      "ref": 260.0,
+      "base": 0.925,
+      "kp": 0.003,
+      "ki": 0.0,
+      "kd": 0.0,
+      "sign": -1.0,
+      "min": 0.85,
+      "max": 1.0,
+      "integral_limit": 500.0,
+      "reset_integral": false
+    }
+  },
+  "live_config_path": "/home/kyuhun/brl_window_v2/pneu_env/src/pneu_env/tcpip/chirp_pid_2ctrl_live.json"
+}

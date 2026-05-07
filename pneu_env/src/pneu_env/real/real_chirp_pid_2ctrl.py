@@ -40,7 +40,7 @@ from pneu_utils.utils import get_pkg_path
 # Manual runtime config
 # ==============================
 FREQ = 50.0
-DURATION = 300.0
+DURATION = 180
 TAG = "chirp_pid_2ctrl"
 
 # 1 means ctrl1/pos_ctrl, 2 means ctrl2/neg_ctrl.
@@ -71,14 +71,15 @@ DEFAULT_LIVE_CONFIG = dict(
     ),
     # PID command: base + sign*(kp*err + ki*int(err) + kd*derr)
     # err = ref - measured_pressure
+    # sign=-1 opens the valve when measured_pressure is above ref.
     pid=dict(
         measure_key="pos_press",
-        ref=160.0,
+        ref=260.0,
         base=0.925,
         kp=0.003,
         ki=0.0,
         kd=0.0,
-        sign=1.0,
+        sign=-1.0,
         min=0.85,
         max=1.0,
         integral_limit=500.0,
@@ -217,6 +218,7 @@ def main():
 
     data = dict(
         time=deque(),
+        rt_time=deque(),
         press_pos=deque(),
         press_neg=deque(),
         act_pos_press=deque(),
@@ -250,8 +252,9 @@ def main():
 
     script_start_time = time.time()
     next_tick = time.perf_counter()
-    last_obs_time = float(obs_state["time"])
-    run_start_obs_time = None
+    run_start_perf = next_tick
+    last_elapsed = 0.0
+    warned_stale_rt_time = False
 
     try:
         safe_ctrls = np.asarray(SAFE_CTRLS, dtype=np.float64)
@@ -299,9 +302,17 @@ def main():
                 max_wait_s=0.6 * period,
             )
             obs_time = float(obs_state["time"])
-            if run_start_obs_time is None:
-                run_start_obs_time = obs_time
-            elapsed = max(0.0, obs_time - run_start_obs_time)
+            elapsed = max(0.0, now_tick - run_start_perf)
+            if (
+                not warned_stale_rt_time
+                and elapsed > 1.0
+                and obs_time <= prev_obs_time + 1e-9
+            ):
+                print(
+                    "[WARN] RT obs time is not advancing; "
+                    "using local monotonic time for chirp/logging."
+                )
+                warned_stale_rt_time = True
 
             if not bool(live_cfg.get("enabled", True)):
                 ctrl = safe_ctrls.copy()
@@ -323,7 +334,7 @@ def main():
                 measure_key = str(live_cfg["pid"]["measure_key"])
                 if measure_key not in obs_state:
                     raise KeyError(f"PID measure_key not found in obs_state: {measure_key}")
-                dt_obs = max(obs_time - last_obs_time, period)
+                dt_obs = max(elapsed - last_elapsed, period)
                 pid_ctrl, pid_info = pid.compute(obs_state[measure_key], live_cfg["pid"], dt_obs)
                 ctrl1, ctrl2 = _active_ctrls(chirp_ctrl, pid_ctrl)
                 ctrl = _compose_ctrls(ctrl1, ctrl2)
@@ -339,7 +350,8 @@ def main():
                 ),
             )
 
-            data["time"].append(obs_time)
+            data["time"].append(elapsed)
+            data["rt_time"].append(obs_time)
             data["press_pos"].append(float(obs_state["pos_press"]))
             data["press_neg"].append(float(obs_state["neg_press"]))
             data["act_pos_press"].append(float(obs_state["act_pos_press"]))
@@ -370,7 +382,7 @@ def main():
                     f"pid=(ref={pid_info['ref']:.1f}, meas={pid_info['measured']:.1f}, err={pid_info['err']:.2f})"
                 )
 
-            last_obs_time = obs_time
+            last_elapsed = elapsed
             if elapsed >= duration:
                 break
 
