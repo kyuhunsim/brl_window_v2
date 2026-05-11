@@ -33,6 +33,9 @@ from scipy import optimize
 from pneu_utils.utils import get_pkg_path
 
 
+WARMUP_EXCLUDE_SEC = 10.0
+
+
 def fit_sine(time_s: np.ndarray, signal: np.ndarray, freq_hz: float) -> tuple[float, float, float]:
     omega = 2.0 * np.pi * freq_hz
     t = time_s - time_s[0]
@@ -288,10 +291,17 @@ def main() -> None:
 
     if args.profile_mode_col and args.profile_mode is not None:
         df = df[df[args.profile_mode_col] == args.profile_mode].copy()
+    if df.empty:
+        raise RuntimeError("No rows after profile mode filtering.")
+
+    warmup_cutoff = float(df[args.time_col].min()) + WARMUP_EXCLUDE_SEC
+    df = df[df[args.time_col] >= warmup_cutoff].copy()
     if args.start is not None:
         df = df[df[args.time_col] >= args.start].copy()
     if args.end is not None:
         df = df[df[args.time_col] <= args.end].copy()
+    if df.empty:
+        raise RuntimeError("No rows after time filtering.")
 
     response = estimate_windows(
         df,
@@ -331,6 +341,8 @@ def main() -> None:
         n_windows=int(len(response)),
         bandwidth_hz=bandwidth_hz,
         threshold_db=args.threshold_db,
+        warmup_exclude_sec=WARMUP_EXCLUDE_SEC,
+        warmup_cutoff=warmup_cutoff,
         fit=fit,
         args=vars(args),
     )
@@ -352,6 +364,7 @@ def main() -> None:
     )
 
     print(f"[INFO] Saved: {out_dir}")
+    print(f"[INFO] Excluded initial {WARMUP_EXCLUDE_SEC:g} sec before analysis (time < {warmup_cutoff:.6g}).")
     print(f"[INFO] Response CSV: {response_path}")
     print(f"[INFO] Summary JSON: {summary_path}")
     if bandwidth_hz is None:

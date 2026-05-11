@@ -1,0 +1,35 @@
+{
+  "csv": "/home/kyuhun/brl_window_v2/pneu_env/exp/260511_17_05_49_fixed_sine_pid_2ctrl.csv",
+  "input_col": "chirp_ctrl",
+  "output_col": "flow1",
+  "freq_col": "chirp_freq",
+  "n_windows": 792,
+  "bandwidth_hz": 0.5,
+  "threshold_db": -3.0,
+  "fit": {
+    "success": true,
+    "cost": 7457.385406816283,
+    "wn_rad_s": 2.7885348420523597,
+    "wn_hz": 0.4438091040966107,
+    "zeta": 0.4491135342074514,
+    "message": "`ftol` termination condition is satisfied."
+  },
+  "args": {
+    "csv": "exp/260511_17_05_49_fixed_sine_pid_2ctrl.csv",
+    "time_col": "time",
+    "input_col": "chirp_ctrl",
+    "output_col": "flow1",
+    "freq_col": "chirp_freq",
+    "profile_mode_col": null,
+    "profile_mode": null,
+    "start": null,
+    "end": null,
+    "cycles_per_window": 4.0,
+    "step_fraction": 0.5,
+    "min_points": 20,
+    "min_input_amp": 0.0001,
+    "threshold_db": -3.0,
+    "no_phase_fit": false,
+    "save_name": null
+  }
+}
