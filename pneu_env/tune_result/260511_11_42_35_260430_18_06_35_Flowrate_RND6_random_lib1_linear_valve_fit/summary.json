@@ -1,0 +1,48 @@
+{
+  "csv": "/home/rise/test/brl_window/pneu_env/exp/260430_18_06_35_Flowrate_RND6_random.csv",
+  "args": {
+    "csv": "exp/260430_18_06_35_Flowrate_RND6_random.csv",
+    "valves": "1,2",
+    "start": 20.0,
+    "end": null,
+    "flow_window": 1,
+    "flow_delay_samples": 0,
+    "save_name": null
+  },
+  "results": {
+    "1": {
+      "params": [
+        0.0006219192573162581,
+        8.543183656600396e-05,
+        -1.9076121604617175e-07
+      ],
+      "metrics": {
+        "rmse": 3.8145149042799362,
+        "mae": 2.668291577911771,
+        "bias": -0.32517285062938284,
+        "n": 12150,
+        "success": true,
+        "cost": 24519.81604993042
+      },
+      "name": "ctrl1 / chamber pos -> ATM"
+    },
+    "2": {
+      "params": [
+        0.0010211333450998727,
+        0.0001470162532224661,
+        3.6481684199321504e-08
+      ],
+      "metrics": {
+        "rmse": 3.543248167878839,
+        "mae": 2.388648683165824,
+        "bias": -0.2465730998119383,
+        "n": 13539,
+        "success": true,
+        "cost": 23846.776531555173
+      },
+      "name": "ctrl2 / ATM -> chamber neg"
+    }
+  },
+  "cpp_snippet": "// Valve 1: ctrl1 / chamber pos -> ATM\ndouble Cpos1 = 0.00062191925731625811;\ndouble Cpos2 = 8.5431836566003959e-05;\ndouble Cpos3 = -1.9076121604617175e-07;\n\n// Valve 2: ctrl2 / ATM -> chamber neg\ndouble Cneg1 = 0.0010211333450998727;\ndouble Cneg2 = 0.00014701625322246611;\ndouble Cneg3 = 3.6481684199321504e-08;\n",
+  "plot": "/home/rise/test/brl_window/pneu_env/tune_result/260511_11_42_35_260430_18_06_35_Flowrate_RND6_random_lib1_linear_valve_fit/260511_11_42_35_260430_18_06_35_Flowrate_RND6_random_lib1_linear_valve_fit.png"
+}

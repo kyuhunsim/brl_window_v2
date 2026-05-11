@@ -1,0 +1,35 @@
+{
+  "csv": "/home/rise/test/brl_window/pneu_env/exp/260507_19_48_38_chirp_pid_2ctrl.csv",
+  "input_col": "chirp_ctrl",
+  "output_col": "flow1",
+  "freq_col": "chirp_freq",
+  "n_windows": 131,
+  "bandwidth_hz": 0.7098363921132478,
+  "threshold_db": -3.0,
+  "fit": {
+    "success": true,
+    "cost": 945.0992253077685,
+    "wn_rad_s": 4.669875982178128,
+    "wn_hz": 0.7432338461897688,
+    "zeta": 0.3500980930973287,
+    "message": "`ftol` termination condition is satisfied."
+  },
+  "args": {
+    "csv": "exp/260507_19_48_38_chirp_pid_2ctrl.csv",
+    "time_col": "time",
+    "input_col": "chirp_ctrl",
+    "output_col": "flow1",
+    "freq_col": "chirp_freq",
+    "profile_mode_col": null,
+    "profile_mode": null,
+    "start": null,
+    "end": null,
+    "cycles_per_window": 4.0,
+    "step_fraction": 0.5,
+    "min_points": 20,
+    "min_input_amp": 0.0001,
+    "threshold_db": -3.0,
+    "no_phase_fit": false,
+    "save_name": null
+  }
+}

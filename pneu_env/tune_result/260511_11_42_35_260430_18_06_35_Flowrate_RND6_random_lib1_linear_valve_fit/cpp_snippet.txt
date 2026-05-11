@@ -1,0 +1,10 @@
+// Valve 1: ctrl1 / chamber pos -> ATM
+double Cpos1 = 0.00062191925731625811;
+double Cpos2 = 8.5431836566003959e-05;
+double Cpos3 = -1.9076121604617175e-07;
+
+// Valve 2: ctrl2 / ATM -> chamber neg
+double Cneg1 = 0.0010211333450998727;
+double Cneg2 = 0.00014701625322246611;
+double Cneg3 = 3.6481684199321504e-08;
+

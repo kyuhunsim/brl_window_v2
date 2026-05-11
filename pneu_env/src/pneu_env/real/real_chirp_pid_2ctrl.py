@@ -40,8 +40,8 @@ from pneu_utils.utils import get_pkg_path
 # Manual runtime config
 # ==============================
 FREQ = 50.0
-DURATION = 180
-TAG = "chirp_pid_2ctrl"
+DURATION = 800
+TAG = "fixed_sine_pid_2ctrl"
 
 # 1 means ctrl1/pos_ctrl, 2 means ctrl2/neg_ctrl.
 CHIRP_CHANNEL = 1
@@ -53,12 +53,12 @@ FIXED_TAIL_CTRLS = [0.0, 0.0, 0.0, 0.0]
 # Safe command written before start and on exit.
 SAFE_CTRLS = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 
-LIVE_CONFIG_NAME = "chirp_pid_2ctrl_live.json"
+LIVE_CONFIG_NAME = "fixed_sine_pid_2ctrl_live.json"
 
 DEFAULT_LIVE_CONFIG = dict(
     enabled=True,
     # profile="chirp" or "stepped_sine".
-    profile="chirp",
+    profile="stepped_sine",
     # Chirp command: offset + amp * sin(2*pi*(f0*t + 0.5*k*t^2) + phase)
     chirp=dict(
         # offset=0.925,
@@ -87,14 +87,17 @@ DEFAULT_LIVE_CONFIG = dict(
     ),
     # Stepped sine command:
     #   offset + amp*sin(2*pi*freq*t_local + phase)
-    # Each frequency is held for max(cycles_per_freq / freq, min_hold_sec).
+    # If hold_sec is set, each frequency is held for exactly hold_sec seconds.
+    # Otherwise each frequency is held for max(cycles_per_freq / freq, min_hold_sec).
     # The first discard_cycles cycles can be ignored later during analysis.
     stepped_sine=dict(
-        offset=0.925,
-        amp=0.01,
-        freqs=[0.05, 0.1, 0.2, 0.4, 0.7, 1.0, 1.5, 2.0, 3.0],
+        offset=0.95,
+        amp=0.05,
+        freqs=[0.1, 0.25, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0],
+        hold_sec=100.0,
         cycles_per_freq=5.0,
         discard_cycles=2.0,
+        startup_discard_sec=20.0,
         min_hold_sec=5.0,
         repeat=False,
         phase=0.0,
@@ -171,21 +174,28 @@ def _stepped_sine_schedule(cfg):
     if any(freq <= 0.0 for freq in freqs):
         raise ValueError("stepped_sine freqs must be positive")
 
+    hold_sec_cfg = cfg.get("hold_sec", None)
+    hold_sec = None if hold_sec_cfg is None else float(hold_sec_cfg)
+    if hold_sec is not None and hold_sec <= 0.0:
+        raise ValueError("stepped_sine hold_sec must be positive when set")
+
     cycles_per_freq = float(cfg.get("cycles_per_freq", 5.0))
     min_hold_sec = float(cfg.get("min_hold_sec", 0.0))
 
     schedule = []
     start = 0.0
     for idx, freq in enumerate(freqs):
-        hold_sec = max(cycles_per_freq / freq, min_hold_sec)
-        end = start + hold_sec
+        segment_hold_sec = hold_sec
+        if segment_hold_sec is None:
+            segment_hold_sec = max(cycles_per_freq / freq, min_hold_sec)
+        end = start + segment_hold_sec
         schedule.append(
             dict(
                 idx=idx,
                 freq=freq,
                 start=start,
                 end=end,
-                hold_sec=hold_sec,
+                hold_sec=segment_hold_sec,
             )
         )
         start = end
@@ -213,13 +223,15 @@ def _stepped_sine_value(local_time, cfg):
 
     discard_cycles = float(cfg.get("discard_cycles", 2.0))
     discard_sec = discard_cycles / freq
-    usable = t_local >= discard_sec
+    startup_discard_sec = float(cfg.get("startup_discard_sec", 0.0))
+    usable = t_local >= discard_sec and t >= startup_discard_sec
 
     return ctrl, freq, dict(
         idx=float(segment["idx"]),
         local_time=float(t_local),
         hold_sec=float(segment["hold_sec"]),
         discard_sec=float(discard_sec),
+        startup_discard_sec=float(startup_discard_sec),
         usable=float(usable),
         total_duration=float(total_duration),
     )
@@ -235,7 +247,9 @@ def _profile_value(local_time, cfg):
             profile_local_time=float("nan"),
             profile_hold_sec=float("nan"),
             profile_discard_sec=float("nan"),
+            profile_startup_discard_sec=float("nan"),
             profile_usable=1.0,
+            profile_total_duration=float("nan"),
         )
         return ctrl, freq, info
     if profile == "stepped_sine":
@@ -246,7 +260,9 @@ def _profile_value(local_time, cfg):
             profile_local_time=sine_info["local_time"],
             profile_hold_sec=sine_info["hold_sec"],
             profile_discard_sec=sine_info["discard_sec"],
+            profile_startup_discard_sec=sine_info["startup_discard_sec"],
             profile_usable=sine_info["usable"],
+            profile_total_duration=sine_info["total_duration"],
         )
         return ctrl, freq, info
     raise ValueError(f"unknown profile: {profile}")
@@ -364,7 +380,9 @@ def main():
         profile_local_time=deque(),
         profile_hold_sec=deque(),
         profile_discard_sec=deque(),
+        profile_startup_discard_sec=deque(),
         profile_usable=deque(),
+        profile_total_duration=deque(),
         pid_ctrl=deque(),
         pid_ref=deque(),
         pid_measured=deque(),
@@ -452,7 +470,9 @@ def main():
                     profile_local_time=float("nan"),
                     profile_hold_sec=float("nan"),
                     profile_discard_sec=float("nan"),
+                    profile_startup_discard_sec=float("nan"),
                     profile_usable=float("nan"),
+                    profile_total_duration=float("nan"),
                 )
                 pid_ctrl = float("nan")
                 pid_info = dict(
@@ -504,7 +524,9 @@ def main():
             data["profile_local_time"].append(float(profile_info["profile_local_time"]))
             data["profile_hold_sec"].append(float(profile_info["profile_hold_sec"]))
             data["profile_discard_sec"].append(float(profile_info["profile_discard_sec"]))
+            data["profile_startup_discard_sec"].append(float(profile_info["profile_startup_discard_sec"]))
             data["profile_usable"].append(float(profile_info["profile_usable"]))
+            data["profile_total_duration"].append(float(profile_info["profile_total_duration"]))
             data["pid_ctrl"].append(float(pid_ctrl))
             data["pid_ref"].append(float(pid_info["ref"]))
             data["pid_measured"].append(float(pid_info["measured"]))

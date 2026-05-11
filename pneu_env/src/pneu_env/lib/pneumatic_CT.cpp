@@ -224,9 +224,13 @@ double PneumaticCT::solenoid_valve(double P_inlet, double P_outlet, double signa
         // double Cpos2 = 8.90726972374690e-05;
         // double Cpos3 = 6.05278829960062e-08;
         // Updated values on 2026-01-10
-        double Cpos1 = 0.001114363881476042;
-        double Cpos2 = 0.00015932275143274647;
-        double Cpos3 = 0;
+        // double Cpos1 = 0.001114363881476042;
+        // double Cpos2 = 0.00015932275143274647;
+        // double Cpos3 = 0;
+        // Updated values on 2026-05-11 from exp/260430_18_06_35_Flowrate_RND6_random.csv --start 20
+        double Cpos1 = 0.00062191925731625811;
+        double Cpos2 = 8.5431836566003959e-05;
+        double Cpos3 = -1.9076121604617175e-07;
 
         Cdkx = Cpos1*current - Cpos2 + Cpos3*(Pin - Patm)*S > 0 ? Cpos1*current - Cpos2 + Cpos3*(Pin - Patm)*S : 0;
     } else {
@@ -237,8 +241,12 @@ double PneumaticCT::solenoid_valve(double P_inlet, double P_outlet, double signa
         // double Cneg1 = 0.000966211405733290;
         // double Cneg2 = 0.000145744566455925;
         // Updated values on 2026-01-10
-        double Cpos1 = 0.001133425704176126;
-        double Cpos2 = 0.0001655487332160521;
+        // double Cpos1 = 0.001133425704176126;
+        // double Cpos2 = 0.0001655487332160521;
+        // double Cpos3 = 3.6481684199321504e-08;
+        // Updated values on 2026-05-11 from exp/260430_18_06_35_Flowrate_RND6_random.csv --start 20
+        double Cpos1 = 0.0010211333450998727;
+        double Cpos2 = 0.00014701625322246611;
         double Cpos3 = 3.6481684199321504e-08;
 
         // Cdkx = Cneg1*current - Cneg2 > 0 ? Cneg1*current - Cneg2 : 0;

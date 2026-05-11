@@ -38,8 +38,13 @@
 // #define COUT_ 32.87060296
 
 //20260110
-#define CIN_ 1.1256394620423595
-#define COUT_ 5.401279325612009
+// #define CIN_ 1.1256394620423595
+// #define COUT_ 5.401279325612009
+
+// 20260511, exp/260430_18_06_35_Flowrate_RND6_random.csv --start 20
+// lib1 linear valve params from tune_result/260511_11_42_35...
+#define CIN_ 0.356287011538403
+#define COUT_ 46.092736297697854
 
 struct PneumaticCT
 {

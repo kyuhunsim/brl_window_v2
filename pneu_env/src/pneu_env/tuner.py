@@ -16,12 +16,23 @@ import matplotlib.gridspec as gridspec
 
 STD_RHO = 1.20411831637462
 
+
+def _data_col(data: Dict[str, np.ndarray], *names: str) -> np.ndarray:
+    for name in names:
+        if name in data:
+            return data[name]
+    raise KeyError(f"None of these columns exist: {names}")
+
 class PneuSimTuner():
     def __init__(
         self,
-        data_names: List[str]
+        data_names: List[str],
+        start: Optional[float] = None,
+        end: Optional[float] = None,
     ):
         super().__init__()
+        self.start = start
+        self.end = end
         self.datas = self.load_datas(data_names)
         self.iter_num = 0
     
@@ -79,9 +90,9 @@ class PneuSimTuner():
         )
 
         ctrl = CtrlTraj(
-            traj_time = data["curr_time"],
-            traj_pos = data["ctrl_pos"],
-            traj_neg = data["ctrl_neg"]
+            traj_time = _data_col(data, "curr_time", "time"),
+            traj_pos = _data_col(data, "ctrl_pos", "ctrl1"),
+            traj_neg = _data_col(data, "ctrl_neg", "ctrl2")
         )
 
         sim_time = deque()
@@ -90,10 +101,10 @@ class PneuSimTuner():
         sim_press_pos = deque()
         sim_press_neg = deque()
 
-        real_pump_in = data["flowrate2"]
-        real_pump_out = data["flowrate1"]
-        real_press_pos = data["press_pos"]
-        real_press_neg = data["press_neg"]
+        real_pump_in = _data_col(data, "flowrate2", "flow2")
+        real_pump_out = _data_col(data, "flowrate1", "flow1")
+        real_press_pos = _data_col(data, "press_pos", "sen_pos")
+        real_press_neg = _data_col(data, "press_neg", "sen_neg")
 
         curr_time = 0
         while curr_time < data["curr_time"][-1]:
@@ -114,7 +125,7 @@ class PneuSimTuner():
         sim_press_pos = np.array(sim_press_pos)
         sim_press_neg = np.array(sim_press_neg)
         
-        sim_idx, real_idx = self.match_size(data["curr_time"], np.array(sim_time))
+        sim_idx, real_idx = self.match_size(_data_col(data, "curr_time", "time"), np.array(sim_time))
 
         mass_flowrate_in_error = 0.1*np.mean(np.abs(sim_pump_in[sim_idx] - real_pump_in[real_idx]))
         mass_flowrate_out_error = 0.1*np.mean(np.abs(sim_pump_out[sim_idx] - real_pump_out[real_idx]))
@@ -139,14 +150,14 @@ class PneuSimTuner():
         data: Dict[str, np.ndarray]
     ) -> Dict[str, np.ndarray]:
         sim.set_init_press(
-            init_pos_press = data["sen_pos"][0],
-            init_neg_press = data["sen_neg"][0]
+            init_pos_press = _data_col(data, "sen_pos", "press_pos")[0],
+            init_neg_press = _data_col(data, "sen_neg", "press_neg")[0]
         )
 
         ctrl = CtrlTraj(
-            traj_time = data["curr_time"],
-            traj_pos = data["ctrl_pos"],
-            traj_neg = data["ctrl_neg"],
+            traj_time = _data_col(data, "curr_time", "time"),
+            traj_pos = _data_col(data, "ctrl_pos", "ctrl1"),
+            traj_neg = _data_col(data, "ctrl_neg", "ctrl2"),
         )
 
         sim_time = deque()
@@ -167,10 +178,12 @@ class PneuSimTuner():
         sen_pos = np.array(sen_pos)
         sen_neg = np.array(sen_neg)
         
-        sim_idx, real_idx = self.match_size(data["curr_time"], np.array(sim_time))
+        sim_idx, real_idx = self.match_size(_data_col(data, "curr_time", "time"), np.array(sim_time))
 
-        err = 0.05*np.sum(np.abs(sen_pos[sim_idx] - data["sen_pos"][real_idx]))
-        err += 0.01*np.sum(np.abs(sen_neg[sim_idx] - data["sen_neg"][real_idx]))
+        real_pos = _data_col(data, "sen_pos", "press_pos")
+        real_neg = _data_col(data, "sen_neg", "press_neg")
+        err = 0.05*np.sum(np.abs(sen_pos[sim_idx] - real_pos[real_idx]))
+        err += 0.01*np.sum(np.abs(sen_neg[sim_idx] - real_neg[real_idx]))
 
         return err
     
@@ -210,7 +223,30 @@ class PneuSimTuner():
         datas = dict()
         
         for data_name in data_names:
-            df = pd.read_csv(f"{get_pkg_path('pneu_env')}/exp/{data_name}.csv")
+            if data_name.endswith(".csv") or "/" in data_name:
+                csv_path = data_name
+                if not csv_path.startswith("/"):
+                    csv_path = f"{get_pkg_path('pneu_env')}/{csv_path}"
+            else:
+                csv_path = f"{get_pkg_path('pneu_env')}/exp/{data_name}.csv"
+
+            df = pd.read_csv(csv_path)
+            time_col = "curr_time" if "curr_time" in df.columns else "time" if "time" in df.columns else None
+            if time_col is not None and (self.start is not None or self.end is not None):
+                mask = np.ones(len(df), dtype=bool)
+                if self.start is not None:
+                    mask &= df[time_col].to_numpy(dtype=np.float64) >= float(self.start)
+                if self.end is not None:
+                    mask &= df[time_col].to_numpy(dtype=np.float64) <= float(self.end)
+                df = df.loc[mask].reset_index(drop=True)
+                if len(df) == 0:
+                    raise ValueError(f"No rows remain after clipping {data_name} with start={self.start}, end={self.end}")
+
+                t0 = float(df[time_col].iloc[0])
+                df[time_col] = df[time_col] - t0
+
+            if "curr_time" not in df.columns and "time" in df.columns:
+                df["curr_time"] = df["time"]
             data = {col: df[col].to_numpy() for col in df.columns}
             datas[data_name] = data
         
@@ -240,16 +276,20 @@ class PneuSimTuner():
             # sim.set_discharge_coeff(
             #     inlet_pump_coeff = 1e-6*float(params[0]),
             #     outlet_pump_coeff = 1e-6*float(params[1])
-            # )    
+            # )
+            sim.set_discharge_coeff(
+                inlet_pump_coeff = 1e-6*float(params[0]),
+                outlet_pump_coeff = 1e-6*float(params[1])
+            )
             sim.set_init_press(
-                init_pos_press = data["press_pos"][0],
-                init_neg_press = data["press_neg"][0]
+                init_pos_press = _data_col(data, "press_pos", "sen_pos")[0],
+                init_neg_press = _data_col(data, "press_neg", "sen_neg")[0]
             )
 
             ctrl = CtrlTraj(
-                traj_time = data["curr_time"],
-                traj_pos = data["ctrl_pos"],
-                traj_neg = data["ctrl_neg"]
+                traj_time = _data_col(data, "curr_time", "time"),
+                traj_pos = _data_col(data, "ctrl_pos", "ctrl1"),
+                traj_neg = _data_col(data, "ctrl_neg", "ctrl2")
             )
 
             sim_time = deque()
@@ -260,14 +300,14 @@ class PneuSimTuner():
             sim_valve_pos = deque()
             sim_valve_neg = deque()
 
-            real_time = data["curr_time"]
-            real_pump_in = data["flowrate2"]
-            real_pump_out = data["flowrate1"]
-            real_press_pos = data["press_pos"]
-            real_press_neg = data["press_neg"]
+            real_time = _data_col(data, "curr_time", "time")
+            real_pump_in = _data_col(data, "flowrate2", "flow2")
+            real_pump_out = _data_col(data, "flowrate1", "flow1")
+            real_press_pos = _data_col(data, "press_pos", "sen_pos")
+            real_press_neg = _data_col(data, "press_neg", "sen_neg")
 
             curr_time = 0
-            while curr_time < data["curr_time"][-1]:
+            while curr_time < _data_col(data, "curr_time", "time")[-1]:
                 act = ctrl.get_ctrl(curr_time)
                 curr_obs, info = sim.observe(act)
 
@@ -300,7 +340,11 @@ class PneuSimTuner():
                 mf_pos = sim_valve_pos,
                 mf_neg = sim_valve_neg
             ))
-            df.to_csv(f"{data_name}_simulation.csv")
+            if save_name is not None:
+                save_dir = f'{get_pkg_path("pneu_env")}/data/discharge_coeff_result/{save_name}'
+                df.to_csv(f"{save_dir}/{save_name}_simulation.csv", index=False)
+            else:
+                df.to_csv(f"{data_name}_simulation.csv", index=False)
             
             # Visualize
             fontname = 'Times New Roman'
@@ -340,7 +384,7 @@ class PneuSimTuner():
             ax3.plot(sim_time, sim_pump_in, linewidth=2, color='red', label='sim')
             ax3.plot(real_time, real_pump_in, linewidth=2, color='blue', label='real')
             ax3.set_xlabel('Time [sec]', fontname=fontname, fontsize=label_font_size)
-            ax3.set_ylabel('Mass flowrate [kg/s]', fontname=fontname, fontsize=label_font_size)
+            ax3.set_ylabel('Flowrate [LPM]', fontname=fontname, fontsize=label_font_size)
             ax3.grid(True)
             ax3.grid(which='major', color='silver', linewidth=1)
             ax3.grid(which='minor', color='lightgray', linewidth=0.5)
@@ -352,7 +396,7 @@ class PneuSimTuner():
             ax4.plot(sim_time, sim_pump_out, linewidth=2, color='red', label='sim')
             ax4.plot(real_time, real_pump_out, linewidth=2, color='blue', label='real')
             ax4.set_xlabel('Time [sec]', fontname=fontname, fontsize=label_font_size)
-            ax4.set_ylabel('Mass flowrate [kg/s]', fontname=fontname, fontsize=label_font_size)
+            ax4.set_ylabel('Flowrate [LPM]', fontname=fontname, fontsize=label_font_size)
             ax4.grid(True)
             ax4.grid(which='major', color='silver', linewidth=1)
             ax4.grid(which='minor', color='lightgray', linewidth=0.5)
@@ -364,7 +408,7 @@ class PneuSimTuner():
             ax5.plot(sim_time, sim_valve_pos, linewidth=2, color='red', label='pos')
             ax5.plot(sim_time, sim_valve_neg, linewidth=2, color='blue', label='neg')
             ax5.set_xlabel('Time [sec]', fontname=fontname, fontsize=label_font_size)
-            ax5.set_ylabel('Mass flowrate [kg/s]', fontname=fontname, fontsize=label_font_size)
+            ax5.set_ylabel('Flowrate [LPM]', fontname=fontname, fontsize=label_font_size)
             ax5.grid(True)
             ax5.grid(which='major', color='silver', linewidth=1)
             ax5.grid(which='minor', color='lightgray', linewidth=0.5)

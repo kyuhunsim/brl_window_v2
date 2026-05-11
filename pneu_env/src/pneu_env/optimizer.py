@@ -12,6 +12,26 @@ from utils.utils import setup_plot_style
 setup_plot_style({"legend.fontsize": 18})
 
 
+# ==============================
+# Manual optimizer defaults
+# ==============================
+# Valve 2nd-order dynamics bounds.
+#
+# Unit:
+#   wn: rad/s, not Hz.  Hz = wn / (2*pi)
+#   zeta: damping ratio
+#
+# Current chirp-based default:
+#   wn 7~25 rad/s  ~= natural frequency 1.1~4.0 Hz
+#   zeta 0.3~1.2   avoids both too-ringing and over-damped slow solutions.
+MANUAL_DYNAMIC_BOUNDS = dict(
+    wn_min=11.0,
+    wn_max=25.0,
+    zeta_min=0.4,
+    zeta_max=0.6,
+)
+
+
 # C++ 공유 라이브러리 로드
 lib_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tuner/sim_core.so')
 if not os.path.exists(lib_path):
@@ -556,10 +576,10 @@ def main():
         default="3-6",
         help="HF penalty 적용 대상 밸브 인덱스. 예) 3-6",
     )
-    parser.add_argument("--wn-min", type=float, default=0.2, help="wn 하한(동특성 파라미터 안정화용)")
-    parser.add_argument("--wn-max", type=float, default=120.0, help="wn 상한(동특성 파라미터 안정화용)")
-    parser.add_argument("--zeta-min", type=float, default=0.05, help="zeta 하한(동특성 파라미터 안정화용)")
-    parser.add_argument("--zeta-max", type=float, default=30.0, help="zeta 상한(동특성 파라미터 안정화용)")
+    parser.add_argument("--wn-min", type=float, default=MANUAL_DYNAMIC_BOUNDS["wn_min"], help="wn 하한(동특성 파라미터 안정화용, rad/s)")
+    parser.add_argument("--wn-max", type=float, default=MANUAL_DYNAMIC_BOUNDS["wn_max"], help="wn 상한(동특성 파라미터 안정화용, rad/s)")
+    parser.add_argument("--zeta-min", type=float, default=MANUAL_DYNAMIC_BOUNDS["zeta_min"], help="zeta 하한(동특성 파라미터 안정화용)")
+    parser.add_argument("--zeta-max", type=float, default=MANUAL_DYNAMIC_BOUNDS["zeta_max"], help="zeta 상한(동특성 파라미터 안정화용)")
     parser.add_argument(
         "--r2-floor",
         type=float,

@@ -258,8 +258,8 @@ class PneuSim():
     
 if __name__ == '__main__':
     env = PneuSim()
-    ctrl = np.array([0.9, 0.9], dtype=np.float64)
-    for n in range(10):
+    ctrl = np.array([0.0, 0.9], dtype=np.float64)
+    for n in range(100):
         obs, _ = env.observe(ctrl)
 
         print(obs)

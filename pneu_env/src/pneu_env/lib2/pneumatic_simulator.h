@@ -33,8 +33,12 @@
 // #define COUT_ 33.47453817004828
 
 
-#define CIN_ 3.57613709
-#define COUT_ 30.34040306
+// #define CIN_ 3.57613709
+// #define COUT_ 30.34040306
+
+
+#define CIN_ 2.92669515
+#define COUT_ 33.3372092
 
 struct PneumaticCT
 {
