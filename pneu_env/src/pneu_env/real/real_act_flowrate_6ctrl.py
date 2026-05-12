@@ -35,6 +35,7 @@ ATM = 101.325
 # ==============================
 CTRL_MODE = "random"    # "random" | "const" | "suite"
 CONST_CTRLS = [0.85, 1.0, 1.0, 1.0, 1.0, 1.0]
+RUN_MODE = "all"        # "all" | "static" | "hysteresis" | "dynamic" | profile name
 
 # Only the first two channels are actively excited by default:
 #   ctrl1: pos_ctrl
@@ -143,6 +144,13 @@ SUITE_PROFILES = [
         cycles=4,
     ),
 ]
+
+RUN_MODE_PROFILE_NAMES = dict(
+    all=None,
+    static=("grid_hold_2ctrl",),
+    hysteresis=("slow_ramp_updown_2ctrl",),
+    dynamic=("step_response_2ctrl",),
+)
 
 PROFILE_MODE_IDS = dict(
     idle=0,
@@ -317,6 +325,24 @@ def _suite_profile_at(suite_time: float):
             return idx, profile, suite_time - elapsed
         elapsed += profile_duration
     return len(SUITE_PROFILES), None, 0.0
+
+
+def _select_suite_profiles(run_mode: str) -> list[dict]:
+    mode = str(run_mode).strip().lower()
+    if not mode or mode == "all":
+        return list(SUITE_PROFILES)
+
+    selected_names = RUN_MODE_PROFILE_NAMES.get(mode, None)
+    if selected_names is None:
+        selected_names = (run_mode,)
+
+    selected = [profile for profile in SUITE_PROFILES if profile.get("name") in selected_names]
+    if not selected:
+        available = ", ".join(profile.get("name", "<unnamed>") for profile in SUITE_PROFILES)
+        raise ValueError(
+            f"RUN_MODE={run_mode!r} did not match any suite profile. Available: {available}"
+        )
+    return selected
 
 
 def _bangbang_channel(local_time: float, period: float, cfg: dict) -> float:
@@ -661,10 +687,12 @@ def main():
     tag = ""                    # filename tag suffix
 
     ctrl_mode = CTRL_MODE
+    run_mode = str(RUN_MODE).strip()
     rand_hold_min = float(RAND_HOLD_MIN)   # hold time range [sec] (inclusive)
     rand_hold_max = float(RAND_HOLD_MAX)
     rand_min = float(RAND_MIN)
     rand_max = float(RAND_MAX)
+    suite_profiles = list(SUITE_PROFILES)
 
     if ctrl_mode not in ("random", "const", "suite"):
         raise ValueError(f"CTRL_MODE must be random|const|suite, got: {ctrl_mode}")
@@ -676,18 +704,24 @@ def main():
         raise ValueError("RAND_MIN must be <= RAND_MAX")
 
     if ctrl_mode == "suite":
-        duration = sum(float(profile["duration"]) for profile in SUITE_PROFILES)
+        suite_profiles = _select_suite_profiles(run_mode)
+        duration = sum(float(profile["duration"]) for profile in suite_profiles)
+        globals()["SUITE_PROFILES"] = suite_profiles
 
     tag = f"_{tag}" if tag else ""
     now = datetime.now()
     formatted_time = now.strftime("%y%m%d_%H_%M_%S")
-    save_file_name = f"{formatted_time}_Flowrate_RND6_{ctrl_mode}{tag}"
+    run_mode_suffix = f"_{run_mode}" if ctrl_mode == "suite" and run_mode else ""
+    save_file_name = f"{formatted_time}_Flowrate_RND6_{ctrl_mode}{run_mode_suffix}{tag}"
 
     print(
         f"[INFO] mode={ctrl_mode}, duration={duration:.1f}s, "
         f"active_ctrl_count={ACTIVE_CTRL_COUNT}, fixed_tail={FIXED_TAIL_CTRLS}, "
-        f"rand_hold=[{rand_hold_min},{rand_hold_max}]s, rand_range=[{rand_min},{rand_max}]"
+        f"rand_hold=[{rand_hold_min},{rand_hold_max}]s, rand_range=[{rand_min},{rand_max}], "
+        f"run_mode={run_mode}"
     )
+    if ctrl_mode == "suite":
+        print("[INFO] selected suite profiles: " + ", ".join(profile["name"] for profile in suite_profiles))
     period = 1.0 / max(freq, 1e-9)
     print(f"[INFO] target control loop: {freq:.1f}Hz ({period * 1000.0:.3f}ms)")
 
