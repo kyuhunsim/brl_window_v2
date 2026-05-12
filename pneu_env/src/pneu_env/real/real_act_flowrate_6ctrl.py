@@ -33,9 +33,9 @@ ATM = 101.325
 # Manual runtime config
 # Edit this block directly.
 # ==============================
-CTRL_MODE = "random"    # "random" | "const" | "suite"
-CONST_CTRLS = [0.85, 1.0, 1.0, 1.0, 1.0, 1.0]
-RUN_MODE = "all"        # "all" | "static" | "hysteresis" | "dynamic" | profile name
+CTRL_MODE = "suite"    # "random" | "const" | "suite"
+CONST_CTRLS = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+RUN_MODE = "hysteresis"        # "all" | "static" | "hysteresis" | "dynamic" | profile name
 
 # Only the first two channels are actively excited by default:
 #   ctrl1: pos_ctrl
@@ -108,23 +108,32 @@ SUITE_PROFILES = [
         ctrl2=dict(mode="bangbang", min=0.85, max=1.0, phase="inverse"),
     ),
     dict(
-        name="grid_hold_2ctrl",
+        name="grid_hold_pos_2ctrl",
         mode="grid_hold",
-        duration=154.0,
-        ctrl1_levels=[0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00],
-        ctrl2_levels=[1.00, 0.95, 0.90, 0.85, 0.80, 0.75, 0.70],
+        duration=88.0,
+        ctrl1_levels=[0.90, 0.925, 0.95, 0.975, 1.00, 0.975, 0.95, 0.925],
+        ctrl2_levels=[1.00],
         hold_sec=10.0,
         transition_sec=1.0,
     ),
     dict(
-        name="slow_ramp_updown_2ctrl",
+        name="grid_hold_neg_2ctrl",
+        mode="grid_hold",
+        duration=88.0,
+        ctrl1_levels=[1.00],
+        ctrl2_levels=[0.90, 0.925, 0.95, 0.975, 1.00, 0.975, 0.95, 0.925],
+        hold_sec=10.0,
+        transition_sec=1.0,
+    ),
+    dict(
+        name="slow_ramp_pos_2ctrl",
         mode="ramp",
-        duration=180.0,
-        ctrl1_start=0.70,
+        duration=140.0,
+        ctrl1_start=0.90,
         ctrl1_peak=1.00,
-        ctrl1_end=0.70,
+        ctrl1_end=0.90,
         ctrl2_start=1.00,
-        ctrl2_peak=0.70,
+        ctrl2_peak=1.00,
         ctrl2_end=1.00,
         ramp_up_sec=60.0,
         hold_peak_sec=10.0,
@@ -132,13 +141,40 @@ SUITE_PROFILES = [
         hold_end_sec=10.0,
     ),
     dict(
-        name="step_response_2ctrl",
+        name="slow_ramp_neg_2ctrl",
+        mode="ramp",
+        duration=140.0,
+        ctrl1_start=1.00,
+        ctrl1_peak=1.00,
+        ctrl1_end=1.00,
+        ctrl2_start=0.90,
+        ctrl2_peak=1.00,
+        ctrl2_end=0.90,
+        ramp_up_sec=60.0,
+        hold_peak_sec=10.0,
+        ramp_down_sec=60.0,
+        hold_end_sec=10.0,
+    ),
+    dict(
+        name="step_response_pos_2ctrl",
         mode="step_response",
         duration=56.0,
-        ctrl1_low=0.70,
+        ctrl1_low=0.90,
         ctrl1_high=1.00,
         ctrl2_low=1.00,
-        ctrl2_high=0.70,
+        ctrl2_high=1.00,
+        settle_sec=8.0,
+        high_sec=6.0,
+        cycles=4,
+    ),
+    dict(
+        name="step_response_neg_2ctrl",
+        mode="step_response",
+        duration=56.0,
+        ctrl1_low=1.00,
+        ctrl1_high=1.00,
+        ctrl2_low=0.90,
+        ctrl2_high=1.00,
         settle_sec=8.0,
         high_sec=6.0,
         cycles=4,
@@ -147,9 +183,9 @@ SUITE_PROFILES = [
 
 RUN_MODE_PROFILE_NAMES = dict(
     all=None,
-    static=("grid_hold_2ctrl",),
-    hysteresis=("slow_ramp_updown_2ctrl",),
-    dynamic=("step_response_2ctrl",),
+    static=("grid_hold_pos_2ctrl", "grid_hold_neg_2ctrl"),
+    hysteresis=("slow_ramp_pos_2ctrl", "slow_ramp_neg_2ctrl"),
+    dynamic=("step_response_pos_2ctrl", "step_response_neg_2ctrl"),
 )
 
 PROFILE_MODE_IDS = dict(
