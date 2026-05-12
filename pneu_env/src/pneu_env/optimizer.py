@@ -283,6 +283,8 @@ def compute_global_error(
     r2_weight=0.0,
     peak_weight=0.0,
     peak_percentile=100.0,
+    full_open_weight=0.0,
+    full_open_min_ratio=0.95,
     wn_min=0.0,
     wn_max=150.0,
     zeta_min=0.0,
@@ -313,6 +315,11 @@ def compute_global_error(
         if peak_weight > 0.0:
             peak_stats = compute_peak_stats(data['Q'], q_pred, percentile=peak_percentile)
             total_error += float(peak_weight) * len(q_pred) * (peak_stats['peak_err'] ** 2)
+        if full_open_weight > 0.0:
+            p_in_abs = float(np.median(data['P_in_abs']))
+            full_open_ratio = float(static_area_ratio_from_ctrl(1.0, sanitize_params(params_eval), p_in_abs))
+            full_open_deficit = max(0.0, float(full_open_min_ratio) - full_open_ratio)
+            total_error += float(full_open_weight) * len(q_pred) * (full_open_deficit ** 2)
     return float(total_error)
 
 
@@ -473,8 +480,18 @@ def ctrl_for_static_area_ratio(area_ratio, params_dict, p_in_abs, i_max=0.30, z=
 
     alpha = max(float(params_dict['alpha_shape']), 1e-12)
     k_shape = max(float(params_dict['k_shape']), 1e-12)
-    denom_minus_one = ratio ** (-1.0 / alpha) - 1.0
-    force_net = -math.log(max(denom_minus_one, 1e-300)) / k_shape
+
+    # Stable inverse of:
+    #   ratio = (1 + exp(-k_shape * force_net))^(-alpha)
+    # We need log(exp(t) - 1) with t = -log(ratio)/alpha, which can overflow
+    # if computed as exp(t) directly. Use asymptotics for large t.
+    t = (-math.log(ratio)) / alpha
+    if t > 50.0:
+        log_denom_minus_one = t
+    else:
+        log_denom_minus_one = math.log(max(math.expm1(t), 1e-300))
+
+    force_net = -log_denom_minus_one / k_shape
     current = (
         force_net
         - float(params_dict['c_z']) * float(z)
@@ -990,6 +1007,9 @@ def build_output_header(args, selected_valves, results):
         f"// peak_weight: {args.peak_weight}",
         f"// peak_percentile: {args.peak_percentile}",
         f"// peak_valves: {args.peak_valves}",
+        f"// full_open_weight: {args.full_open_weight}",
+        f"// full_open_min_ratio: {args.full_open_min_ratio}",
+        f"// full_open_valves: {args.full_open_valves}",
         f"// wn_range: [{args.wn_min}, {args.wn_max}]",
         f"// zeta_range: [{args.zeta_min}, {args.zeta_max}]",
     ]
@@ -1134,6 +1154,23 @@ def main():
         default="all",
         help="peak penalty 적용 대상 밸브 인덱스. 예) all, 1-6, 3,4",
     )
+    parser.add_argument(
+        "--full-open-weight",
+        type=float,
+        default=1.0,
+        help="ctrl=1.0에서 static opening이 충분히 커야 한다는 penalty 가중치(0이면 비활성)",
+    )
+    parser.add_argument(
+        "--full-open-min-ratio",
+        type=float,
+        default=0.95,
+        help="ctrl=1.0에서 요구하는 최소 static opening ratio (0~1)",
+    )
+    parser.add_argument(
+        "--full-open-valves",
+        default="all",
+        help="full-open penalty 적용 대상 밸브 인덱스. 예) all, 1-6, 3,4",
+    )
     args = parser.parse_args()
 
     if args.window_size < 1:
@@ -1166,6 +1203,10 @@ def main():
         raise ValueError("--peak-weight 는 0 이상의 값이어야 합니다.")
     if args.peak_percentile <= 0 or args.peak_percentile > 100:
         raise ValueError("--peak-percentile 은 0 초과 100 이하이어야 합니다.")
+    if args.full_open_weight < 0:
+        raise ValueError("--full-open-weight 는 0 이상의 값이어야 합니다.")
+    if args.full_open_min_ratio <= 0 or args.full_open_min_ratio > 1.0:
+        raise ValueError("--full-open-min-ratio 는 0 초과 1 이하이어야 합니다.")
     if args.wn_min <= 0 or args.wn_max <= 0:
         raise ValueError("--wn-min/--wn-max 는 0보다 커야 합니다.")
     if args.zeta_min < 0 or args.zeta_max <= 0:
@@ -1178,6 +1219,7 @@ def main():
     dynamic_valves = parse_valve_selection(args.dynamic_valves, max_valve=max_valve_idx)
     hf_valves = parse_valve_selection(args.hf_valves, max_valve=max_valve_idx)
     peak_valves = parse_valve_selection(args.peak_valves, max_valve=max_valve_idx)
+    full_open_valves = parse_valve_selection(args.full_open_valves, max_valve=max_valve_idx)
     selected_cfgs = [cfg for cfg in CONFIGS if cfg["idx"] in selected_valves]
     if not selected_cfgs:
         raise ValueError("선택 조건에 맞는 밸브가 없습니다.")
@@ -1222,6 +1264,7 @@ def main():
         hf_weight_local = args.hf_weight if cfg["idx"] in hf_valves else 0.0
         r2_weight_local = args.r2_weight if cfg["idx"] in hf_valves else 0.0
         peak_weight_local = args.peak_weight if cfg["idx"] in peak_valves else 0.0
+        full_open_weight_local = args.full_open_weight if cfg["idx"] in full_open_valves else 0.0
         print(f"   - tune_mode = {'dynamic(wn/zeta only)' if tune_dynamic else 'all(13 params)'}")
         print(
             f"   - hf_penalty = {hf_weight_local:.4f} "
@@ -1234,6 +1277,10 @@ def main():
         print(
             f"   - peak_penalty = {peak_weight_local:.4f} "
             f"(percentile={args.peak_percentile:.2f}, 적용대상={'예' if cfg['idx'] in peak_valves else '아니오'})"
+        )
+        print(
+            f"   - full_open_penalty = {full_open_weight_local:.4f} "
+            f"(min_ratio={args.full_open_min_ratio:.3f}, 적용대상={'예' if cfg['idx'] in full_open_valves else '아니오'})"
         )
         data = load_and_preprocess(
             args.data,
@@ -1264,6 +1311,8 @@ def main():
                 r2_weight=r2_weight_local,
                 peak_weight=peak_weight_local,
                 peak_percentile=args.peak_percentile,
+                full_open_weight=full_open_weight_local,
+                full_open_min_ratio=args.full_open_min_ratio,
                 wn_min=args.wn_min,
                 wn_max=args.wn_max,
                 zeta_min=args.zeta_min,

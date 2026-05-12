@@ -35,7 +35,7 @@ ATM = 101.325
 # ==============================
 CTRL_MODE = "suite"    # "random" | "const" | "suite"
 CONST_CTRLS = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-RUN_MODE = "hysteresis"        # "all" | "static" | "hysteresis" | "dynamic" | profile name
+RUN_MODE = "hysteresis_combo"        # "all" | "static" | "hysteresis" | "dynamic" | "hysteresis_combo" | profile name
 
 # Only the first two channels are actively excited by default:
 #   ctrl1: pos_ctrl
@@ -179,6 +179,147 @@ SUITE_PROFILES = [
         high_sec=6.0,
         cycles=4,
     ),
+    dict(
+        name="settle_all_open_a",
+        mode="hold",
+        duration=8.0,
+        ctrl1=1.0,
+        ctrl2=1.0,
+    ),
+    dict(
+        name="triangle_pos_0p1hz",
+        mode="triangle_wave",
+        duration=40.0,
+        period=10.0,
+        ctrl1_min=0.85,
+        ctrl1_max=1.00,
+        ctrl2_min=1.00,
+        ctrl2_max=1.00,
+    ),
+    dict(
+        name="triangle_pos_0p5hz",
+        mode="triangle_wave",
+        duration=16.0,
+        period=2.0,
+        ctrl1_min=0.85,
+        ctrl1_max=1.00,
+        ctrl2_min=1.00,
+        ctrl2_max=1.00,
+    ),
+    dict(
+        name="triangle_pos_1hz",
+        mode="triangle_wave",
+        duration=10.0,
+        period=1.0,
+        ctrl1_min=0.85,
+        ctrl1_max=1.00,
+        ctrl2_min=1.00,
+        ctrl2_max=1.00,
+    ),
+    dict(
+        name="triangle_pos_2hz",
+        mode="triangle_wave",
+        duration=6.0,
+        period=0.5,
+        ctrl1_min=0.85,
+        ctrl1_max=1.00,
+        ctrl2_min=1.00,
+        ctrl2_max=1.00,
+    ),
+    dict(
+        name="settle_all_open_b",
+        mode="hold",
+        duration=8.0,
+        ctrl1=1.0,
+        ctrl2=1.0,
+    ),
+    dict(
+        name="triangle_neg_0p1hz",
+        mode="triangle_wave",
+        duration=40.0,
+        period=10.0,
+        ctrl1_min=1.00,
+        ctrl1_max=1.00,
+        ctrl2_min=0.85,
+        ctrl2_max=1.00,
+    ),
+    dict(
+        name="triangle_neg_0p5hz",
+        mode="triangle_wave",
+        duration=16.0,
+        period=2.0,
+        ctrl1_min=1.00,
+        ctrl1_max=1.00,
+        ctrl2_min=0.85,
+        ctrl2_max=1.00,
+    ),
+    dict(
+        name="triangle_neg_1hz",
+        mode="triangle_wave",
+        duration=10.0,
+        period=1.0,
+        ctrl1_min=1.00,
+        ctrl1_max=1.00,
+        ctrl2_min=0.85,
+        ctrl2_max=1.00,
+    ),
+    dict(
+        name="triangle_neg_2hz",
+        mode="triangle_wave",
+        duration=6.0,
+        period=0.5,
+        ctrl1_min=1.00,
+        ctrl1_max=1.00,
+        ctrl2_min=0.85,
+        ctrl2_max=1.00,
+    ),
+    dict(
+        name="settle_all_open_c",
+        mode="hold",
+        duration=8.0,
+        ctrl1=1.0,
+        ctrl2=1.0,
+    ),
+    dict(
+        name="random_stair_pos",
+        mode="random_staircase",
+        duration=44.0,
+        target="ctrl1",
+        low=0.85,
+        high=1.00,
+        n_random_steps=5,
+        hold_sec=3.0,
+        transition_sec=0.3,
+        seed=101,
+        fixed_other=1.0,
+    ),
+    dict(
+        name="settle_all_open_d",
+        mode="hold",
+        duration=8.0,
+        ctrl1=1.0,
+        ctrl2=1.0,
+    ),
+    dict(
+        name="random_stair_neg",
+        mode="random_staircase",
+        duration=44.0,
+        target="ctrl2",
+        low=0.85,
+        high=1.00,
+        n_random_steps=5,
+        hold_sec=3.0,
+        transition_sec=0.3,
+        seed=202,
+        fixed_other=1.0,
+    ),
+    dict(
+        name="settle_all_open_e",
+        mode="hold",
+        duration=8.0,
+        ctrl1=1.0,
+        ctrl2=1.0,
+    ),
 ]
 
 RUN_MODE_PROFILE_NAMES = dict(
@@ -186,6 +327,23 @@ RUN_MODE_PROFILE_NAMES = dict(
     static=("grid_hold_pos_2ctrl", "grid_hold_neg_2ctrl"),
     hysteresis=("slow_ramp_pos_2ctrl", "slow_ramp_neg_2ctrl"),
     dynamic=("step_response_pos_2ctrl", "step_response_neg_2ctrl"),
+    hysteresis_combo=(
+        "settle_all_open_a",
+        "triangle_pos_0p1hz",
+        "triangle_pos_0p5hz",
+        "triangle_pos_1hz",
+        "triangle_pos_2hz",
+        "settle_all_open_b",
+        "triangle_neg_0p1hz",
+        "triangle_neg_0p5hz",
+        "triangle_neg_1hz",
+        "triangle_neg_2hz",
+        "settle_all_open_c",
+        "random_stair_pos",
+        "settle_all_open_d",
+        "random_stair_neg",
+        "settle_all_open_e",
+    ),
 )
 
 PROFILE_MODE_IDS = dict(
@@ -198,6 +356,9 @@ PROFILE_MODE_IDS = dict(
     grid_hold=6,
     ramp=7,
     step_response=8,
+    hold=9,
+    triangle_wave=10,
+    random_staircase=11,
 )
 
 
@@ -254,6 +415,35 @@ def _ramp_value(
     if t < end_hold:
         return _clip_ctrl(end), max(end_hold, 1e-9)
     return _clip_ctrl(end), max(end_hold, 1e-9)
+
+
+def _triangle_value(local_time: float, *, period: float, v_min: float, v_max: float) -> float:
+    period = float(max(period, 1e-9))
+    phase = (float(local_time) % period) / period
+    if phase < 0.5:
+        alpha = phase / 0.5
+        value = float(v_min) + alpha * (float(v_max) - float(v_min))
+    else:
+        alpha = (phase - 0.5) / 0.5
+        value = float(v_max) + alpha * (float(v_min) - float(v_max))
+    return _clip_ctrl(value)
+
+
+def _random_stair_levels(profile: dict) -> list[float]:
+    low = _clip_ctrl(profile["low"])
+    high = _clip_ctrl(profile["high"])
+    n_random_steps = int(profile.get("n_random_steps", 4))
+    if n_random_steps < 0:
+        raise ValueError("random_staircase n_random_steps must be >= 0")
+
+    seed = int(profile.get("seed", 0))
+    rng = np.random.default_rng(seed)
+    mids = []
+    if n_random_steps > 0:
+        mids = sorted(float(x) for x in rng.uniform(low, high, size=n_random_steps))
+    up = [low] + mids + [high]
+    down = list(reversed(up[:-1]))
+    return [_clip_ctrl(v) for v in (up + down)]
 
 
 def _resolve_tcpip_dir() -> str:
@@ -492,6 +682,57 @@ def _make_suite_ctrls(
         )
         period = hold_sec + transition_sec
         active_ctrls = np.array([ctrl1, ctrl2], dtype=np.float64)
+        return _compose_6ctrl(active_ctrls), next_change_time, profile_idx, mode_id, local_time, period
+
+    if mode == "hold":
+        active_ctrls = np.array(
+            [float(profile["ctrl1"]), float(profile["ctrl2"])],
+            dtype=np.float64,
+        )
+        return _compose_6ctrl(active_ctrls), next_change_time, profile_idx, mode_id, local_time, float(profile["duration"])
+
+    if mode == "triangle_wave":
+        period = float(profile["period"])
+        if period <= 0.0:
+            raise ValueError("triangle_wave period must be positive")
+        ctrl1 = _triangle_value(
+            local_time,
+            period=period,
+            v_min=float(profile["ctrl1_min"]),
+            v_max=float(profile["ctrl1_max"]),
+        )
+        ctrl2 = _triangle_value(
+            local_time,
+            period=period,
+            v_min=float(profile["ctrl2_min"]),
+            v_max=float(profile["ctrl2_max"]),
+        )
+        active_ctrls = np.array([ctrl1, ctrl2], dtype=np.float64)
+        return _compose_6ctrl(active_ctrls), next_change_time, profile_idx, mode_id, local_time, period
+
+    if mode == "random_staircase":
+        hold_sec = float(profile["hold_sec"])
+        transition_sec = float(profile.get("transition_sec", 0.0))
+        if hold_sec <= 0.0:
+            raise ValueError("random_staircase hold_sec must be positive")
+        if transition_sec < 0.0:
+            raise ValueError("random_staircase transition_sec must be >= 0")
+        levels = _random_stair_levels(profile)
+        moving_ctrl = stair_value(
+            local_time,
+            levels=levels,
+            hold_s=hold_sec,
+            transition_s=transition_sec,
+        )
+        fixed_other = _clip_ctrl(profile.get("fixed_other", 1.0))
+        target = str(profile.get("target", "ctrl1")).lower()
+        if target == "ctrl1":
+            active_ctrls = np.array([moving_ctrl, fixed_other], dtype=np.float64)
+        elif target == "ctrl2":
+            active_ctrls = np.array([fixed_other, moving_ctrl], dtype=np.float64)
+        else:
+            raise ValueError(f"random_staircase target must be ctrl1 or ctrl2, got: {target}")
+        period = hold_sec + transition_sec
         return _compose_6ctrl(active_ctrls), next_change_time, profile_idx, mode_id, local_time, period
 
     if mode == "ramp":
