@@ -1,0 +1,45 @@
+// Optimizer metadata
+// data: exp/260512_18_43_04_Flowrate_RND6_suite_hysteresis_combo.csv
+// valves: [1, 2]
+// start: 5.0
+// end: file_end
+// tail_cut: 0.0
+// drop_incomplete_last_command: False
+// settle_sec: 2.0
+// window_size_compat: 1
+// input_window_size: 1
+// flow_window_size: 1
+// flow_delay_samples_arg: 0
+// flow_delay_sec_arg: none
+// tune_mode: all
+// dynamic_valves: 3-6
+// samples: 50
+// seed: 0
+// hf_weight: 0.0
+// hf_target: 1.0
+// hf_valves: 3-6
+// r2_floor: 0.0
+// r2_weight: 0.0
+// peak_weight: 0.0
+// peak_percentile: 100.0
+// peak_valves: all
+// full_open_weight: 1.0
+// full_open_min_ratio: 0.95
+// full_open_valves: all
+// wn_range: [9.0, 25.0]
+// zeta_range: [0.4, 0.6]
+// valve1: best_error=95872.7125142, effective_flow_delay_samples=0, input_window_size=1, flow_window_size=1, peak_real=29.1153, peak_fit=22.4118, peak_err=-6.70353, peak_rel_err=-23%, opening_static=(P_in_median=141.864kPa, ctrl@1%A=0.7710, ctrl@10%A=0.8068, ctrl@50%A=0.8684, ctrl@90%A=0.9649, ctrl@99%A=1.0850 unreachable, A@ctrl0.9=68.8%, A@ctrl1.0=94.8%)
+// valve2: best_error=120559.417805, effective_flow_delay_samples=0, input_window_size=1, flow_window_size=1, peak_real=16.0381, peak_fit=16.2548, peak_err=0.216685, peak_rel_err=1.35%, opening_static=(P_in_median=101.325kPa, ctrl@1%A=0.8961, ctrl@10%A=0.9120, ctrl@50%A=0.9393, ctrl@90%A=0.9823, ctrl@99%A=1.0359 unreachable, A@ctrl0.9=2.0%, A@ctrl1.0=95.3%)
+
+const ValveModelParams CHAMBER_POS_PARAMS = {
+    0.171920263232, 32.6001660312, 1.9190874726e-05, -0.000387070683114, -1.83899510354e-07,
+    1012586.72599, 4.94267310486, 0.041084404531, 156.296492221,
+    9, 0.599999999969, 9, 0.6
+};
+
+
+const ValveModelParams CHAMBER_NEG_PARAMS = {
+    0.224042425057, 73.0742087641, 0.120896191739, 5.4264863465e-05, -4.9235283373e-05,
+    128968.280121, 563.981540102, 0.129776962749, 35005.9248419,
+    9, 0.6, 9, 0.6
+};

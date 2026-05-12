@@ -27,7 +27,7 @@ setup_plot_style({"legend.fontsize": 18})
 #   zeta 0.3~1.2   avoids both too-ringing and over-damped slow solutions.
 
 MANUAL_DYNAMIC_BOUNDS = dict(
-    wn_min=9.0,
+    wn_min=11.0,
     wn_max=25.0,
     zeta_min=0.4,
     zeta_max=0.6,
