@@ -1,5 +1,6 @@
 import argparse
 import ctypes
+import json
 import math
 import os
 import numpy as np
@@ -24,8 +25,9 @@ setup_plot_style({"legend.fontsize": 18})
 # Current chirp-based default:
 #   wn 7~25 rad/s  ~= natural frequency 1.1~4.0 Hz
 #   zeta 0.3~1.2   avoids both too-ringing and over-damped slow solutions.
+
 MANUAL_DYNAMIC_BOUNDS = dict(
-    wn_min=11.0,
+    wn_min=9.0,
     wn_max=25.0,
     zeta_min=0.4,
     zeta_max=0.6,
@@ -227,6 +229,31 @@ def compute_r2(y_true, y_pred):
     return 1.0 - (ss_res / ss_tot)
 
 
+def compute_peak_value(y, percentile=100.0):
+    y = np.asarray(y, dtype=np.float64)
+    if y.size == 0:
+        return 0.0
+    y = np.nan_to_num(y, nan=0.0, posinf=1e9, neginf=-1e9)
+    y = np.clip(y, -1e9, 1e9)
+    pct = float(percentile)
+    if pct >= 100.0:
+        return float(np.max(y))
+    return float(np.percentile(y, np.clip(pct, 0.0, 100.0)))
+
+
+def compute_peak_stats(y_true, y_pred, percentile=100.0):
+    peak_true = compute_peak_value(y_true, percentile=percentile)
+    peak_pred = compute_peak_value(y_pred, percentile=percentile)
+    err = peak_pred - peak_true
+    rel_err = err / max(abs(peak_true), 1e-12)
+    return {
+        'peak_true': peak_true,
+        'peak_pred': peak_pred,
+        'peak_err': err,
+        'peak_rel_err': rel_err,
+    }
+
+
 def simulate_physics_model(data, params):
     N = len(data['I'])
     Q_pred = np.zeros(N, dtype=np.float64)
@@ -254,6 +281,8 @@ def compute_global_error(
     hf_target=1.0,
     r2_floor=-1.0,
     r2_weight=0.0,
+    peak_weight=0.0,
+    peak_percentile=100.0,
     wn_min=0.0,
     wn_max=150.0,
     zeta_min=0.0,
@@ -281,6 +310,9 @@ def compute_global_error(
             r2_val = compute_r2(data['Q'], q_pred)
             r2_deficit = max(0.0, float(r2_floor) - r2_val)
             total_error += float(r2_weight) * len(q_pred) * (r2_deficit ** 2)
+        if peak_weight > 0.0:
+            peak_stats = compute_peak_stats(data['Q'], q_pred, percentile=peak_percentile)
+            total_error += float(peak_weight) * len(q_pred) * (peak_stats['peak_err'] ** 2)
     return float(total_error)
 
 
@@ -416,6 +448,121 @@ def sanitize_params(opt_p):
     }
 
 
+def static_area_ratio_from_ctrl(ctrl, params_dict, p_in_abs, i_max=0.30, z=0.0):
+    u = np.clip((np.asarray(ctrl, dtype=np.float64) - 0.5) * 2.0, 0.0, 1.0)
+    p_in = np.asarray(p_in_abs, dtype=np.float64)
+    current = u * float(i_max)
+    force_net = (
+        current
+        + float(params_dict['c_z']) * float(z)
+        + float(params_dict['c_p']) * p_in
+        - float(params_dict['c_k'])
+    )
+    exp_arg = -float(params_dict['k_shape']) * force_net
+    log_denom = float(params_dict['alpha_shape']) * np.logaddexp(0.0, exp_arg)
+    ratio = np.zeros_like(log_denom, dtype=np.float64)
+    valid = log_denom <= 700.0
+    ratio[valid] = np.exp(-log_denom[valid])
+    return ratio
+
+
+def ctrl_for_static_area_ratio(area_ratio, params_dict, p_in_abs, i_max=0.30, z=0.0):
+    ratio = float(area_ratio)
+    if ratio <= 0.0 or ratio >= 1.0:
+        raise ValueError(f"area_ratio는 0과 1 사이여야 합니다: {area_ratio}")
+
+    alpha = max(float(params_dict['alpha_shape']), 1e-12)
+    k_shape = max(float(params_dict['k_shape']), 1e-12)
+    denom_minus_one = ratio ** (-1.0 / alpha) - 1.0
+    force_net = -math.log(max(denom_minus_one, 1e-300)) / k_shape
+    current = (
+        force_net
+        - float(params_dict['c_z']) * float(z)
+        - float(params_dict['c_p']) * float(p_in_abs)
+        + float(params_dict['c_k'])
+    )
+    u = current / float(i_max)
+    return 0.5 + 0.5 * u
+
+
+def build_opening_report(data, params_dict, i_max=0.30):
+    p_in_abs = float(np.median(data['P_in_abs']))
+    levels = [0.01, 0.10, 0.50, 0.90, 0.99]
+    ctrl_by_level = {
+        level: ctrl_for_static_area_ratio(level, params_dict, p_in_abs, i_max=i_max)
+        for level in levels
+    }
+    ratio_at_ctrl = {
+        ctrl: float(static_area_ratio_from_ctrl(ctrl, params_dict, p_in_abs, i_max=i_max))
+        for ctrl in [0.9, 1.0]
+    }
+    return {
+        'p_in_abs_median': p_in_abs,
+        'i_max': float(i_max),
+        'ctrl_by_level': ctrl_by_level,
+        'ratio_at_ctrl': ratio_at_ctrl,
+    }
+
+
+def format_opening_report(report):
+    def fmt_ctrl_level(level, ctrl):
+        status = ""
+        if ctrl < 0.5:
+            status = " below_min"
+        elif ctrl > 1.0:
+            status = " unreachable"
+        return f"ctrl@{int(level * 100)}%A={ctrl:.4f}{status}"
+
+    ctrl_parts = [
+        fmt_ctrl_level(level, ctrl)
+        for level, ctrl in report['ctrl_by_level'].items()
+    ]
+    ratio_parts = [
+        f"A@ctrl{ctrl:.1f}={ratio * 100:.1f}%"
+        for ctrl, ratio in report['ratio_at_ctrl'].items()
+    ]
+    return (
+        f"P_in_median={report['p_in_abs_median']:.3f}kPa, "
+        + ", ".join(ctrl_parts + ratio_parts)
+    )
+
+
+def format_opening_report_compact(report):
+    if not report:
+        return ""
+
+    def fmt_ctrl(ctrl):
+        suffix = ""
+        if ctrl < 0.5:
+            suffix = "<min"
+        elif ctrl > 1.0:
+            suffix = ">max"
+        return f"{ctrl:.3f}{suffix}"
+
+    ctrl_by_level = report.get('ctrl_by_level', {})
+    ratio_at_ctrl = report.get('ratio_at_ctrl', {})
+    ctrl50 = ctrl_by_level.get(0.50)
+    ctrl90 = ctrl_by_level.get(0.90)
+    ctrl99 = ctrl_by_level.get(0.99)
+    area09 = ratio_at_ctrl.get(0.9)
+    area10 = ratio_at_ctrl.get(1.0)
+    ctrl_parts = []
+    if ctrl50 is not None:
+        ctrl_parts.append(f"50:{fmt_ctrl(ctrl50)}")
+    if ctrl90 is not None:
+        ctrl_parts.append(f"90:{fmt_ctrl(ctrl90)}")
+    if ctrl99 is not None:
+        ctrl_parts.append(f"99:{fmt_ctrl(ctrl99)}")
+    area_parts = []
+    if area09 is not None:
+        area_parts.append(f"A0.9:{area09 * 100:.1f}%")
+    if area10 is not None:
+        area_parts.append(f"A1.0:{area10 * 100:.1f}%")
+    if area_parts:
+        return " ".join(ctrl_parts) + "\n" + " ".join(area_parts)
+    return " ".join(ctrl_parts)
+
+
 def format_param_value(value):
     return f"{float(value):.12g}"
 
@@ -456,6 +603,364 @@ def write_cpp_output(results, output_path, header_text=None):
         f.write("\n\n\n".join(blocks) + "\n")
 
 
+def pressure_axis_for_diagnostic(cfg, data):
+    if cfg['P_in_col'] == 'ATM' and cfg['P_out_col'] != 'ATM':
+        return data['P_out_abs'], 'P_out [kPa]'
+    if cfg['P_out_col'] == 'ATM' and cfg['P_in_col'] != 'ATM':
+        return data['P_in_abs'], 'P_in [kPa]'
+
+    p_in_span = float(np.ptp(data['P_in_abs']))
+    p_out_span = float(np.ptp(data['P_out_abs']))
+    if p_in_span >= p_out_span:
+        return data['P_in_abs'], 'P_in [kPa]'
+    return data['P_out_abs'], 'P_out [kPa]'
+
+
+def static_flow_from_pressure_ctrl_grid(item, pressure_values, ctrl_values):
+    cfg = item['cfg']
+    params = item['params_dict']
+    data = item['plot_data']
+    pressure_grid, ctrl_grid = np.meshgrid(
+        np.asarray(pressure_values, dtype=np.float64),
+        np.asarray(ctrl_values, dtype=np.float64),
+    )
+
+    if cfg['P_in_col'] == 'ATM' and cfg['P_out_col'] != 'ATM':
+        p_in_grid = np.full_like(pressure_grid, 101.325)
+        p_out_grid = pressure_grid
+    elif cfg['P_out_col'] == 'ATM' and cfg['P_in_col'] != 'ATM':
+        p_in_grid = pressure_grid
+        p_out_grid = np.full_like(pressure_grid, 101.325)
+    else:
+        _, axis_label = pressure_axis_for_diagnostic(cfg, data)
+        if axis_label.startswith('P_in'):
+            p_in_grid = pressure_grid
+            p_out_grid = np.full_like(pressure_grid, float(np.median(data['P_out_abs'])))
+        else:
+            p_in_grid = np.full_like(pressure_grid, float(np.median(data['P_in_abs'])))
+            p_out_grid = pressure_grid
+
+    p_in_grid = np.maximum(p_in_grid, 1e-9)
+    phi = get_phi(p_in_grid, p_out_grid, 1.4)
+    area_ratio = static_area_ratio_from_ctrl(ctrl_grid, params, p_in_grid)
+    return params['a_max'] * area_ratio * p_in_grid * phi
+
+
+def plot_3d_fit_diagnostics(results, output_path, max_points=5000, plots_per_figure=3, ctrl_min=0.7):
+    ordered = sorted(results, key=lambda x: x['cfg']['output_order'])
+    if not ordered:
+        return []
+
+    output_dir = os.path.dirname(os.path.abspath(output_path))
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+    output_root, output_ext = os.path.splitext(output_path)
+    if not output_ext:
+        output_ext = ".png"
+
+    saved_paths = []
+    figures = []
+    rc = {
+        "font.size": 8,
+        "axes.titlesize": 8,
+        "axes.labelsize": 8,
+        "xtick.labelsize": 7,
+        "ytick.labelsize": 7,
+        "legend.fontsize": 7,
+    }
+    with plt.rc_context(rc):
+        for fig_idx, start in enumerate(range(0, len(ordered), plots_per_figure), start=2):
+            chunk = ordered[start:start + plots_per_figure]
+            n_plots = len(chunk)
+            fig = plt.figure(
+                num=fig_idx,
+                figsize=(max(7.2, 5.6 * n_plots), 5.4),
+                facecolor="w",
+                constrained_layout=True,
+            )
+            fig.suptitle(
+                f"Figure {fig_idx}: 3D Fit Diagnostic (X=pressure axis, Y=ctrl, Z=flow)",
+                fontsize=10,
+            )
+            figures.append(fig)
+
+            for i, item in enumerate(chunk):
+                data = item['plot_data']
+                q_pred = item['q_pred']
+                ax = fig.add_subplot(1, n_plots, i + 1, projection='3d')
+
+                n = len(data['Q'])
+                stride = max(1, int(math.ceil(n / float(max_points))))
+                idx = np.arange(0, n, stride)
+                pressure_axis, pressure_label = pressure_axis_for_diagnostic(item['cfg'], data)
+                pressure_plot = pressure_axis[idx]
+                q_real = data['Q'][idx]
+                q_fit = q_pred[idx]
+                ctrl_raw = 0.5 + 0.5 * data['u'][idx]
+
+                pressure_grid = np.linspace(float(np.min(pressure_axis)), float(np.max(pressure_axis)), 34)
+                ctrl_grid = np.linspace(float(ctrl_min), 1.0, 34)
+                surface_flow = static_flow_from_pressure_ctrl_grid(item, pressure_grid, ctrl_grid)
+                pressure_mesh, ctrl_mesh = np.meshgrid(pressure_grid, ctrl_grid)
+                ax.plot_surface(
+                    pressure_mesh,
+                    ctrl_mesh,
+                    surface_flow,
+                    color='tab:blue',
+                    alpha=0.18,
+                    linewidth=0,
+                    antialiased=True,
+                )
+
+                real_scatter = ax.scatter(
+                    pressure_plot,
+                    ctrl_raw,
+                    q_real,
+                    c=ctrl_raw,
+                    cmap='viridis',
+                    s=8,
+                    alpha=0.7,
+                    label='real',
+                    depthshade=False,
+                )
+                ax.scatter(
+                    pressure_plot,
+                    ctrl_raw,
+                    q_fit,
+                    c='tab:red',
+                    s=8,
+                    alpha=0.38,
+                    marker='^',
+                    label='fit',
+                    depthshade=False,
+                )
+
+                opening_report = item.get('opening_report', {})
+                ctrl_by_level = opening_report.get('ctrl_by_level', {})
+                full_ctrl_raw = 0.5 + 0.5 * data['u']
+                marker_levels = [0.50, 0.90, 0.99]
+                for level in marker_levels:
+                    ctrl_target = ctrl_by_level.get(level)
+                    if ctrl_target is None:
+                        continue
+                    if ctrl_target < 0.5 or ctrl_target > 1.0:
+                        continue
+                    nearest = int(np.argmin(np.abs(full_ctrl_raw - ctrl_target)))
+                    ax.scatter(
+                        [pressure_axis[nearest]],
+                        [full_ctrl_raw[nearest]],
+                        [data['Q'][nearest]],
+                        c='black',
+                        s=34,
+                        marker='x',
+                        linewidths=1.2,
+                        depthshade=False,
+                    )
+                    ax.text(
+                        pressure_axis[nearest],
+                        full_ctrl_raw[nearest],
+                        data['Q'][nearest],
+                        f"{int(level * 100)}%",
+                        fontsize=6,
+                    )
+
+                opening_text = format_opening_report_compact(opening_report) if opening_report else ""
+
+                ax.set_title(
+                    f"[{item['cfg']['idx']}] {item['cfg']['name']}\n{opening_text}",
+                    fontsize=6.5,
+                    pad=2,
+                )
+                ax.set_xlabel(pressure_label, labelpad=1)
+                ax.set_ylabel('ctrl', labelpad=1)
+                ax.set_zlabel('flow', labelpad=1)
+                ax.set_ylim(float(ctrl_min), 1.0)
+                ax.tick_params(axis='both', which='major', labelsize=7, pad=0)
+                ax.tick_params(axis='z', which='major', labelsize=7, pad=0)
+                ax.legend(loc='upper left', fontsize=6)
+                colorbar = fig.colorbar(real_scatter, ax=ax, shrink=0.48, pad=0.03)
+                colorbar.set_label('ctrl', fontsize=7)
+                colorbar.ax.tick_params(labelsize=7)
+
+            suffix = "" if len(ordered) <= plots_per_figure else f"_fig{fig_idx}"
+            figure_output_path = f"{output_root}{suffix}{output_ext}"
+            fig.savefig(figure_output_path, dpi=150)
+            saved_paths.append(figure_output_path)
+
+    return figures, saved_paths
+
+
+def write_interactive_3d_fit_html(results, output_path, max_points=5000, plots_per_figure=3, ctrl_min=0.7):
+    ordered = sorted(results, key=lambda x: x['cfg']['output_order'])
+    if not ordered:
+        return []
+
+    output_dir = os.path.dirname(os.path.abspath(output_path))
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+    output_root, _ = os.path.splitext(output_path)
+
+    saved_paths = []
+    for fig_idx, start in enumerate(range(0, len(ordered), plots_per_figure), start=2):
+        chunk = ordered[start:start + plots_per_figure]
+        panels = []
+
+        for i, item in enumerate(chunk):
+            data = item['plot_data']
+            q_pred = item['q_pred']
+            n = len(data['Q'])
+            stride = max(1, int(math.ceil(n / float(max_points))))
+            idx = np.arange(0, n, stride)
+            pressure_axis, pressure_label = pressure_axis_for_diagnostic(item['cfg'], data)
+            pressure_plot = pressure_axis[idx]
+            q_real = data['Q'][idx]
+            q_fit = q_pred[idx]
+            ctrl_raw = 0.5 + 0.5 * data['u'][idx]
+            pressure_grid = np.linspace(float(np.min(pressure_axis)), float(np.max(pressure_axis)), 34)
+            ctrl_grid = np.linspace(float(ctrl_min), 1.0, 34)
+            surface_flow = static_flow_from_pressure_ctrl_grid(item, pressure_grid, ctrl_grid)
+            pressure_mesh, ctrl_mesh = np.meshgrid(pressure_grid, ctrl_grid)
+            traces = [
+                {
+                    "type": "surface",
+                    "name": f"v{item['cfg']['idx']} static surface",
+                    "x": pressure_mesh.tolist(),
+                    "y": ctrl_mesh.tolist(),
+                    "z": surface_flow.tolist(),
+                    "opacity": 0.28,
+                    "colorscale": "Blues",
+                    "showscale": False,
+                    "hovertemplate": (
+                        "static surface<br>"
+                        + pressure_label
+                        + "=%{x:.3f}<br>ctrl=%{y:.4f}<br>flow=%{z:.4g}<extra></extra>"
+                    ),
+                },
+                {
+                    "type": "scatter3d",
+                    "mode": "markers",
+                    "name": f"v{item['cfg']['idx']} real",
+                    "x": pressure_plot.tolist(),
+                    "y": ctrl_raw.tolist(),
+                    "z": q_real.tolist(),
+                    "customdata": ctrl_raw.reshape(-1, 1).tolist(),
+                    "marker": {
+                        "size": 3,
+                        "color": ctrl_raw.tolist(),
+                        "colorscale": "Viridis",
+                        "showscale": True,
+                        "colorbar": {"title": "ctrl", "len": 0.62},
+                    },
+                    "hovertemplate": (
+                        "real<br>"
+                        + pressure_label
+                        + "=%{x:.3f}<br>ctrl=%{y:.4f}<br>flow=%{z:.4g}<extra></extra>"
+                    ),
+                },
+                {
+                    "type": "scatter3d",
+                    "mode": "markers",
+                    "name": f"v{item['cfg']['idx']} fit",
+                    "x": pressure_plot.tolist(),
+                    "y": ctrl_raw.tolist(),
+                    "z": q_fit.tolist(),
+                    "customdata": ctrl_raw.reshape(-1, 1).tolist(),
+                    "marker": {"size": 3, "color": "red", "opacity": 0.45, "symbol": "diamond"},
+                    "hovertemplate": (
+                        "fit<br>"
+                        + pressure_label
+                        + "=%{x:.3f}<br>ctrl=%{y:.4f}<br>flow=%{z:.4g}<extra></extra>"
+                    ),
+                },
+            ]
+
+            opening_report = item.get('opening_report', {})
+            ctrl_by_level = opening_report.get('ctrl_by_level', {})
+            full_ctrl_raw = 0.5 + 0.5 * data['u']
+            for level in [0.50, 0.90, 0.99]:
+                ctrl_target = ctrl_by_level.get(level)
+                if ctrl_target is None or ctrl_target < 0.5 or ctrl_target > 1.0:
+                    continue
+                nearest = int(np.argmin(np.abs(full_ctrl_raw - ctrl_target)))
+                traces.append(
+                    {
+                        "type": "scatter3d",
+                        "mode": "markers+text",
+                        "name": f"v{item['cfg']['idx']} {int(level * 100)}% opening",
+                        "x": [float(pressure_axis[nearest])],
+                        "y": [float(full_ctrl_raw[nearest])],
+                        "z": [float(data['Q'][nearest])],
+                        "text": [f"{int(level * 100)}%"],
+                        "textposition": "top center",
+                        "marker": {"size": 7, "color": "black", "symbol": "x"},
+                        "hovertemplate": (
+                            f"{int(level * 100)}% opening<br>"
+                            + pressure_label
+                            + "=%{x:.3f}<br>ctrl=%{y:.4f}<br>flow=%{z:.4g}<extra></extra>"
+                        ),
+                    }
+                )
+
+            title = f"[{item['cfg']['idx']}] {item['cfg']['name']}<br>{format_opening_report_compact(opening_report)}"
+            layout = {
+                "title": {"text": title, "font": {"size": 13}},
+                "height": 620,
+                "margin": {"l": 0, "r": 0, "t": 64, "b": 0},
+                "legend": {"font": {"size": 11}},
+                "scene": {
+                    "xaxis": {"title": pressure_label},
+                    "yaxis": {"title": "ctrl", "range": [float(ctrl_min), 1.0]},
+                    "zaxis": {"title": "flow"},
+                },
+            }
+            panels.append({"id": f"plot_{fig_idx}_{i}", "title": title, "traces": traces, "layout": layout})
+
+        suffix = "" if len(ordered) <= plots_per_figure else f"_fig{fig_idx}"
+        html_output_path = f"{output_root}{suffix}.html"
+        panel_divs = "\n".join(f'<div class="plot-panel"><div id="{panel["id"]}"></div></div>' for panel in panels)
+        panel_scripts = "\n".join(
+            "Plotly.newPlot("
+            + json.dumps(panel["id"])
+            + ", "
+            + json.dumps(panel["traces"])
+            + ", "
+            + json.dumps(panel["layout"])
+            + ", {responsive: true, scrollZoom: true});"
+            for panel in panels
+        )
+        html = f"""<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Figure {fig_idx}: Interactive 3D Fit Diagnostic</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    body {{ margin: 0; font-family: Arial, sans-serif; background: #fff; color: #111; }}
+    h1 {{ font-size: 18px; font-weight: 600; margin: 12px 16px 4px; }}
+    .hint {{ font-size: 12px; margin: 0 16px 8px; color: #555; }}
+    .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); gap: 8px; padding: 8px; }}
+    .plot-panel {{ min-height: 640px; border: 1px solid #ddd; }}
+  </style>
+</head>
+<body>
+  <h1>Figure {fig_idx}: Interactive 3D Fit Diagnostic</h1>
+  <div class="hint">Drag to rotate, wheel to zoom, shift-drag to pan. X is the dominant pressure axis, Y is ctrl, Z is flow. Blue surface is fitted static flow; red diamonds are fitted trajectory.</div>
+  <div class="grid">
+    {panel_divs}
+  </div>
+  <script>
+    {panel_scripts}
+  </script>
+</body>
+</html>
+"""
+        with open(html_output_path, "w", encoding="utf-8") as f:
+            f.write(html)
+        saved_paths.append(html_output_path)
+
+    return saved_paths
+
+
 def build_output_header(args, selected_valves, results):
     input_window = args.input_window_size if args.input_window_size is not None else args.window_size
     flow_window = args.flow_window_size if args.flow_window_size is not None else args.window_size
@@ -482,15 +987,33 @@ def build_output_header(args, selected_valves, results):
         f"// hf_valves: {args.hf_valves}",
         f"// r2_floor: {args.r2_floor}",
         f"// r2_weight: {args.r2_weight}",
+        f"// peak_weight: {args.peak_weight}",
+        f"// peak_percentile: {args.peak_percentile}",
+        f"// peak_valves: {args.peak_valves}",
         f"// wn_range: [{args.wn_min}, {args.wn_max}]",
         f"// zeta_range: [{args.zeta_min}, {args.zeta_max}]",
     ]
     for item in sorted(results, key=lambda x: x['cfg']['output_order']):
+        opening_report = item.get('opening_report')
+        opening_text = ""
+        if opening_report is not None:
+            opening_text = f", opening_static=({format_opening_report(opening_report)})"
+        peak_stats = item.get('peak_stats')
+        peak_text = ""
+        if peak_stats is not None:
+            peak_text = (
+                f", peak_real={peak_stats['peak_true']:.6g}, "
+                f"peak_fit={peak_stats['peak_pred']:.6g}, "
+                f"peak_err={peak_stats['peak_err']:.6g}, "
+                f"peak_rel_err={peak_stats['peak_rel_err'] * 100:.3g}%"
+            )
         lines.append(
             f"// valve{item['cfg']['idx']}: best_error={item['best_error']:.12g}, "
             f"effective_flow_delay_samples={item.get('flow_delay_samples', 'unknown')}, "
             f"input_window_size={item.get('input_window_size', input_window)}, "
             f"flow_window_size={item.get('flow_window_size', flow_window)}"
+            f"{peak_text}"
+            f"{opening_text}"
         )
     return "\n".join(lines)
 
@@ -547,6 +1070,8 @@ def main():
     parser.add_argument("--flow-window-size", type=int, default=None, help="실측 유량 Q에만 적용할 moving average window size")
     parser.add_argument("--output", default="output.txt", help="tune_result에 저장할 결과 파일 이름(.txt/.png는 같은 이름으로 저장)")
     parser.add_argument("--result-dir", default="tune_result", help="txt와 image 결과를 저장할 폴더")
+    parser.add_argument("--plot3d-max-points", type=int, default=5000, help="3D 진단 그림에 밸브별로 표시할 최대 샘플 수")
+    parser.add_argument("--plot3d-ctrl-min", type=float, default=0.7, help="3D 진단 그림의 ctrl 축 시작값")
     parser.add_argument("--valves", default="all", help="최적화할 밸브 인덱스. 예) all, 3-6, 3,4,5,6")
     parser.add_argument(
         "--tune-mode",
@@ -592,6 +1117,23 @@ def main():
         default=0.0,
         help="R² floor penalty 가중치(0이면 비활성). 권장 시작값: 0.5~3.0",
     )
+    parser.add_argument(
+        "--peak-weight",
+        type=float,
+        default=0.0,
+        help="유량 peak mismatch penalty 가중치(0이면 비활성). penalty=N*(peak_fit-peak_real)^2*weight",
+    )
+    parser.add_argument(
+        "--peak-percentile",
+        type=float,
+        default=100.0,
+        help="peak 계산 percentile. 100이면 max, 노이즈가 크면 99~99.9 권장",
+    )
+    parser.add_argument(
+        "--peak-valves",
+        default="all",
+        help="peak penalty 적용 대상 밸브 인덱스. 예) all, 1-6, 3,4",
+    )
     args = parser.parse_args()
 
     if args.window_size < 1:
@@ -608,6 +1150,10 @@ def main():
         raise ValueError("--settle-sec 은 0 이상의 값이어야 합니다.")
     if args.samples < 1:
         raise ValueError("--samples 는 1 이상의 정수여야 합니다.")
+    if args.plot3d_max_points < 1:
+        raise ValueError("--plot3d-max-points 는 1 이상의 정수여야 합니다.")
+    if args.plot3d_ctrl_min < 0.0 or args.plot3d_ctrl_min >= 1.0:
+        raise ValueError("--plot3d-ctrl-min 은 0 이상 1 미만이어야 합니다.")
     if args.hf_weight < 0:
         raise ValueError("--hf-weight 는 0 이상의 값이어야 합니다.")
     if args.hf_target <= 0:
@@ -616,6 +1162,10 @@ def main():
         raise ValueError("--r2-weight 는 0 이상의 값이어야 합니다.")
     if args.r2_floor >= 1.0:
         raise ValueError("--r2-floor 는 1.0 미만이어야 합니다.")
+    if args.peak_weight < 0:
+        raise ValueError("--peak-weight 는 0 이상의 값이어야 합니다.")
+    if args.peak_percentile <= 0 or args.peak_percentile > 100:
+        raise ValueError("--peak-percentile 은 0 초과 100 이하이어야 합니다.")
     if args.wn_min <= 0 or args.wn_max <= 0:
         raise ValueError("--wn-min/--wn-max 는 0보다 커야 합니다.")
     if args.zeta_min < 0 or args.zeta_max <= 0:
@@ -627,6 +1177,7 @@ def main():
     selected_valves = parse_valve_selection(args.valves, max_valve=max_valve_idx)
     dynamic_valves = parse_valve_selection(args.dynamic_valves, max_valve=max_valve_idx)
     hf_valves = parse_valve_selection(args.hf_valves, max_valve=max_valve_idx)
+    peak_valves = parse_valve_selection(args.peak_valves, max_valve=max_valve_idx)
     selected_cfgs = [cfg for cfg in CONFIGS if cfg["idx"] in selected_valves]
     if not selected_cfgs:
         raise ValueError("선택 조건에 맞는 밸브가 없습니다.")
@@ -670,6 +1221,7 @@ def main():
         tune_dynamic = (args.tune_mode == "dynamic") and (cfg["idx"] in dynamic_valves)
         hf_weight_local = args.hf_weight if cfg["idx"] in hf_valves else 0.0
         r2_weight_local = args.r2_weight if cfg["idx"] in hf_valves else 0.0
+        peak_weight_local = args.peak_weight if cfg["idx"] in peak_valves else 0.0
         print(f"   - tune_mode = {'dynamic(wn/zeta only)' if tune_dynamic else 'all(13 params)'}")
         print(
             f"   - hf_penalty = {hf_weight_local:.4f} "
@@ -678,6 +1230,10 @@ def main():
         print(
             f"   - r2_floor_penalty = {r2_weight_local:.4f} "
             f"(floor={args.r2_floor:.3f}, 적용대상={'예' if cfg['idx'] in hf_valves else '아니오'})"
+        )
+        print(
+            f"   - peak_penalty = {peak_weight_local:.4f} "
+            f"(percentile={args.peak_percentile:.2f}, 적용대상={'예' if cfg['idx'] in peak_valves else '아니오'})"
         )
         data = load_and_preprocess(
             args.data,
@@ -706,6 +1262,8 @@ def main():
                 hf_target=args.hf_target,
                 r2_floor=args.r2_floor,
                 r2_weight=r2_weight_local,
+                peak_weight=peak_weight_local,
+                peak_percentile=args.peak_percentile,
                 wn_min=args.wn_min,
                 wn_max=args.wn_max,
                 zeta_min=args.zeta_min,
@@ -722,6 +1280,8 @@ def main():
                 hf_target=args.hf_target,
                 r2_floor=args.r2_floor,
                 r2_weight=r2_weight_local,
+                peak_weight=peak_weight_local,
+                peak_percentile=args.peak_percentile,
                 wn_min=args.wn_min,
                 wn_max=args.wn_max,
                 zeta_min=args.zeta_min,
@@ -791,6 +1351,7 @@ def main():
             zeta_max=args.zeta_max,
         )
         params_dict = sanitize_params(best_params)
+        opening_report = build_opening_report(data, params_dict)
 
         print(f'\n[결과] {cfg["name"]} 파라미터 도출 완료!')
         print(f"A_max      = {params_dict['a_max']:.6f}")
@@ -806,15 +1367,8 @@ def main():
         print(f"zeta_up    = {params_dict['zeta_up']:.4f}")
         print(f"wn_down    = {params_dict['wn_down']:.4f}")
         print(f"zeta_down  = {params_dict['zeta_down']:.4f}\n")
-
-        optimization_results.append({
-            'cfg': cfg,
-            'params_dict': params_dict,
-            'best_error': best_error,
-            'flow_delay_samples': data['flow_delay_samples'],
-            'input_window_size': data['input_window_size'],
-            'flow_window_size': data['flow_window_size'],
-        })
+        print("[static opening @ median P_in, z=0]")
+        print(f"{format_opening_report(opening_report)}\n")
 
         _, Q_pred = simulate_physics_model(data, best_params)
         q_plot = np.nan_to_num(Q_pred, nan=0.0, posinf=1e9, neginf=-1e9)
@@ -824,7 +1378,13 @@ def main():
         ss_tot = np.sum((data['Q'] - np.mean(data['Q'])) ** 2)
         r_sq = 1 - (np.sum(diff_plot ** 2) / ss_tot) if ss_tot != 0 else 0.0
         hf_ratio_fit = high_freq_ratio(data['Q'], Q_pred)
+        peak_stats = compute_peak_stats(data['Q'], Q_pred, percentile=args.peak_percentile)
         t_plot = data['Time'] - args.start
+        print(
+            f"[peak @ p{args.peak_percentile:.2f}] "
+            f"real={peak_stats['peak_true']:.6g}, fit={peak_stats['peak_pred']:.6g}, "
+            f"err={peak_stats['peak_err']:.6g} ({peak_stats['peak_rel_err'] * 100:.3g}%)\n"
+        )
 
         ax = axes[i]
 
@@ -836,7 +1396,10 @@ def main():
             f"Iwin={data['input_window_size']} | Qwin={data['flow_window_size']} | "
             f"delay={data['flow_delay_samples']} samples"
         )
-        title_line2 = f"RMSE={rmse:.4f} | R²={r_sq * 100:.1f}% | HF ratio={hf_ratio_fit:.3f}"
+        title_line2 = (
+            f"RMSE={rmse:.4f} | R²={r_sq * 100:.1f}% | HF ratio={hf_ratio_fit:.3f} | "
+            f"Peak real/fit={peak_stats['peak_true']:.3g}/{peak_stats['peak_pred']:.3g}"
+        )
         ax.set_title(
             f"{title_line1}\n{title_line2}",
             fontsize=12,
@@ -846,17 +1409,48 @@ def main():
         ax.legend(loc='upper left', fontsize=10)
         ax.grid(True)
 
+        optimization_results.append({
+            'cfg': cfg,
+            'params_dict': params_dict,
+            'best_error': best_error,
+            'flow_delay_samples': data['flow_delay_samples'],
+            'input_window_size': data['input_window_size'],
+            'flow_window_size': data['flow_window_size'],
+            'opening_report': opening_report,
+            'peak_stats': peak_stats,
+            'plot_data': data,
+            'q_pred': q_plot,
+        })
+
     for idx_ax in range(n_plots):
         row_idx = idx_ax // ncols
         if row_idx == nrows - 1:
             axes[idx_ax].set_xlabel('Time [s]', fontsize=12)
 
     txt_output_path, image_output_path = resolve_result_paths(args.output, args.result_dir)
+    image_root, image_ext = os.path.splitext(image_output_path)
+    image_3d_output_path = f"{image_root}_3d{image_ext or '.png'}"
     output_header = build_output_header(args, selected_valves, optimization_results)
     write_cpp_output(optimization_results, txt_output_path, header_text=output_header)
+    _, image_3d_output_paths = plot_3d_fit_diagnostics(
+        optimization_results,
+        image_3d_output_path,
+        max_points=args.plot3d_max_points,
+        ctrl_min=args.plot3d_ctrl_min,
+    )
+    html_3d_output_path = f"{image_root}_3d.html"
+    html_3d_output_paths = write_interactive_3d_fit_html(
+        optimization_results,
+        html_3d_output_path,
+        max_points=args.plot3d_max_points,
+        ctrl_min=args.plot3d_ctrl_min,
+    )
     fig.savefig(image_output_path, dpi=150)
     print(f"[INFO] C++ make_params 형식 저장 완료: {txt_output_path}")
     print(f"[INFO] fit image 저장 완료: {image_output_path}")
+    print(f"[INFO] 3D fit diagnostic 저장 완료: {', '.join(image_3d_output_paths)}")
+    if html_3d_output_paths:
+        print(f"[INFO] interactive 3D HTML 저장 완료: {', '.join(html_3d_output_paths)}")
 
     plt.show()
 

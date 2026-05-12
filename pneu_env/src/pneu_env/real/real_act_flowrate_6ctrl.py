@@ -22,6 +22,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
+from pneu_env.real.flowrate_profiles import make_stair_levels, stair_value
 from pneu_utils.utils import get_pkg_path
 
 
@@ -105,6 +106,42 @@ SUITE_PROFILES = [
         ctrl1=dict(mode="bangbang", min=0.85, max=1.0, phase="normal"),
         ctrl2=dict(mode="bangbang", min=0.85, max=1.0, phase="inverse"),
     ),
+    dict(
+        name="grid_hold_2ctrl",
+        mode="grid_hold",
+        duration=154.0,
+        ctrl1_levels=[0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00],
+        ctrl2_levels=[1.00, 0.95, 0.90, 0.85, 0.80, 0.75, 0.70],
+        hold_sec=10.0,
+        transition_sec=1.0,
+    ),
+    dict(
+        name="slow_ramp_updown_2ctrl",
+        mode="ramp",
+        duration=180.0,
+        ctrl1_start=0.70,
+        ctrl1_peak=1.00,
+        ctrl1_end=0.70,
+        ctrl2_start=1.00,
+        ctrl2_peak=0.70,
+        ctrl2_end=1.00,
+        ramp_up_sec=60.0,
+        hold_peak_sec=10.0,
+        ramp_down_sec=60.0,
+        hold_end_sec=10.0,
+    ),
+    dict(
+        name="step_response_2ctrl",
+        mode="step_response",
+        duration=56.0,
+        ctrl1_low=0.70,
+        ctrl1_high=1.00,
+        ctrl2_low=1.00,
+        ctrl2_high=0.70,
+        settle_sec=8.0,
+        high_sec=6.0,
+        cycles=4,
+    ),
 ]
 
 PROFILE_MODE_IDS = dict(
@@ -114,7 +151,65 @@ PROFILE_MODE_IDS = dict(
     bangbang=3,
     const=4,
     sin=5,
+    grid_hold=6,
+    ramp=7,
+    step_response=8,
 )
+
+
+def _clip_ctrl(value: float) -> float:
+    return float(np.clip(float(value), 0.0, 1.0))
+
+
+def _get_profile_levels(profile: dict, prefix: str) -> list[float]:
+    levels_key = f"{prefix}_levels"
+    if levels_key in profile:
+        levels = [float(v) for v in profile[levels_key]]
+        if not levels:
+            raise ValueError(f"{levels_key} must not be empty")
+        return [_clip_ctrl(v) for v in levels]
+
+    start = float(profile[f"{prefix}_start"])
+    peak = float(profile[f"{prefix}_peak"])
+    end = float(profile.get(f"{prefix}_end", start))
+    delta = float(profile[f"{prefix}_delta"])
+    return make_stair_levels(start=start, peak=peak, end=end, delta=delta)
+
+
+def _ramp_value(
+    local_time: float,
+    *,
+    start: float,
+    peak: float,
+    end: float,
+    ramp_up_sec: float,
+    hold_peak_sec: float,
+    ramp_down_sec: float,
+    hold_end_sec: float,
+) -> tuple[float, float]:
+    t = float(max(0.0, local_time))
+    ramp_up = float(max(0.0, ramp_up_sec))
+    peak_hold = float(max(0.0, hold_peak_sec))
+    ramp_down = float(max(0.0, ramp_down_sec))
+    end_hold = float(max(0.0, hold_end_sec))
+
+    if ramp_up > 0.0 and t < ramp_up:
+        alpha = t / ramp_up
+        return _clip_ctrl(start + alpha * (peak - start)), ramp_up
+    t -= ramp_up
+
+    if t < peak_hold:
+        return _clip_ctrl(peak), max(peak_hold, 1e-9)
+    t -= peak_hold
+
+    if ramp_down > 0.0 and t < ramp_down:
+        alpha = t / ramp_down
+        return _clip_ctrl(peak + alpha * (end - peak)), ramp_down
+    t -= ramp_down
+
+    if t < end_hold:
+        return _clip_ctrl(end), max(end_hold, 1e-9)
+    return _clip_ctrl(end), max(end_hold, 1e-9)
 
 
 def _resolve_tcpip_dir() -> str:
@@ -310,6 +405,81 @@ def _make_suite_ctrls(
         period = min(ctrl1_period, ctrl2_period)
         active_ctrls = np.array([ctrl1, ctrl2], dtype=np.float64)
         return _compose_6ctrl(active_ctrls), next_change_time, profile_idx, mode_id, local_time, period
+
+    if mode == "grid_hold":
+        hold_sec = float(profile["hold_sec"])
+        transition_sec = float(profile.get("transition_sec", 0.0))
+        if hold_sec <= 0.0:
+            raise ValueError("grid_hold hold_sec must be positive")
+        if transition_sec < 0.0:
+            raise ValueError("grid_hold transition_sec must be >= 0")
+
+        ctrl1_levels = _get_profile_levels(profile, "ctrl1")
+        ctrl2_levels = _get_profile_levels(profile, "ctrl2")
+        ctrl1 = stair_value(
+            local_time,
+            levels=ctrl1_levels,
+            hold_s=hold_sec,
+            transition_s=transition_sec,
+        )
+        ctrl2 = stair_value(
+            local_time,
+            levels=ctrl2_levels,
+            hold_s=hold_sec,
+            transition_s=transition_sec,
+        )
+        period = hold_sec + transition_sec
+        active_ctrls = np.array([ctrl1, ctrl2], dtype=np.float64)
+        return _compose_6ctrl(active_ctrls), next_change_time, profile_idx, mode_id, local_time, period
+
+    if mode == "ramp":
+        ramp_up_sec = float(profile["ramp_up_sec"])
+        hold_peak_sec = float(profile.get("hold_peak_sec", 0.0))
+        ramp_down_sec = float(profile["ramp_down_sec"])
+        hold_end_sec = float(profile.get("hold_end_sec", 0.0))
+
+        ctrl1, _ = _ramp_value(
+            local_time,
+            start=float(profile["ctrl1_start"]),
+            peak=float(profile["ctrl1_peak"]),
+            end=float(profile.get("ctrl1_end", profile["ctrl1_start"])),
+            ramp_up_sec=ramp_up_sec,
+            hold_peak_sec=hold_peak_sec,
+            ramp_down_sec=ramp_down_sec,
+            hold_end_sec=hold_end_sec,
+        )
+        ctrl2, _ = _ramp_value(
+            local_time,
+            start=float(profile["ctrl2_start"]),
+            peak=float(profile["ctrl2_peak"]),
+            end=float(profile.get("ctrl2_end", profile["ctrl2_start"])),
+            ramp_up_sec=ramp_up_sec,
+            hold_peak_sec=hold_peak_sec,
+            ramp_down_sec=ramp_down_sec,
+            hold_end_sec=hold_end_sec,
+        )
+        period = max(ramp_up_sec + hold_peak_sec + ramp_down_sec + hold_end_sec, 1e-9)
+        active_ctrls = np.array([ctrl1, ctrl2], dtype=np.float64)
+        return _compose_6ctrl(active_ctrls), next_change_time, profile_idx, mode_id, local_time, period
+
+    if mode == "step_response":
+        settle_sec = float(profile["settle_sec"])
+        high_sec = float(profile["high_sec"])
+        cycles = int(profile.get("cycles", 1))
+        if settle_sec <= 0.0 or high_sec <= 0.0:
+            raise ValueError("step_response settle_sec/high_sec must be positive")
+        if cycles <= 0:
+            raise ValueError("step_response cycles must be >= 1")
+
+        cycle_period = settle_sec + high_sec
+        cycle_idx = min(int(local_time // cycle_period), cycles - 1)
+        cycle_time = local_time - cycle_idx * cycle_period
+        high = cycle_time >= settle_sec
+
+        ctrl1 = float(profile["ctrl1_high"] if high else profile["ctrl1_low"])
+        ctrl2 = float(profile["ctrl2_high"] if high else profile["ctrl2_low"])
+        active_ctrls = np.array([ctrl1, ctrl2], dtype=np.float64)
+        return _compose_6ctrl(active_ctrls), next_change_time, profile_idx, mode_id, local_time, cycle_period
 
     if mode == "bangbang":
         period, period_time = _bangbang_period_at(local_time, profile)
