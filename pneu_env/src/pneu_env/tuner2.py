@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from scipy import optimize
 
-from pneu_env.sim3 import PneuSim
+from pneu_env.sim2 import PneuSim
 from pneu_utils.utils import get_pkg_path
 
 
@@ -25,12 +25,22 @@ OPTIMIZER_OPTIONS = dict(
 ERROR_WEIGHTS = dict(
     press_pos=1.5,
     press_neg=1.0,
-    flow1=0.1,
-    flow2=0.1,
+    flow_out=0.1,
+    flow_in=0.1,
 )
+COEFF_MIN = 1e-12
 
 
-class PneuSimTuner3:
+class PneuSimTuner2:
+    """
+    Pump discharge-coefficient tuner for lib2/sim2.
+
+    Assumptions:
+    - real flow1 measures pump discharge (pump_out)
+    - real flow2 measures pump suction   (pump_in)
+    - real ctrl1/ctrl2 are physical valve commands in [0, 1]
+    """
+
     def __init__(
         self,
         data_names: List[str],
@@ -49,6 +59,14 @@ class PneuSimTuner3:
         self.iter_num = 0
         self.params = np.asarray(INITIAL_GUESS, dtype=np.float64)
         self._sims = {data_name: self._make_sim(data) for data_name, data in self.datas.items()}
+
+    def _sanitize_coeffs(self, params: np.ndarray) -> np.ndarray:
+        arr = np.asarray(params, dtype=np.float64).copy()
+        if arr.shape != (2,):
+            raise ValueError(f"Pump coeff params must have shape (2,), got {arr.shape}")
+        arr[0] = max(float(arr[0]), COEFF_MIN)
+        arr[1] = max(float(arr[1]), COEFF_MIN)
+        return arr
 
     def _resolve_data_path(self, data_name: str) -> Path:
         candidate = Path(data_name)
@@ -69,8 +87,9 @@ class PneuSimTuner3:
             return "time"
         raise ValueError(f"{path}: missing required time column: curr_time/time")
 
-    def _unit_to_sim3_ctrl(self, ctrl_unit: np.ndarray) -> np.ndarray:
-        return np.clip(2.0 * np.asarray(ctrl_unit, dtype=np.float64) - 1.0, -1.0, 1.0)
+    def _unit_to_sim2_ctrl(self, ctrl_unit: np.ndarray) -> np.ndarray:
+        ctrl_unit = np.clip(np.asarray(ctrl_unit, dtype=np.float64), 0.0, 1.0)
+        return np.clip(2.0 * ctrl_unit - 1.0, -1.0, 1.0)
 
     def _ctrl_at_time(
         self,
@@ -86,7 +105,7 @@ class PneuSimTuner3:
         while idx + 1 < n and t >= float(traj_time[idx + 1]):
             idx += 1
 
-        return self._unit_to_sim3_ctrl(ctrls_unit[idx]), idx
+        return self._unit_to_sim2_ctrl(ctrls_unit[idx]), idx
 
     def _make_sim(self, data: Dict[str, np.ndarray]) -> PneuSim:
         return PneuSim(
@@ -96,27 +115,20 @@ class PneuSimTuner3:
             scale=False,
             init_pos_press=float(data["press_pos"][0]),
             init_neg_press=float(data["press_neg"][0]),
-            init_act_pos_press=float(data["act_pos_press"][0]),
-            init_act_neg_press=float(data["act_neg_press"][0]),
         )
 
     def _reset_sim(self, sim: PneuSim, data: Dict[str, np.ndarray]) -> None:
         sim.set_init_press(
             init_pos_press=float(data["press_pos"][0]),
             init_neg_press=float(data["press_neg"][0]),
-            init_act_pos_press=float(data["act_pos_press"][0]),
-            init_act_neg_press=float(data["act_neg_press"][0]),
         )
         sim.obs_buf.clear()
 
-    def _sim_flow1_flow2_lpm(self, sim: PneuSim) -> tuple[float, float]:
-        mf = sim.get_mass_flowrate()
-        if len(mf) < 6:
-            raise ValueError(f"sim3 mass-flow vector must have at least 6 values, got {len(mf)}")
-
-        flow1 = float(mf[4] * 60000.0 / STD_RHO)
-        flow2 = float(mf[5] * 60000.0 / STD_RHO)
-        return flow1, flow2
+    def _sim_pump_flows_lpm(self, sim: PneuSim) -> tuple[float, float]:
+        mf = sim.get_mean_mass_flowrate()
+        flow_out = float(mf["pump_out"] * 60000.0 / STD_RHO)
+        flow_in = float(mf["pump_in"] * 60000.0 / STD_RHO)
+        return flow_out, flow_in
 
     def tune(
         self,
@@ -137,13 +149,13 @@ class PneuSimTuner3:
 
     def objective_function(self, params: np.ndarray) -> float:
         self.iter_num += 1
-        self.params = np.asarray(params, dtype=np.float64)
+        self.params = self._sanitize_coeffs(params)
         total_error = 0.0
 
         for data_name, data in self.datas.items():
             if self.verbose:
                 print()
-                print(f"[ INFO] Tuner3 ==> Data name: {data_name}")
+                print(f"[ INFO] Tuner2 ==> Data name: {data_name}")
 
             sim = self._sims[data_name]
             sim.set_discharge_coeff(
@@ -155,7 +167,7 @@ class PneuSimTuner3:
 
         if self.verbose:
             print()
-            print(f"[ INFO] Tuner3 (iter: {self.iter_num}) ==> Coeff: {self.params} err: {total_error}")
+            print(f"[ INFO] Tuner2 (iter: {self.iter_num}) ==> Coeff: {self.params} err: {total_error}")
             print()
 
         return float(total_error)
@@ -165,16 +177,16 @@ class PneuSimTuner3:
         ctrls_unit = data["ctrls_unit"]
         real_press_pos = data["press_pos"]
         real_press_neg = data["press_neg"]
-        real_flow1 = data["flow1"]
-        real_flow2 = data["flow2"]
+        real_flow_out = data["flow1"]
+        real_flow_in = data["flow2"]
         t_end = float(traj_time[-1])
 
         n_est = max(1, int(np.ceil(t_end * SIM_FREQ)) + 4)
         sim_time = np.empty(n_est, dtype=np.float64)
         sim_press_pos = np.empty(n_est, dtype=np.float64)
         sim_press_neg = np.empty(n_est, dtype=np.float64)
-        sim_flow1 = np.empty(n_est, dtype=np.float64)
-        sim_flow2 = np.empty(n_est, dtype=np.float64)
+        sim_flow_out = np.empty(n_est, dtype=np.float64)
+        sim_flow_in = np.empty(n_est, dtype=np.float64)
 
         idx = 0
         curr_time = 0.0
@@ -183,21 +195,21 @@ class PneuSimTuner3:
         while curr_time < t_end:
             act, idx = self._ctrl_at_time(traj_time, ctrls_unit, curr_time, idx)
             curr_obs, _ = sim.observe(act)
-            flow1, flow2 = self._sim_flow1_flow2_lpm(sim)
+            flow_out, flow_in = self._sim_pump_flows_lpm(sim)
 
             if k >= n_est:
                 sim_time = np.resize(sim_time, n_est * 2)
                 sim_press_pos = np.resize(sim_press_pos, n_est * 2)
                 sim_press_neg = np.resize(sim_press_neg, n_est * 2)
-                sim_flow1 = np.resize(sim_flow1, n_est * 2)
-                sim_flow2 = np.resize(sim_flow2, n_est * 2)
+                sim_flow_out = np.resize(sim_flow_out, n_est * 2)
+                sim_flow_in = np.resize(sim_flow_in, n_est * 2)
                 n_est *= 2
 
             sim_time[k] = float(curr_obs[0])
             sim_press_pos[k] = float(curr_obs[1])
             sim_press_neg[k] = float(curr_obs[2])
-            sim_flow1[k] = flow1
-            sim_flow2[k] = flow2
+            sim_flow_out[k] = flow_out
+            sim_flow_in[k] = flow_in
 
             curr_time = sim_time[k]
             k += 1
@@ -206,16 +218,16 @@ class PneuSimTuner3:
 
         press_pos_error = ERROR_WEIGHTS["press_pos"] * np.mean(np.abs(sim_press_pos[:k][sim_idx] - real_press_pos[real_idx]))
         press_neg_error = ERROR_WEIGHTS["press_neg"] * np.mean(np.abs(sim_press_neg[:k][sim_idx] - real_press_neg[real_idx]))
-        flow1_error = ERROR_WEIGHTS["flow1"] * np.mean(np.abs(sim_flow1[:k][sim_idx] - real_flow1[real_idx]))
-        flow2_error = ERROR_WEIGHTS["flow2"] * np.mean(np.abs(sim_flow2[:k][sim_idx] - real_flow2[real_idx]))
-        error = press_pos_error + press_neg_error + flow1_error + flow2_error
+        flow_out_error = ERROR_WEIGHTS["flow_out"] * np.mean(np.abs(sim_flow_out[:k][sim_idx] - real_flow_out[real_idx]))
+        flow_in_error = ERROR_WEIGHTS["flow_in"] * np.mean(np.abs(sim_flow_in[:k][sim_idx] - real_flow_in[real_idx]))
+        error = press_pos_error + press_neg_error + flow_out_error + flow_in_error
 
         if self.verbose:
-            print(f"[ INFO] Tuner3 ==> Pressure pos error: {press_pos_error}")
-            print(f"[ INFO] Tuner3 ==> Pressure neg error: {press_neg_error}")
-            print(f"[ INFO] Tuner3 ==> flow1 error: {flow1_error}")
-            print(f"[ INFO] Tuner3 ==> flow2 error: {flow2_error}")
-            print(f"[ INFO] Tuner3 ==> Total error: {error}")
+            print(f"[ INFO] Tuner2 ==> Pressure pos error: {press_pos_error}")
+            print(f"[ INFO] Tuner2 ==> Pressure neg error: {press_neg_error}")
+            print(f"[ INFO] Tuner2 ==> Pump flow out error: {flow_out_error}")
+            print(f"[ INFO] Tuner2 ==> Pump flow in error: {flow_in_error}")
+            print(f"[ INFO] Tuner2 ==> Total error: {error}")
 
         return float(error)
 
@@ -248,7 +260,7 @@ class PneuSimTuner3:
         return choose, short_idx
 
     def get_coeff(self) -> list[float]:
-        return list(np.asarray(self.params, dtype=np.float64))
+        return list(self._sanitize_coeffs(self.params))
 
     def load_datas(self, data_names: List[str]) -> Dict[str, Dict[str, np.ndarray]]:
         datas: Dict[str, Dict[str, np.ndarray]] = {}
@@ -262,17 +274,14 @@ class PneuSimTuner3:
                 time_col,
                 "press_pos",
                 "press_neg",
-                "ctrl1", "ctrl2", "ctrl3", "ctrl4", "ctrl5", "ctrl6",
-                "flow1", "flow2",
+                "ctrl1",
+                "ctrl2",
+                "flow1",
+                "flow2",
             ]
             missing = [c for c in required_cols if c not in df.columns]
             if missing:
                 raise ValueError(f"{path}: missing required columns: {missing}")
-
-            if "act_pos_press" not in df.columns:
-                df["act_pos_press"] = 101.325
-            if "act_neg_press" not in df.columns:
-                df["act_neg_press"] = 101.325
 
             df = df.sort_values(time_col).reset_index(drop=True)
             t0 = float(df[time_col].iloc[0])
@@ -297,18 +306,12 @@ class PneuSimTuner3:
             ctrls_unit = np.column_stack([
                 np.clip(df["ctrl1"].to_numpy(dtype=np.float64), 0.0, 1.0),
                 np.clip(df["ctrl2"].to_numpy(dtype=np.float64), 0.0, 1.0),
-                np.clip(df["ctrl3"].to_numpy(dtype=np.float64), 0.0, 1.0),
-                np.clip(df["ctrl4"].to_numpy(dtype=np.float64), 0.0, 1.0),
-                np.clip(df["ctrl5"].to_numpy(dtype=np.float64), 0.0, 1.0),
-                np.clip(df["ctrl6"].to_numpy(dtype=np.float64), 0.0, 1.0),
             ]).astype(np.float64)
 
             datas[path.stem] = {
                 "curr_time": curr_time,
                 "press_pos": df["press_pos"].to_numpy(dtype=np.float64),
                 "press_neg": df["press_neg"].to_numpy(dtype=np.float64),
-                "act_pos_press": df["act_pos_press"].to_numpy(dtype=np.float64),
-                "act_neg_press": df["act_neg_press"].to_numpy(dtype=np.float64),
                 "ctrls_unit": ctrls_unit,
                 "flow1": df["flow1"].to_numpy(dtype=np.float64),
                 "flow2": df["flow2"].to_numpy(dtype=np.float64),
@@ -328,7 +331,7 @@ class PneuSimTuner3:
 
         for data_name, data in self.datas.items():
             print()
-            print(f"[ INFO] Tuner3 ==> Data name: {data_name}")
+            print(f"[ INFO] Tuner2 ==> Data name: {data_name}")
 
             sim = self._sims[data_name]
             sim.set_discharge_coeff(
@@ -345,8 +348,8 @@ class PneuSimTuner3:
             sim_time = np.empty(n_est, dtype=np.float64)
             sim_press_pos = np.empty(n_est, dtype=np.float64)
             sim_press_neg = np.empty(n_est, dtype=np.float64)
-            sim_flow1 = np.empty(n_est, dtype=np.float64)
-            sim_flow2 = np.empty(n_est, dtype=np.float64)
+            sim_flow_out = np.empty(n_est, dtype=np.float64)
+            sim_flow_in = np.empty(n_est, dtype=np.float64)
 
             idx = 0
             curr_time = 0.0
@@ -355,29 +358,29 @@ class PneuSimTuner3:
             while curr_time < t_end:
                 act, idx = self._ctrl_at_time(traj_time, ctrls_unit, curr_time, idx)
                 curr_obs, _ = sim.observe(act)
-                flow1, flow2 = self._sim_flow1_flow2_lpm(sim)
+                flow_out, flow_in = self._sim_pump_flows_lpm(sim)
 
                 if k >= n_est:
                     sim_time = np.resize(sim_time, n_est * 2)
                     sim_press_pos = np.resize(sim_press_pos, n_est * 2)
                     sim_press_neg = np.resize(sim_press_neg, n_est * 2)
-                    sim_flow1 = np.resize(sim_flow1, n_est * 2)
-                    sim_flow2 = np.resize(sim_flow2, n_est * 2)
+                    sim_flow_out = np.resize(sim_flow_out, n_est * 2)
+                    sim_flow_in = np.resize(sim_flow_in, n_est * 2)
                     n_est *= 2
 
                 sim_time[k] = float(curr_obs[0])
                 sim_press_pos[k] = float(curr_obs[1])
                 sim_press_neg[k] = float(curr_obs[2])
-                sim_flow1[k] = flow1
-                sim_flow2[k] = flow2
+                sim_flow_out[k] = flow_out
+                sim_flow_in[k] = flow_in
                 curr_time = sim_time[k]
                 k += 1
 
             sim_time = sim_time[:k]
             sim_press_pos = sim_press_pos[:k]
             sim_press_neg = sim_press_neg[:k]
-            sim_flow1 = sim_flow1[:k]
-            sim_flow2 = sim_flow2[:k]
+            sim_flow_out = sim_flow_out[:k]
+            sim_flow_in = sim_flow_in[:k]
 
             fig1 = plt.figure(figsize=(12, 6))
             ax1 = fig1.add_subplot(2, 1, 1)
@@ -396,14 +399,14 @@ class PneuSimTuner3:
             fig2 = plt.figure(figsize=(12, 6))
             ax3 = fig2.add_subplot(2, 1, 1)
             ax4 = fig2.add_subplot(2, 1, 2)
-            ax3.plot(traj_time, data["flow1"], label="real_flow1")
-            ax3.plot(sim_time, sim_flow1, label="sim_flow1")
-            ax3.set_title(f"{data_name} - Flow1")
+            ax3.plot(traj_time, data["flow1"], label="real_pump_flow_out")
+            ax3.plot(sim_time, sim_flow_out, label="sim_pump_flow_out")
+            ax3.set_title(f"{data_name} - Pump Flow Out")
             ax3.grid(True)
             ax3.legend()
-            ax4.plot(traj_time, data["flow2"], label="real_flow2")
-            ax4.plot(sim_time, sim_flow2, label="sim_flow2")
-            ax4.set_title(f"{data_name} - Flow2")
+            ax4.plot(traj_time, data["flow2"], label="real_pump_flow_in")
+            ax4.plot(sim_time, sim_flow_in, label="sim_pump_flow_in")
+            ax4.set_title(f"{data_name} - Pump Flow In")
             ax4.grid(True)
             ax4.legend()
 

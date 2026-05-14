@@ -8,7 +8,7 @@ from datetime import datetime
 import numpy as np
 import yaml
 
-from pneu_env.tuner3 import INITIAL_GUESS, OPTIMIZER_OPTIONS, PneuSimTuner3
+from pneu_env.tuner2 import INITIAL_GUESS, OPTIMIZER_OPTIONS, PneuSimTuner2
 from pneu_utils.utils import get_pkg_path
 
 
@@ -51,15 +51,15 @@ def main() -> None:
 
     now = datetime.now()
     suffix = f"_{args.tag}" if args.tag else ""
-    save_name = now.strftime("%y%m%d_%H_%M_%S") + f"_discharge_coeff_lib3{suffix}"
+    save_name = now.strftime("%y%m%d_%H_%M_%S") + f"_discharge_coeff_lib2{suffix}"
     folder_path = f"{get_pkg_path('pneu_env')}/data/discharge_coeff_result/{save_name}"
     os.makedirs(folder_path, exist_ok=True)
 
-    print(f"[ INFO] Tuner3 ==> Save folder: {save_name}")
+    print(f"[ INFO] Tuner2 ==> Save folder: {save_name}")
     with open(f"{folder_path}/cfg.yaml", "w", encoding="utf-8") as f:
         yaml.dump(kwargs, f)
 
-    tuner = PneuSimTuner3(
+    tuner = PneuSimTuner2(
         data_names=kwargs["data_names"],
         **kwargs["tuner"],
     )
@@ -68,7 +68,7 @@ def main() -> None:
     try:
         result = tuner.tune(**kwargs["tune"])
         print(result)
-        coeff = list(result.x)
+        coeff = tuner.get_coeff()
         tune_info["inlet_pump_coeff"] = float(coeff[0])
         tune_info["outlet_pump_coeff"] = float(coeff[1])
         with open(f"{folder_path}/result.pkl", "wb") as f:
