@@ -76,13 +76,10 @@ class PneuReal:
             raise ValueError(f"ctrl must be length 2 or 6, got {ctrl.size}")
 
         if not np.all(np.isfinite(ctrl)):
-            ctrl = np.nan_to_num(ctrl, nan=0.0, posinf=1.0, neginf=-1.0)
-        ctrl = np.clip(ctrl, -1.0, 1.0)
+            ctrl = np.nan_to_num(ctrl, nan=0.0, posinf=1.0, neginf=0.0)
+        ctrl = np.clip(ctrl, 0.0, 1.0)
 
-        main_ctrl = ctrl[:2]
-        act_ctrls = 0.5 * ctrl[2:] + 0.5
-        act_ctrls = np.clip(act_ctrls, 0.0, 1.0)
-        return main_ctrl, act_ctrls
+        return ctrl[:2], ctrl[2:]
 
     def _flowrate_lpm_tuple(self) -> tuple[float, float, float, float, float, float]:
         return (
@@ -109,9 +106,17 @@ class PneuReal:
             goal_posneg = np.array([101.325, 101.325], dtype=np.float64)
 
         main_ctrl, act_ctrls = self._split_ctrl(ctrl)
-        ctrl6_bipolar = np.r_[main_ctrl, 2.0 * act_ctrls - 1.0]
+        ctrl_unit = np.r_[main_ctrl, act_ctrls]
+        if self.scale:
+            # PneuRealAct currently maps bipolar input x to 0.1*x + 0.9 when
+            # scale=True. Pre-compensate so the real command matches sim3's
+            # trained valve command: 0.85 + 0.15*action.
+            backend_ctrl = 1.5 * ctrl_unit - 0.5
+        else:
+            backend_ctrl = 2.0 * ctrl_unit - 1.0
+        backend_ctrl = np.clip(backend_ctrl, -1.0, 1.0)
         _, raw_info = self.backend.observe(
-            ctrl=ctrl6_bipolar,
+            ctrl=backend_ctrl,
             goal=goal_posneg,
         )
         obs = raw_info["Observation"]

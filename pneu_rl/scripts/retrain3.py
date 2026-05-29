@@ -42,7 +42,7 @@ delete_lines(5)
 kwargs = load_yaml(model_name)
 
 kwargs["parent_model"] = model_name
-kwargs["retrain_epi"] = 50
+kwargs["retrain_epi"] = 200
 kwargs["type"] = "simulation" if obs_mode == "1" else "real"
 
 # Keep the selected model's reference distribution for sim2real.
