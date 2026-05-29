@@ -9,8 +9,8 @@ import json
 import os
 
 
-from utils.utils import get_pkg_path, color
-from env.pid import PID
+from pneu_utils.utils import get_pkg_path, color
+from pneu_env.pid import PID
 
 
 class PneuRealAct:
@@ -83,7 +83,7 @@ class PneuRealAct:
 
         # LabVIEW / TCP 브리지와 공유할 디렉터리
         # 실제 프로젝트 구조에 맞춰 경로 확인 필수
-        self.labview_path = f"{get_pkg_path('pneu_env')}/tcpip"
+        self.labview_path = f"{get_pkg_path('pneu_env')}/src/pneu_env/tcpip"
 
         self.stop_flag = threading.Event()
 

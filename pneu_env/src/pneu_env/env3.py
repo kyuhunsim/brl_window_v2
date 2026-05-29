@@ -28,10 +28,18 @@ class PneuEnv3:
             neg_pred_rwd_coeff=0.0,
             pos_diff_rwd_coeff=0.0,
             neg_diff_rwd_coeff=0.0,
+            action_delta_rwd_coeff=0.0,
+            conflict_rwd_coeff=0.0,
+            chamber_reserve_rwd_coeff=0.0,
+            chamber_margin_kpa=15.0,
+            chamber_deadband_kpa=5.0,
         ),
         pos_pred_rnd_offset_range: float = 0,
         neg_pred_rnd_offset_range: float = 0,
         verbose: bool = True,
+        action_low: float = 0.0,
+        action_high: float = 1.0,
+        episode_carry_state: bool = True,
     ):
         self.obs = obs
         self.goal = PneuRef(
@@ -66,8 +74,8 @@ class PneuEnv3:
             dtype=np.float64,
         )
         self.action_space = Box(
-            low=-1.0,
-            high=1.0,
+            low=action_low,
+            high=action_high,
             shape=(self.dim_act_traj,),
             dtype=np.float64,
         )
@@ -92,9 +100,42 @@ class PneuEnv3:
         self.publish_obs = False
         self.is_pid = False
         self.verbose_enabled = bool(verbose)
+        self.episode_carry_state = bool(episode_carry_state)
+        self.has_episode_state = False
+        self.prev_action = np.full(self.dim_act, action_low, dtype=np.float64)
 
     def reset(self) -> Tuple[np.ndarray, Dict[str, Any]]:
-        ctrl = np.zeros(self.action_space.shape[0], dtype=np.float64)
+        base_init_press = np.array(
+            [
+                getattr(self.obs, "init_pos_press", 101.325),
+                getattr(self.obs, "init_neg_press", 101.325),
+                getattr(self.obs, "init_act_pos_press", 101.325),
+                getattr(self.obs, "init_act_neg_press", 101.325),
+            ],
+            dtype=np.float64,
+        )
+        if self.episode_carry_state and self.has_episode_state:
+            init_press = self.curr_full_press.copy()
+        else:
+            init_press = base_init_press
+        if hasattr(self.obs, "set_init_press"):
+            self.obs.set_init_press(
+                init_press[0],
+                init_press[1],
+                init_press[2],
+                init_press[3],
+            )
+        if hasattr(self.goal, "reset"):
+            self.goal.reset()
+        self.obs_traj = np.tile(init_press, (self.num_obs, 1))
+        self.curr_full_press = init_press.copy()
+        self.t = 0.0
+        self.prev_action = np.full(self.dim_act, self.action_space.low[0], dtype=np.float64)
+
+        if self.is_pid:
+            self.obs.reset_pid()
+
+        ctrl = np.asarray(self.action_space.low, dtype=np.float64)
         state, _, _, _, info = self.step(ctrl)
         self.t = info["obs"]["curr_time"]
 
@@ -120,6 +161,8 @@ class PneuEnv3:
             self.verbose(info)
         if self.publish_obs:
             self.publish_observation(info)
+
+        self.prev_action = np.asarray(action, dtype=np.float64).reshape(-1, self.dim_act)[0].copy()
 
         return state, reward, terminated, truncated, info
 
@@ -166,6 +209,7 @@ class PneuEnv3:
         self.t = obs[0]
         self.obs_traj = obs_traj
         self.curr_full_press = obs_traj[-1].copy()
+        self.has_episode_state = True
         obs_info["ctrl"] = ctrl
         obs_info["pred"] = pred_info
         obs_info["goal_traj"] = goal_traj
@@ -274,6 +318,36 @@ class PneuEnv3:
             pos_pred_reward = 0.0
             neg_pred_reward = 0.0
 
+        curr_ctrl = np.asarray(action, dtype=np.float64).reshape(-1, self.dim_act)[0]
+
+        # 2026-05-28:
+        # lib3의 RL+PID 제어가 tracking은 되지만 밸브 동시 개방과 chamber drift로 인해
+        # 거칠게 흔들리는 경향이 있어, 작은 보상 항으로 부드러움/충돌/저장압을 함께 유도한다.
+        action_delta = float(np.mean((curr_ctrl - self.prev_action) ** 2))
+        action_delta_reward = -self.rwd_kwargs["action_delta_rwd_coeff"] * action_delta
+        reward += action_delta_reward
+
+        conflict = float(
+            0.5 * (
+                curr_ctrl[2] * curr_ctrl[3]
+                + curr_ctrl[4] * curr_ctrl[5]
+            )
+        )
+        conflict_reward = -self.rwd_kwargs["conflict_rwd_coeff"] * conflict
+        reward += conflict_reward
+
+        chamber_margin = self.rwd_kwargs["chamber_margin_kpa"]
+        chamber_deadband = self.rwd_kwargs["chamber_deadband_kpa"]
+        ch_pos = obs_traj[-1, 0]
+        ch_neg = obs_traj[-1, 1]
+        pos_reserve_target = refs[-1, 0] + chamber_margin
+        neg_reserve_target = refs[-1, 1] - chamber_margin
+        pos_reserve_shortage = max(pos_reserve_target - ch_pos - chamber_deadband, 0.0)
+        neg_reserve_shortage = max(ch_neg - neg_reserve_target - chamber_deadband, 0.0)
+        chamber_reserve_error = pos_reserve_shortage + neg_reserve_shortage
+        chamber_reserve_reward = -self.rwd_kwargs["chamber_reserve_rwd_coeff"] * chamber_reserve_error
+        reward += chamber_reserve_reward
+
         info = {
             "pos_prev_reward": pos_prev_reward,
             "neg_prev_reward": neg_prev_reward,
@@ -283,6 +357,12 @@ class PneuEnv3:
             "neg_fut_reward": neg_fut_reward,
             "pos_pred_reward": pos_pred_reward,
             "neg_pred_reward": neg_pred_reward,
+            "action_delta_reward": action_delta_reward,
+            "conflict_reward": conflict_reward,
+            "chamber_reserve_reward": chamber_reserve_reward,
+            "action_delta": action_delta,
+            "conflict": conflict,
+            "chamber_reserve_error": chamber_reserve_error,
         }
 
         return float(reward), info
@@ -303,20 +383,84 @@ class PneuEnv3:
         )
 
     def verbose(self, info: Dict[str, Any]) -> None:
-        print(
-            f'[ INFO] Pneumatic Env3 ==> \n'
-            f'\tTime: {info["obs"]["curr_time"]}\n'
-            f'\tCh  : (\t{info["obs"]["sen_pos"]:3.4f}\t{info["obs"]["sen_neg"]:3.4f})\n'
-            f'\tAct : (\t{info["obs"]["sen_act_pos"]:3.4f}\t{info["obs"]["sen_act_neg"]:3.4f})\n'
-            f'\tRef : (\t{info["obs"]["ref_act_pos"]:3.4f}\t{info["obs"]["ref_act_neg"]:3.4f})\n'
-            f'\tCtrl: {np.array2string(np.asarray(info["ctrl_input"])[0:self.dim_act], precision=4)}\n'
-            f'\tw/o : {info["obs_wo_noise"]}\n'
-            f'\tRWD : Curr \t{info["reward"]["pos_curr_reward"]:.4f}\t{info["reward"]["neg_curr_reward"]:.4f}\n'
-            f'\t    : Prev \t{info["reward"]["pos_prev_reward"]:.4f}\t{info["reward"]["neg_prev_reward"]:.4f}\n'
-            f'\t    : Fut  \t{info["reward"]["pos_fut_reward"]:.4f}\t{info["reward"]["neg_fut_reward"]:.4f}\n'
-            f'\t    : Pred \t{info["reward"]["pos_pred_reward"]:.4f}\t{info["reward"]["neg_pred_reward"]:.4f}\n'
+        applied_ctrl = np.array(
+            [
+                info["obs"]["ctrl_pos"],
+                info["obs"]["ctrl_neg"],
+                info["obs"]["ctrl_act_pos_in"],
+                info["obs"]["ctrl_act_pos_out"],
+                info["obs"]["ctrl_act_neg_in"],
+                info["obs"]["ctrl_act_neg_out"],
+            ],
+            dtype=np.float64,
         )
-        for _ in range(13):
+        raw_ctrl = np.asarray(info["ctrl_input"], dtype=np.float64)[0:self.dim_act]
+        ctrl_str = np.array2string(
+            applied_ctrl,
+            precision=4,
+            max_line_width=1000,
+            separator=" ",
+        )
+        raw_ctrl_str = np.array2string(
+            raw_ctrl,
+            precision=4,
+            max_line_width=1000,
+            separator=" ",
+        )
+        obs_wo_noise_str = np.array2string(
+            np.asarray(info["obs_wo_noise"], dtype=np.float64),
+            precision=4,
+            max_line_width=1000,
+            separator=" ",
+        )
+        lines = [
+            '[ INFO] Pneumatic Env3 ==>',
+            f'\tTime: {info["obs"]["curr_time"]}',
+            f'\tCh  : (\t{info["obs"]["sen_pos"]:3.4f}\t{info["obs"]["sen_neg"]:3.4f})',
+            f'\tAct : (\t{info["obs"]["sen_act_pos"]:3.4f}\t{info["obs"]["sen_act_neg"]:3.4f})',
+            f'\tRef : (\t{info["obs"]["ref_act_pos"]:3.4f}\t{info["obs"]["ref_act_neg"]:3.4f})',
+            f'\tCtrl: {ctrl_str}',
+            f'\tC/I : {raw_ctrl_str}',
+            f'\tw/o : {obs_wo_noise_str}',
+            (
+                f'\tRWD : Curr \t'
+                f'{info["reward"]["pos_curr_reward"]:.4f}\t'
+                f'{info["reward"]["neg_curr_reward"]:.4f}'
+            ),
+            (
+                f'\t    : Prev \t'
+                f'{info["reward"]["pos_prev_reward"]:.4f}\t'
+                f'{info["reward"]["neg_prev_reward"]:.4f}'
+            ),
+            (
+                f'\t    : Fut  \t'
+                f'{info["reward"]["pos_fut_reward"]:.4f}\t'
+                f'{info["reward"]["neg_fut_reward"]:.4f}'
+            ),
+            (
+                f'\t    : Pred \t'
+                f'{info["reward"]["pos_pred_reward"]:.4f}\t'
+                f'{info["reward"]["neg_pred_reward"]:.4f}'
+            ),
+            (
+                f'\t    : Delta\t'
+                f'{info["reward"]["action_delta_reward"]:.4f}\t'
+                f'val={info["reward"]["action_delta"]:.4f}'
+            ),
+            (
+                f'\t    : Conf \t'
+                f'{info["reward"]["conflict_reward"]:.4f}\t'
+                f'val={info["reward"]["conflict"]:.4f}'
+            ),
+            (
+                f'\t    : ChRes\t'
+                f'{info["reward"]["chamber_reserve_reward"]:.4f}\t'
+                f'err={info["reward"]["chamber_reserve_error"]:.4f}'
+            ),
+        ]
+        output = "\n".join(lines)
+        print(output)
+        for _ in range(len(lines)):
             sys.stdout.write("\x1b[1A")
             sys.stdout.write("\x1b[2K")
 

@@ -33,7 +33,7 @@ from scipy import optimize
 from pneu_utils.utils import get_pkg_path
 
 
-WARMUP_EXCLUDE_SEC = 10.0
+WARMUP_EXCLUDE_SEC = 0.0
 
 
 def fit_sine(time_s: np.ndarray, signal: np.ndarray, freq_hz: float) -> tuple[float, float, float]:
@@ -51,10 +51,16 @@ def fit_sine(time_s: np.ndarray, signal: np.ndarray, freq_hz: float) -> tuple[fl
     return amp, phase, float(c)
 
 
-def second_order_response(freq_hz: np.ndarray, wn: float, zeta: float) -> tuple[np.ndarray, np.ndarray]:
+def second_order_response(
+    freq_hz: np.ndarray,
+    wn: float,
+    zeta: float,
+    delay_sec: float = 0.0,
+) -> tuple[np.ndarray, np.ndarray]:
     omega = 2.0 * np.pi * freq_hz
     mag = wn * wn / np.sqrt((wn * wn - omega * omega) ** 2 + (2.0 * zeta * wn * omega) ** 2)
     phase = -np.arctan2(2.0 * zeta * wn * omega, wn * wn - omega * omega)
+    phase -= omega * delay_sec
     return mag, phase
 
 
@@ -153,7 +159,16 @@ def find_bandwidth(response: pd.DataFrame, threshold_db: float) -> Optional[floa
     return float(below.iloc[0]["freq_hz"])
 
 
-def fit_second_order(response: pd.DataFrame, *, use_phase: bool) -> dict:
+def apply_phase_branch(response: pd.DataFrame, branch_deg: float) -> pd.DataFrame:
+    out = response.copy()
+    branch_rad = np.deg2rad(branch_deg)
+    out["phase_unwrapped_rad"] = out["phase_unwrapped_rad"] + branch_rad
+    out["phase_unwrapped_deg"] = out["phase_unwrapped_deg"] + branch_deg
+    out["phase_branch_deg"] = branch_deg
+    return out
+
+
+def fit_second_order(response: pd.DataFrame, *, use_phase: bool, fit_delay: bool = False) -> dict:
     freq = response["freq_hz"].to_numpy(dtype=float)
     gain = response["gain_norm"].to_numpy(dtype=float)
     phase = response["phase_unwrapped_rad"].to_numpy(dtype=float)
@@ -170,7 +185,8 @@ def fit_second_order(response: pd.DataFrame, *, use_phase: bool) -> dict:
     def residual(log_params):
         wn = np.exp(log_params[0])
         zeta = np.exp(log_params[1])
-        mag_model, phase_model = second_order_response(freq, wn, zeta)
+        delay_sec = np.exp(log_params[2]) if fit_delay else 0.0
+        mag_model, phase_model = second_order_response(freq, wn, zeta, delay_sec)
         res_gain = 20.0 * np.log10(np.maximum(mag_model, 1e-12)) - 20.0 * np.log10(np.maximum(gain, 1e-12))
         if not use_phase:
             return res_gain
@@ -182,24 +198,35 @@ def fit_second_order(response: pd.DataFrame, *, use_phase: bool) -> dict:
         bw_guess = float(np.median(freq))
     wn0 = 2.0 * np.pi * max(bw_guess, 1e-3)
     zeta0 = 0.8
+    delay0 = 0.05
 
+    x0 = [wn0, zeta0]
+    lower = [2.0 * np.pi * 1e-3, 0.05]
+    upper = [2.0 * np.pi * 100.0, 20.0]
+    if fit_delay:
+        x0.append(delay0)
+        lower.append(1e-4)
+        upper.append(2.0)
     res = optimize.least_squares(
         residual,
-        x0=np.log([wn0, zeta0]),
+        x0=np.log(x0),
         bounds=(
-            np.log([2.0 * np.pi * 1e-3, 0.05]),
-            np.log([2.0 * np.pi * 100.0, 20.0]),
+            np.log(lower),
+            np.log(upper),
         ),
         max_nfev=5000,
     )
     wn = float(np.exp(res.x[0]))
     zeta = float(np.exp(res.x[1]))
+    delay_sec = float(np.exp(res.x[2])) if fit_delay else 0.0
     return dict(
         success=bool(res.success),
         cost=float(res.cost),
         wn_rad_s=wn,
         wn_hz=wn / (2.0 * np.pi),
         zeta=zeta,
+        delay_sec=delay_sec,
+        fit_delay=bool(fit_delay),
         message=str(res.message),
     )
 
@@ -239,9 +266,15 @@ def plot_results(
 
     if fit.get("success"):
         f_model = np.logspace(np.log10(max(response["freq_hz"].min(), 1e-4)), np.log10(response["freq_hz"].max()), 300)
-        mag, phase_model = second_order_response(f_model, fit["wn_rad_s"], fit["zeta"])
+        mag, phase_model = second_order_response(
+            f_model,
+            fit["wn_rad_s"],
+            fit["zeta"],
+            fit.get("delay_sec", 0.0),
+        )
         axes[2].plot(f_model, 20.0 * np.log10(np.maximum(mag, 1e-12)), color="black", label="2nd-order fit")
-        axes[3].plot(f_model, np.rad2deg(phase_model), color="black", label="2nd-order fit")
+        fit_label = "2nd-order + delay fit" if fit.get("fit_delay") else "2nd-order fit"
+        axes[3].plot(f_model, np.rad2deg(phase_model), color="black", label=fit_label)
 
     axes[2].set_xscale("log")
     axes[2].set_ylabel("Gain [dB]")
@@ -258,6 +291,8 @@ def plot_results(
     title = "Chirp flow analysis"
     if fit.get("success"):
         title += f" | wn={fit['wn_hz']:.3g} Hz ({fit['wn_rad_s']:.3g} rad/s), zeta={fit['zeta']:.3g}"
+        if fit.get("fit_delay"):
+            title += f", delay={fit['delay_sec']:.3g}s"
     fig.suptitle(title)
     fig.tight_layout()
     fig.savefig(output_path, dpi=150)
@@ -281,6 +316,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-input-amp", type=float, default=1e-4)
     parser.add_argument("--threshold-db", type=float, default=-3.0)
     parser.add_argument("--no-phase-fit", action="store_true")
+    parser.add_argument(
+        "--phase-branch-deg",
+        type=float,
+        default=0.0,
+        help="Add this offset to the unwrapped measured phase before fitting/plotting, e.g. -360.",
+    )
+    parser.add_argument(
+        "--fit-delay",
+        action="store_true",
+        help="Fit G(s) times exp(-sT) instead of a pure second-order low-pass.",
+    )
     parser.add_argument("--save-name", default=None)
     return parser.parse_args()
 
@@ -316,9 +362,15 @@ def main() -> None:
     )
     if response.empty:
         raise RuntimeError("No valid chirp response windows. Check columns, frequency, and signal amplitude.")
+    if args.phase_branch_deg != 0.0:
+        response = apply_phase_branch(response, args.phase_branch_deg)
 
     bandwidth_hz = find_bandwidth(response, args.threshold_db)
-    fit = fit_second_order(response, use_phase=not args.no_phase_fit)
+    fit = fit_second_order(
+        response,
+        use_phase=not args.no_phase_fit,
+        fit_delay=args.fit_delay,
+    )
 
     if args.save_name:
         save_name = args.save_name
@@ -343,6 +395,7 @@ def main() -> None:
         threshold_db=args.threshold_db,
         warmup_exclude_sec=WARMUP_EXCLUDE_SEC,
         warmup_cutoff=warmup_cutoff,
+        phase_branch_deg=args.phase_branch_deg,
         fit=fit,
         args=vars(args),
     )
@@ -376,6 +429,7 @@ def main() -> None:
             "[INFO] Fit: "
             f"wn={fit['wn_rad_s']:.6g} rad/s ({fit['wn_hz']:.6g} Hz), "
             f"zeta={fit['zeta']:.6g}"
+            + (f", delay={fit['delay_sec']:.6g} sec" if fit.get("fit_delay") else "")
         )
     else:
         print(f"[WARN] Fit failed: {fit}")

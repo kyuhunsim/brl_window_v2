@@ -30,47 +30,46 @@ constexpr double FORCE_LIMIT = 500.0;
 constexpr double LOG_GUARD = 700.0;
 constexpr double Z_LIMIT = 1e6;
 
-
 const ValveModelParams CHAMBER_POS_PARAMS = {
-    0.177722907799, 30.5227678788, 0.037918321473, -0.000311534389229, -2.41127082078e-06,
-    136147.863015, 8.78578862272e-05, 0.101260743403, 93.8023842274,
+    0.19894303291, 31.7172181606, 0.194962266427, -5.68685026066e-06, 3.23578144865e-06,
+    29027.0356546, 0.338844793172, 0.000826633684367, 9.41735107961,
     11, 0.6, 11, 0.6
 };
 
+
 const ValveModelParams CHAMBER_NEG_PARAMS = {
-    0.222972882056, 67.5946341463, 0.134697118175, -0.000141099120723, -0.000108112778366,
-    39554.0013834, 570.114878781, 0.4927461249, 1672.80421907,
+    0.239169164564, 48.518620906, 0.0700924875331, 0.000135888575828, -2.32481437758e-09,
+    0.0507762901747, 1435.46402399, 0.321098083025, 13321.2772422,
     11, 0.6, 11, 0.6
 };
 
 
 const ValveModelParams ACT_POS_IN_PARAMS = {
-    0.176615662976, 35.8567971705, 0.0410902906033, 0.000125140241968, 3.10897782258e-06,
-    342765.237631, 1.55234148422, 0.0931140221163, 40009.5348198,
-    2.05383080476, 1.45653972629, 1.36538371888, 0.932842101505
+    0.158726064226, 58.1040771774, 0.0639074588174, -0.000134164335495, -2.44680270341e-08,
+    636076.392414, 11.7383266067, 0.22163825519, 49442.1108384,
+    11, 0.6, 11, 0.6
 };
 
 
 const ValveModelParams ACT_POS_OUT_PARAMS = {
-    0.141147778024, 21.6085736731, 0.050353667423, 0.00030994966622, 5.99171947936e-06,
-    287636.806294, 8.82854815565e-14, 0.0207782439013, 841.089918154,
-    44.6797853561, 8.31559275949, 49.9426537221, 1.00609852673
+    0.164792215402, 47.2199676354, 0.068454298723, -0.000263494384174, 7.45208724224e-06,
+    2.96590269622e-09, 6.92033753208, 0.0910547602345, 1460.15672543,
+    11, 0.6, 11, 0.6
 };
 
 
 const ValveModelParams ACT_NEG_IN_PARAMS = {
-    0.166803861296, 48.3965822138, 0.125721792181, 0.000133474187013, 7.67638801282e-06,
-    47065.7506453, 1.29345836639, 2.80378931006, 2586.83453211,
-    3.04249012193, 1.11227644648, 2.29343565369, 0.901083780449
+    0.182330496938, 46.1883492334, 0.0681161027831, 4.68555949625e-05, 6.33623577564e-07,
+    139898.737565, 1.10699393845, 1.14001146149, 17561.4973492,
+    11, 0.6, 11, 0.6
 };
 
 
 const ValveModelParams ACT_NEG_OUT_PARAMS = {
-    0.171456892317, 55.3406762135, 0.00325287760306, 0.000401485931598, 0.000153626179729,
-    3950.78516302, 5.14936971591e-12, 0.212289034266, 654501.778604,
-    2.62948474457, 1.18983816911, 4.04483946577, 1.53568873742
+    0.208997209267, 38.9210250875, 0.0129116104922, -0.000197660796598, 0.00012448624898,
+    530.826123437, 2.23407111407, 4.40916708332, 7237.76861615,
+    25, 0.6, 11, 0.6
 };
-
 
 
 double clamp01(double value)
@@ -137,6 +136,7 @@ PneumaticCT::PneumaticCT()
 
     dxdt = new double[X_DIM];
     mass_flowrate = new double[M_DOT_DIM];
+    for (int i = 0; i < VALVE_DEBUG_DIM; i++) valve_debug[i] = 0.0;
     reset_valve_states();
 }
 
@@ -334,7 +334,7 @@ void PneumaticCT::model(const double* x, const double* u, double* dxdt, int step
     mass_flowrate[1] = dm1indt;
     mass_flowrate[2] = dm2outdt;
     mass_flowrate[3] = dm2indt;
-    mass_flowrate[4] = ㅓ;
+    mass_flowrate[4] = mdot_pos_valve;
     mass_flowrate[5] = mdot_neg_valve;
     mass_flowrate[6] = m_sv11p;
     mass_flowrate[7] = m_sv12p;
@@ -477,6 +477,18 @@ double PneumaticCT::solenoid_valve(double P_inlet, double P_outlet, double signa
 
     const double q_pred_lpm = std::max(state->x1, 0.0);
     const double mdot = q_pred_lpm * STD_RHO / 60000.0;
+    const int debug_base = (static_cast<int>(type) - 1) * 9;
+    if (debug_base >= 0 && debug_base + 8 < VALVE_DEBUG_DIM) {
+        valve_debug[debug_base + 0] = u_eff;
+        valve_debug[debug_base + 1] = current;
+        valve_debug[debug_base + 2] = state_curr;
+        valve_debug[debug_base + 3] = state->z;
+        valve_debug[debug_base + 4] = force_net;
+        valve_debug[debug_base + 5] = area_eff;
+        valve_debug[debug_base + 6] = q_static_lpm;
+        valve_debug[debug_base + 7] = q_pred_lpm;
+        valve_debug[debug_base + 8] = mdot;
+    }
     if (!std::isfinite(mdot)) return 0.0;
 
     return std::max(num * mdot, 0.0);
@@ -490,6 +502,8 @@ double PneumaticCT::chamber(double dmdt, double V)
 }
 
 double* PneumaticCT::get_mass_flowrate() { return mass_flowrate; }
+
+double* PneumaticCT::get_valve_debug() { return valve_debug; }
 
 void PneumaticCT::set_logging(bool enable) {
     this->enable_logging_ = enable;

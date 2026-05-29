@@ -19,6 +19,15 @@ print(color('\t---', 'blue'))
 train_mode = input(color('\tTM: ', 'blue'))
 delete_lines(7)
 
+print(color('[INPUT] Episode state carry?', 'blue'))
+print(color('\t1. On (carry previous episode pressure state)', 'yellow'))
+print(color('\t2. Off (reset to initial pressure state)', 'yellow'))
+print(color('\t---', 'blue'))
+episode_carry_mode = input(color('\tCarry: ', 'blue'))
+delete_lines(5)
+episode_carry_state = episode_carry_mode != '2'
+print(f'[ INFO] Episode carry state: {"On" if episode_carry_state else "Off"}')
+
 # ==> My model <==
 if train_mode == '1':
     kwargs = dict(
@@ -37,14 +46,14 @@ if train_mode == '1':
         ),
         # pred = None,
         rnd_ref = dict(
-            pos_min_off = 110,
-            pos_max_off = 180,
-            neg_min_off = 40,
-            neg_max_off = 120,
+            pos_min_off = 115,
+            pos_max_off = 140,
+            neg_min_off = 60,
+            neg_max_off = 80,
             pos_max_ts = 5,
             neg_max_ts = 5,
-            pos_max_amp = 20,
-            neg_max_amp = 20,
+            pos_max_amp = 10,
+            neg_max_amp = 5,
             pos_max_per = 10,
             neg_max_per = 10
         ),
@@ -52,7 +61,8 @@ if train_mode == '1':
             num_prev = 10,
             num_pred = 15,
             num_act = 5,
-            verbose = False,
+            verbose = True,
+            episode_carry_state = episode_carry_state,
             rwd_kwargs = dict(
                 pos_prev_rwd_coeff = 0.0,
                 neg_prev_rwd_coeff = 0.0,
@@ -64,6 +74,13 @@ if train_mode == '1':
                 neg_pred_rwd_coeff = 0.25*1,
                 pos_diff_rwd_coeff = 0.0,
                 neg_diff_rwd_coeff = 0.0,
+                # 2026-05-28:
+                # lib3에서 RL+PID의 tracking은 유지하면서도 제어 진동과 chamber drift를 줄이기 위한 약한 보상 항
+                action_delta_rwd_coeff = 0.02,
+                conflict_rwd_coeff = 0.03,
+                chamber_reserve_rwd_coeff = 0.002,
+                chamber_margin_kpa = 15.0,
+                chamber_deadband_kpa = 5.0,
             ),
             pos_pred_rnd_offset_range = 0,
             neg_pred_rnd_offset_range = 0,
@@ -85,24 +102,26 @@ if train_mode == '1':
             log_std_max = 1,
             temporal_weight = 1,
             spatial_weight = 0.4,
-            noise_std = 1.5
+            noise_std = 1.5,
+            train_diag_interval = 1,
+            train_diag_atm_band = 8.0
         ),
-        epi = 2000,
+        epi = 1000,
         # sim3 actuator-pressure PID:
         # pid = dict(
-        #     Kp_act_pos_in = 0.0,
-        #     Ki_act_pos_in = 0.01,
-        #     Kd_act_pos_in = 0.0,
-        #     Kp_act_pos_out = 0.0,
-        #     Ki_act_pos_out = 0.01,
-        #     Kd_act_pos_out = 0.0,
-        #     Kp_act_neg_in = 0.0,
-        #     Ki_act_neg_in = 0.01,
-        #     Kd_act_neg_in = 0.0,
-        #     Kp_act_neg_out = 0.0,
-        #     Ki_act_neg_out = 0.01,
-        #     Kd_act_neg_out = 0.0,
-        #     Ka = 1
+            # Kp_act_pos_in = 0.0,
+            # Ki_act_pos_in = 0.01,
+            # Kd_act_pos_in = 0.0,
+            # Kp_act_pos_out = 0.0,
+            # Ki_act_pos_out = 0.01,
+            # Kd_act_pos_out = 0.0,
+            # Kp_act_neg_in = 0.0,
+            # Ki_act_neg_in = 0.01,
+            # Kd_act_neg_in = 0.0,
+            # Kp_act_neg_out = 0.0,
+            # Ki_act_neg_out = 0.01,
+            # Kd_act_neg_out = 0.0,
+            # Ka = 1
         # )
         pid = None
     )
@@ -119,14 +138,14 @@ elif train_mode == '2':
         ),
         pred = None,
         rnd_ref = dict(
-            pos_min_off = 110,
-            pos_max_off = 180,
-            neg_min_off = 40,
-            neg_max_off = 120,
+            pos_min_off = 115,
+            pos_max_off = 140,
+            neg_min_off = 60,
+            neg_max_off = 80,
             pos_max_ts = 5,
             neg_max_ts = 5,
-            pos_max_amp = 20,
-            neg_max_amp = 20,
+            pos_max_amp = 10,
+            neg_max_amp = 5,
             pos_max_per = 10,
             neg_max_per = 10
         ),
@@ -134,7 +153,8 @@ elif train_mode == '2':
             num_prev = 0,
             num_pred = 1,
             num_act = 1,
-            verbose = False,
+            verbose = True,
+            episode_carry_state = episode_carry_state,
 
             rwd_kwargs = dict(
                 pos_curr_rwd_coeff = 0.3*1,
@@ -148,6 +168,11 @@ elif train_mode == '2':
                 neg_prev_rwd_coeff = 0.0,
                 pos_diff_rwd_coeff = 0.0,
                 neg_diff_rwd_coeff = 0.0,
+                action_delta_rwd_coeff = 0.0,
+                conflict_rwd_coeff = 0.0,
+                chamber_reserve_rwd_coeff = 0.0,
+                chamber_margin_kpa = 15.0,
+                chamber_deadband_kpa = 5.0,
             ),
             pos_pred_rnd_offset_range = 0,
             neg_pred_rnd_offset_range = 0,
@@ -170,9 +195,11 @@ elif train_mode == '2':
 
             temporal_weight = 0.0,
             spatial_weight = 0.0,
-            noise_std = 0.0
+            noise_std = 0.0,
+            train_diag_interval = 1,
+            train_diag_atm_band = 8.0
         ),
-        epi = 1200,
+        epi = 1500,
         pid = None
     )
     print(f'[ INFO] Train mode: SAC')
@@ -209,6 +236,7 @@ elif train_mode == '3':
             num_pred = 15,
             num_act = 5,
             verbose = False,
+            episode_carry_state = episode_carry_state,
 
             rwd_kwargs = dict(
                 pos_curr_rwd_coeff = 0.3*1,
@@ -222,6 +250,11 @@ elif train_mode == '3':
                 neg_prev_rwd_coeff = 0.0,
                 pos_diff_rwd_coeff = 0.0,
                 neg_diff_rwd_coeff = 0.0,
+                action_delta_rwd_coeff = 0.0,
+                conflict_rwd_coeff = 0.0,
+                chamber_reserve_rwd_coeff = 0.0,
+                chamber_margin_kpa = 15.0,
+                chamber_deadband_kpa = 5.0,
             ),
             pos_pred_rnd_offset_range = 0,
             neg_pred_rnd_offset_range = 0,
@@ -244,7 +277,9 @@ elif train_mode == '3':
 
             temporal_weight = 0,
             spatial_weight = 0,
-            noise_std = 0
+            noise_std = 0,
+            train_diag_interval = 1,
+            train_diag_atm_band = 8.0
         ),
         epi = 1200,
         pid = None
@@ -277,6 +312,7 @@ elif train_mode == '4':
             num_pred = 1,
             num_act = 1,
             verbose = False,
+            episode_carry_state = episode_carry_state,
 
             rwd_kwargs = dict(
                 pos_curr_rwd_coeff = 0.3*1,
@@ -290,6 +326,11 @@ elif train_mode == '4':
                 neg_prev_rwd_coeff = 0.0,
                 pos_diff_rwd_coeff = 0.0,
                 neg_diff_rwd_coeff = 0.0,
+                action_delta_rwd_coeff = 0.0,
+                conflict_rwd_coeff = 0.0,
+                chamber_reserve_rwd_coeff = 0.0,
+                chamber_margin_kpa = 15.0,
+                chamber_deadband_kpa = 5.0,
             ),
             pos_pred_rnd_offset_range = 0,
             neg_pred_rnd_offset_range = 0,
@@ -312,7 +353,9 @@ elif train_mode == '4':
 
             temporal_weight = 0.5,
             spatial_weight = 0.4,
-            noise_std = 1.0
+            noise_std = 1.0,
+            train_diag_interval = 1,
+            train_diag_atm_band = 8.0
         ),
         epi = 200,
         pid = None

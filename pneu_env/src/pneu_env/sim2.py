@@ -1,5 +1,11 @@
 import sys
+import ctypes
 from pathlib import Path
+
+THIS_DIR = Path(__file__).resolve().parent
+SRC_DIR = THIS_DIR.parent
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
 from ctypes import CDLL, c_double, POINTER
 
@@ -46,12 +52,15 @@ class PneuSim():
             )
 
         self.lib.set_init_env.argtypes = [c_double, c_double]
+        self.lib.set_init_env_with_pump_state.argtypes = [c_double, c_double, c_double, c_double]
         self.lib.set_volume.argtypes = [c_double, c_double]
         self.lib.get_time.restype = c_double
         self.lib.step.argtypes = [POINTER(c_double), c_double]
         self.lib.step.restype = POINTER(c_double)
         self.lib.set_discharge_coeff.argtypes = [c_double for _ in range(4)]
         self.lib.get_mass_flowrate.restype = POINTER(c_double)
+        self.lib.set_debug_enabled.argtypes = [ctypes.c_int]
+        self.lib.get_model_debug.restype = POINTER(c_double)
 
         self.lib.solenoid_valve_test.argtypes = [c_double for _ in range(5)]
         self.lib.solenoid_valve_test.restype = c_double
@@ -99,7 +108,10 @@ class PneuSim():
             if self.is_anti_windup:
                 original_ctrl = ctrl
     
-        ctrl = np.clip(ctrl, -1, 1)
+        # RL action is normalized to [0, 1]; lib2 valves open around 0.85.
+        ctrl = np.clip(np.asarray(ctrl, dtype=np.float64), 0.0, 1.0)
+        if self.scale:
+            ctrl = 0.85 + 0.15*ctrl
 
         if self.is_anti_windup:
             sat_ctrl = ctrl
@@ -108,11 +120,6 @@ class PneuSim():
                 sat_ctrl = sat_ctrl
             )
         
-        if self.scale:
-            ctrl = 0.3*0.5*(ctrl + 1) + 0.7
-        else:
-            ctrl = 0.5*ctrl + 0.5
-
         time_step = 1/self.freq
         next_obs = np.array(
             list(self.lib.step((c_double*2)(*list(ctrl)), time_step)[0:3]),
@@ -162,6 +169,24 @@ class PneuSim():
         self.lib.set_init_env(
             init_pos_press,
             init_neg_press
+        )
+        self.obs = np.array([
+            init_pos_press, init_neg_press
+        ], dtype=np.float32)
+
+    def set_init_press_with_pump_state(
+        self,
+        init_pos_press: float,
+        init_neg_press: float,
+        p1_init: float,
+        p2_init: float,
+    ):
+        self.lib.time_reset()
+        self.lib.set_init_env_with_pump_state(
+            init_pos_press,
+            init_neg_press,
+            p1_init,
+            p2_init,
         )
         self.obs = np.array([
             init_pos_press, init_neg_press
@@ -244,6 +269,35 @@ class PneuSim():
             **{f"neg_{name}": values[i + 9] for i, name in enumerate(names)},
         }
 
+    def set_debug_enabled(self, enabled: bool) -> None:
+        self.lib.set_debug_enabled(int(bool(enabled)))
+
+    def get_model_debug(self):
+        values = list(self.lib.get_model_debug()[0:20])
+        names = [
+            "Ppos",
+            "Pneg",
+            "angle",
+            "P1",
+            "P2",
+            "u_pos",
+            "u_neg",
+            "dm1outdt",
+            "dm1indt",
+            "dm2outdt",
+            "dm2indt",
+            "mdot_pos_valve",
+            "mdot_neg_valve",
+            "mdot_out",
+            "mdot_in",
+            "dPposdt",
+            "dPnegdt",
+            "dP1dt",
+            "dP2dt",
+            "angular_velocity",
+        ]
+        return {name: values[i] for i, name in enumerate(names)}
+
     
     def solenoid_valve(
         self,
@@ -258,10 +312,9 @@ class PneuSim():
     
 if __name__ == '__main__':
     env = PneuSim()
-    ctrl = np.array([0.0, 0.9], dtype=np.float64)
-    for n in range(100):
+    ctrl = np.array([1.0, 1.0], dtype=np.float64)
+    for _ in range(1000):
         obs, _ = env.observe(ctrl)
-
         print(obs)
 
         

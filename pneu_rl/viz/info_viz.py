@@ -3,6 +3,7 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from matplotlib import font_manager
 
 from collections import deque
 import pickle
@@ -26,17 +27,22 @@ for k, v in data_info.items():
     data_deque['epis'].append(k)
     data_deque['steps'].append(v['steps'])
     data_deque['rewards'].append(v['reward'])
-    # data_deque['alphas'].append(v['alpha'].item())
+    if 'alpha' in v:
+        alpha = v['alpha']
+        if hasattr(alpha, 'item'):
+            alpha = alpha.item()
+        data_deque['alphas'].append(alpha)
 
 data = dict(
     epis = np.array(data_deque['epis']),
     steps = np.array(data_deque['steps']),
     rewards = np.array(data_deque['rewards']),
-    # alphas = np.array(data_deque['alphas'])
+    alphas = np.array(data_deque['alphas'])
 )
 
 
-fontname = 'Times New Roman'
+available_fonts = {font.name for font in font_manager.fontManager.ttflist}
+fontname = 'Times New Roman' if 'Times New Roman' in available_fonts else 'DejaVu Serif'
 fontsize = 18
 fig = plt.figure(figsize=(14, 7))
 gs = gridspec.GridSpec(1, 2, figure=fig)
@@ -46,7 +52,8 @@ ax2 = fig.add_subplot(gs[0,1])
 ax1.plot(
     data['steps'],
     data['rewards'],
-    linewidth=2, color='black'
+    linewidth=2, color='black',
+    label='reward'
 )
 ax1.set_xlabel('Steps', fontname=fontname, fontsize=fontsize)
 ax1.set_title('Total Reward', fontname=fontname, fontsize=fontsize)
@@ -55,21 +62,34 @@ ax1.set_title('Total Reward', fontname=fontname, fontsize=fontsize)
 ax1.legend(loc='upper right')
 ax1.minorticks_on()
 
-ax2.plot(
-    data['steps'],
-    data['rewards'],
-    linewidth=2, color='black'
-)
+if len(data['alphas']) == len(data['steps']):
+    ax2.plot(
+        data['steps'],
+        data['alphas'],
+        linewidth=2, color='black',
+        label='alpha'
+    )
+    ax2.set(xlim=(None, None), ylim=(0, 1.7))
+else:
+    ax2.text(
+        0.5, 0.5,
+        'No alpha data',
+        transform=ax2.transAxes,
+        ha='center',
+        va='center',
+        fontname=fontname,
+        fontsize=fontsize,
+    )
 ax2.set_xlabel('Steps', fontname=fontname, fontsize=fontsize)
 ax2.set_title('Temperature Parameter', fontname=fontname, fontsize=fontsize)
 # ax2.grid(which='major', color='silver', linewidth=1)
 # ax2.grid(which='minor', color='lightgray', linewidth=0.5)
-ax2.legend(loc='upper right')
+handles, labels = ax2.get_legend_handles_labels()
+if handles:
+    ax2.legend(loc='upper right')
 ax2.minorticks_on()
-ax2.set(xlim=(None, None), ylim=(0, 1.7))
 
 plt.tight_layout()
 plt.savefig(f'fig.png')
-plt.show()
-
-
+if 'agg' not in plt.get_backend().lower():
+    plt.show()

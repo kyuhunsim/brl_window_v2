@@ -24,6 +24,11 @@ from pneu_utils.utils import (
     get_pkg_path,
     load_yaml
 )
+from quick_viz_utils import (
+    compute_tracking_metrics,
+    datas_to_df,
+    print_tracking_metrics,
+)
 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -88,10 +93,10 @@ viz_kwargs = dict(
             file = "241113_16_09_05_PID_Real"
         ),
         random = dict(
-            pos_max_off = 300,
-            pos_min_off = 160,
-            neg_max_off = 30,
-            neg_min_off = 15,
+            pos_max_off = 210,
+            pos_min_off = 140,
+            neg_max_off = 32,
+            neg_min_off = 10,
             pos_max_ts = 10,
             neg_max_ts = 10,
             pos_max_amp = 10,
@@ -159,20 +164,7 @@ def infos_to_datas(infos: deque):
     return datas
 
 def calc_metrics(datas):
-    ref_pos = np.asarray(datas['ref_pos'], dtype=np.float64)
-    sen_pos = np.asarray(datas['sen_pos'], dtype=np.float64)
-    ref_neg = np.asarray(datas['ref_neg'], dtype=np.float64)
-    sen_neg = np.asarray(datas['sen_neg'], dtype=np.float64)
-
-    pos_err = ref_pos - sen_pos
-    neg_err = ref_neg - sen_neg
-
-    return dict(
-        rmse_pos = float(np.sqrt(np.mean(pos_err * pos_err))),
-        rmse_neg = float(np.sqrt(np.mean(neg_err * neg_err))),
-        mae_pos = float(np.mean(np.abs(pos_err))),
-        mae_neg = float(np.mean(np.abs(neg_err))),
-    )
+    return compute_tracking_metrics(datas)
 
 def save_datas(datas, model_name, obs_mode, ref_mode, save_name=None, kwargs=None):
     if save_name is not None:
@@ -182,14 +174,17 @@ def save_datas(datas, model_name, obs_mode, ref_mode, save_name=None, kwargs=Non
 
     if save_name is not None:
         os.makedirs(f'{get_pkg_path("pneu_rl")}/exp/{save_name}')
-        df = pd.DataFrame(datas)
+        df = datas_to_df(datas)
         # df.to_csv(f'/Users/greenlandshark/MATLAB/main/datas/{save_name}.csv', index=False)
         df.to_csv(f'{get_pkg_path("pneu_rl")}/exp/{save_name}/{save_name}.csv', index=False)
+
+    metrics = calc_metrics(datas)
+    print_tracking_metrics(metrics)
 
     kwargs["model_name"] = model_name
     kwargs["obs_mode"] = obs_mode
     kwargs["ref_mode"] = ref_mode
-    kwargs["metrics"] = calc_metrics(datas)
+    kwargs["metrics"] = metrics
 
     if save_name is not None:
         with open(f'{get_pkg_path("pneu_rl")}/exp/{save_name}/cfg.yaml', 'w') as f:

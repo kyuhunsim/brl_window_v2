@@ -37,8 +37,8 @@
 // #define COUT_ 30.34040306
 
 
-#define CIN_ 2.92669515
-#define COUT_ 33.3372092
+#define CIN_ 3.467453458679315
+#define COUT_ 14.936306067937274
 
 struct PneumaticCT
 {
@@ -63,6 +63,8 @@ private:
     double* dxdt;
     double* mass_flowrate;
     double valve_debug[18];
+    double model_debug[20];
+    bool debug_enabled;
     ValveRuntimeState valve_state_pos;
     ValveRuntimeState valve_state_neg;
 
@@ -84,9 +86,11 @@ public:
         double Cd2IN,
         double Cd2OUT
     );
+    void set_debug_enabled(bool enabled);
     double* model(double* x, double* u);
     double* get_mass_flowrate();
     double* get_valve_debug();
+    double* get_model_debug();
     
     double solenoid_valve(double P_inlet, double P_outlet, double signal, double type, double num);
 };
@@ -98,11 +102,13 @@ public:
     ~PneumaticSimulator() {}
     static PneumaticSimulator& get_instance();
     void set_init_env(double pos_press, double neg_press);
+    void set_init_env_with_pump_state(double pos_press, double neg_press, double p1_init, double p2_init);
     void pneumaticDT(double* xk, double* uk, double Ts, double* xk1);
     double get_time();
     double* get_mass_flowrate();
     double* get_mean_mass_flowrate();
     double* get_valve_debug();
+    double* get_model_debug();
     double* step(double* control, double time_step);
     void set_volume(double volume1, double volume2);
     void set_discharge_coeff(
@@ -111,6 +117,7 @@ public:
         double Cd2IN,
         double C2OUT
     );
+    void set_debug_enabled(bool enabled);
     void time_reset();
 
     double solenoid_valve_test(double P_inlet, double P_outlet, double signal, double type, double num);

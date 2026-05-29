@@ -74,6 +74,17 @@ void PneumaticSimulator::set_init_env(double pos_press, double neg_press)
     // std::cout << "[ INFO] Pneumatic Simulator ==> Env initialized: POS " << xk0[1] << " NEG " << xk0[2] << std::endl; 
 }
 
+void PneumaticSimulator::set_init_env_with_pump_state(double pos_press, double neg_press, double p1_init, double p2_init)
+{
+    pneumaticCT -> reset_valve_states();
+
+    xk0[1] = pos_press;
+    xk0[2] = neg_press;
+    xk0[3] = 0;
+    xk0[4] = p1_init;
+    xk0[5] = p2_init;
+}
+
 void PneumaticSimulator::set_volume(double volume1, double volume2)
 {
     pneumaticCT -> set_volume(volume1, volume2);
@@ -96,6 +107,11 @@ void PneumaticSimulator::set_discharge_coeff(
     std::cout << "[ INFO] Pneumatic Simulator ==> Discharge Coefficient Initialized" << std::endl;
     std::cout << "[ INFO] C1IN : " << Cd1IN << " C1OUT: " << Cd1OUT << std::endl;
     std::cout << "[ INFO] C2IN : " << Cd2IN << " C2OUT: " << Cd2OUT << std::endl;
+}
+
+void PneumaticSimulator::set_debug_enabled(bool enabled)
+{
+    pneumaticCT -> set_debug_enabled(enabled);
 }
 
 void PneumaticSimulator::pneumaticDT(double* xk, double* uk, double Ts, double* xk1)
@@ -250,6 +266,10 @@ double* PneumaticSimulator::get_valve_debug() {
     return pneumaticCT -> get_valve_debug();
 }
 
+double* PneumaticSimulator::get_model_debug() {
+    return pneumaticCT -> get_model_debug();
+}
+
 void PneumaticSimulator::time_reset() { 
     xk0[0] = 0; 
     pneumaticCT -> reset_valve_states();
@@ -275,8 +295,13 @@ extern "C" {
     }
     double* get_mass_flowrate() { return PneumaticSimulator::get_instance().get_mass_flowrate(); }
     void time_reset() {return PneumaticSimulator::get_instance().time_reset();}
+    void set_init_env_with_pump_state(double pos_press, double neg_press, double p1_init, double p2_init) {
+        return PneumaticSimulator::get_instance().set_init_env_with_pump_state(pos_press, neg_press, p1_init, p2_init);
+    }
+    void set_debug_enabled(int enabled) { return PneumaticSimulator::get_instance().set_debug_enabled(enabled != 0); }
 
     double solenoid_valve_test(double P_inlet, double P_outlet, double signal, double type, double num) { return PneumaticSimulator::get_instance().solenoid_valve_test(P_inlet, P_outlet, signal, type, num); }
     double* get_mean_mass_flowrate() { return PneumaticSimulator::get_instance().get_mean_mass_flowrate(); }
     double* get_valve_debug() { return PneumaticSimulator::get_instance().get_valve_debug(); }
+    double* get_model_debug() { return PneumaticSimulator::get_instance().get_model_debug(); }
 }

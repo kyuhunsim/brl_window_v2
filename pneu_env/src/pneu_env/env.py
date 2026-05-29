@@ -30,7 +30,9 @@ class PneuEnv():
             neg_diff_rwd_coeff = 0.0,
         ),
         pos_pred_rnd_offset_range: float = 0,
-        neg_pred_rnd_offset_range: float = 0
+        neg_pred_rnd_offset_range: float = 0,
+        action_low: float = 0.0,
+        action_high: float = 1.0
     ):
         self.obs = obs
         self.goal = PneuRef(
@@ -66,8 +68,8 @@ class PneuEnv():
             dtype = np.float64
         )
         self.action_space = Box(
-            low = -1.,
-            high = 1.,
+            low = action_low,
+            high = action_high,
             shape = (self.dim_act_traj,),
             dtype = np.float64
         )
@@ -87,7 +89,18 @@ class PneuEnv():
         self.curr_ref = 101.325*np.ones((self.dim_obs), dtype=np.float32)
 
     def reset(self) -> Tuple[np.ndarray, Dict[str, Any]]:
-        ctrl = np.ones(self.action_space.shape[0], dtype=np.float64)
+        init_obs = np.array([
+            getattr(self.obs, "init_pos_press", 101.325),
+            getattr(self.obs, "init_neg_press", 101.325),
+        ], dtype=np.float64)
+        if hasattr(self.obs, "set_init_press"):
+            self.obs.set_init_press(init_obs[0], init_obs[1])
+        if hasattr(self.goal, "reset"):
+            self.goal.reset()
+        self.obs_traj = np.tile(init_obs, (self.num_obs, 1))
+        self.t = 0.0
+
+        ctrl = np.asarray(self.action_space.low, dtype=np.float64)
         state, _, _, _, info = self.step(ctrl)
         self.t = info['obs']['curr_time']
 

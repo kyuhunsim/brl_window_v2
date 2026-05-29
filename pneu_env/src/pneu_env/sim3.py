@@ -43,6 +43,7 @@ class PneuSim:
         self.lib.step_c.restype = POINTER(c_double)
         self.lib.set_discharge_coeff_c.argtypes = [c_double for _ in range(4)]
         self.lib.get_mass_flowrate_c.restype = POINTER(c_double)
+        self.lib.get_valve_debug_c.restype = POINTER(c_double)
         self.lib.time_reset_c.argtypes = []
         self.lib.set_logging_c.argtypes = [c_bool]
 
@@ -101,7 +102,8 @@ class PneuSim:
             if self.is_anti_windup:
                 original_ctrl = ctrl.copy()
 
-        ctrl = np.clip(ctrl, -1, 1)
+        # RL action is normalized to [0, 1]; lib3 valves open around 0.85.
+        ctrl = np.clip(ctrl, 0.0, 1.0)
 
         if self.is_anti_windup:
             self.pid.anti_windup(
@@ -110,9 +112,7 @@ class PneuSim:
             )
 
         if self.scale:
-            ctrl = 0.3 * 0.5 * (ctrl + 1) + 0.7
-        else:
-            ctrl = 0.5 * ctrl + 0.5
+            ctrl = 0.85 + 0.15 * ctrl
 
         time_step = 1 / self.freq
         next_obs = np.array(
@@ -241,10 +241,39 @@ class PneuSim:
     def get_mass_flowrate(self) -> list[float]:
         return list(self.lib.get_mass_flowrate_c()[0:10])
 
+    def get_valve_debug(self) -> dict[str, float]:
+        names = [
+            "u_eff",
+            "current",
+            "state_curr",
+            "z",
+            "force_net",
+            "area_eff",
+            "q_static_lpm",
+            "q_pred_lpm",
+            "mdot",
+        ]
+        valve_names = [
+            "ch_pos",
+            "ch_neg",
+            "act_pos_in",
+            "act_pos_out",
+            "act_neg_in",
+            "act_neg_out",
+        ]
+        values = list(self.lib.get_valve_debug_c()[0:54])
+        debug = {}
+        for valve_idx, valve_name in enumerate(valve_names):
+            offset = valve_idx * len(names)
+            for name_idx, name in enumerate(names):
+                debug[f"{valve_name}_{name}"] = values[offset + name_idx]
+        return debug
+
 
 if __name__ == "__main__":
     env = PneuSim()
-    ctrl = np.array([0.9, 0.9, 0.0, 0.0, 0.0, 0.0], dtype=np.float64)
-    for _ in range(10):
+    # ctrl = np.array([0.95, 0.95, 0.95, 0.95, 0.95, 0.95], dtype=np.float64)
+    ctrl = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5], dtype=np.float64)
+    for _ in range(1000):
         obs, _ = env.observe(ctrl)
         print(obs)

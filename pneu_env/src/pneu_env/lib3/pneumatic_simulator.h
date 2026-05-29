@@ -31,10 +31,17 @@
 
 // #define CIN_ 3.79683467
 // #define COUT_ 7.73269091
-# define CIN_ 3.57059304
-# define COUT_ 28.58182353
+// # define CIN_ 3.57059304
+// # define COUT_ 28.58182353
+
+// #define CIN_ 3.4756947114013292
+// #define COUT_ 7.936024647066513
+
+#define CIN_ 3.6198491
+#define COUT_ 7.49941545
 
 #define M_DOT_DIM 10
+#define VALVE_DEBUG_DIM 54
 // mass_flowrate (lib5) index map:
 // 0 m_po1, 1 m_pi1, 2 m_po2, 3 m_pi2,
 // 4 m_sv_cp, 5 m_sv_cn,
@@ -62,6 +69,7 @@ private:
     double C1OUT, C1IN, C2OUT, C2IN;
     double* dxdt;
     double* mass_flowrate;
+    double valve_debug[VALVE_DEBUG_DIM];
     ValveRuntimeState valve_state_ch_pos;
     ValveRuntimeState valve_state_ch_neg;
     ValveRuntimeState valve_state_act_pos_in;
@@ -91,6 +99,7 @@ public:
     );
     void model(const double* x, const double* u, double* dxdt, int step_num);
     double* get_mass_flowrate();
+    double* get_valve_debug();
     void set_logging(bool enable);
     
     double solenoid_valve(double P_inlet, double P_outlet, double signal, double type, double num);
@@ -112,6 +121,7 @@ public:
     void pneumaticDT(double* xk, double* uk, double Ts, double* xk1);
     double get_time();
     double* get_mass_flowrate();
+    double* get_valve_debug();
     double* step(double* control, double time_step);
     void set_volume(double volume1, double volume2);
     void set_discharge_coeff(

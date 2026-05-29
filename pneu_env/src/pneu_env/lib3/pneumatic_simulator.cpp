@@ -148,6 +148,11 @@ double* PneumaticSimulator::get_mass_flowrate()
     return mass_flowrate;
 }
 
+double* PneumaticSimulator::get_valve_debug()
+{
+    return pneumaticCT->get_valve_debug();
+}
+
 void PneumaticSimulator::time_reset() { 
     xk0[0] = 0; 
     pneumaticCT -> reset_valve_states();
@@ -183,6 +188,7 @@ extern "C" {
         );
     }
     double* get_mass_flowrate_c() { return PneumaticSimulator::get_instance().get_mass_flowrate(); }
+    double* get_valve_debug_c() { return PneumaticSimulator::get_instance().get_valve_debug(); }
     void time_reset_c() {return PneumaticSimulator::get_instance().time_reset();}
     void set_logging_c(bool enable) { return PneumaticSimulator::get_instance().set_logging(enable); }
 }

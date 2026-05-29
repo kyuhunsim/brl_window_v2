@@ -13,15 +13,19 @@ class PneuRef():
     ):
         self.ref = ref
         self.num_ref = num_prev + num_pred + 1 # reference traj dimension: R^{n+k+1}
+        self.ctrl_freq = ctrl_freq
 
-        # init_ref = self.ref.get_goal(1/ctrl_freq)
-        init_ref = self.ref.get_goal(1/ctrl_freq)
+        self.reset()
+        self.step_time = (num_pred + 1)/ctrl_freq # (k+1)/f
+
+    def reset(self) -> None:
+        if hasattr(self.ref, "time_reset"):
+            self.ref.time_reset()
+        init_ref = self.ref.get_goal(1/self.ctrl_freq)
         self.buf = np.c_[
             init_ref[0]*np.ones(self.num_ref, dtype=np.float64),
             init_ref[1]*np.ones(self.num_ref, dtype=np.float64),
         ].reshape(-1)
-
-        self.step_time = (num_pred + 1)/ctrl_freq # (k+1)/f
     
     def get_ref(
         self,

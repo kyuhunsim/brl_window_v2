@@ -1,5 +1,6 @@
 import os
 import shutil
+import csv
 from typing import Any, Union, Optional
 
 import numpy as np
@@ -37,7 +38,9 @@ class SAC():
         log_std_max: float = 1,
         temporal_weight: float = 0.1,
         spatial_weight: float = 0.5,
-        noise_std: float = 0.1
+        noise_std: float = 0.1,
+        train_diag_interval: int = 1,
+        train_diag_atm_band: float = 8.0,
     ):
         self.env = env
         state_dim = env.observation_space.shape[0]
@@ -89,6 +92,8 @@ class SAC():
 
         self.last_epi = 0
         self.total_steps = 0
+        self.train_diag_interval = max(int(train_diag_interval), 0)
+        self.train_diag_atm_band = float(train_diag_atm_band)
 
         self.log = False
         self.model_name = 'SAC'
@@ -249,6 +254,7 @@ class SAC():
             total_critic_loss = 0
             total_policy_loss = 0
             update_count = 0
+            episode_infos = []
 
             while epi_steps < self.horizon:
                 if self.start_epi > self.last_epi + epi:
@@ -257,6 +263,7 @@ class SAC():
                     action = self.predict(state)
                 
                 next_state, reward, done, _, info = self.env.step(action)
+                episode_infos.append(info)
                 self.buffer.add(state, action, reward, next_state, done)
                 state = next_state
                 
@@ -297,6 +304,143 @@ class SAC():
                     critic_loss = avg_critic_loss,
                     policy_loss = avg_policy_loss
                 )
+                if self.train_diag_interval > 0 and epi % self.train_diag_interval == 0:
+                    diag = self._episode_diagnostics(
+                        epi=self.last_epi + epi,
+                        reward=epi_reward,
+                        infos=episode_infos,
+                    )
+                    self._append_train_diagnostics(diag)
+
+    def _episode_diagnostics(
+        self,
+        epi: int,
+        reward: float,
+        infos: list[dict],
+    ) -> dict[str, float]:
+        if len(infos) == 0:
+            return dict(epi=epi, reward=reward, n=0)
+
+        def arr(path: tuple[str, str]) -> np.ndarray:
+            return np.asarray([info[path[0]][path[1]] for info in infos], dtype=np.float64)
+
+        time_arr = arr(("obs", "curr_time"))
+        ch_pos = arr(("obs", "sen_pos"))
+        ch_neg = arr(("obs", "sen_neg"))
+        act_pos = arr(("obs", "sen_act_pos"))
+        act_neg = arr(("obs", "sen_act_neg"))
+        ref_pos = arr(("obs", "ref_act_pos"))
+        ref_neg = arr(("obs", "ref_act_neg"))
+        u_ch_pos = arr(("obs", "ctrl_pos"))
+        u_ch_neg = arr(("obs", "ctrl_neg"))
+        u_pos_in = arr(("obs", "ctrl_act_pos_in"))
+        u_pos_out = arr(("obs", "ctrl_act_pos_out"))
+        u_neg_in = arr(("obs", "ctrl_act_neg_in"))
+        u_neg_out = arr(("obs", "ctrl_act_neg_out"))
+
+        pos_err = ref_pos - act_pos
+        neg_err = ref_neg - act_neg
+        err_deadband = 2.0
+        pos_need_up = pos_err > err_deadband
+        pos_need_down = pos_err < -err_deadband
+        neg_need_up = neg_err > err_deadband
+        neg_need_down = neg_err < -err_deadband
+
+        def rmse(x: np.ndarray) -> float:
+            return float(np.sqrt(np.mean(x * x))) if len(x) else 0.0
+
+        def mean_when(x: np.ndarray, mask: np.ndarray) -> float:
+            return float(np.mean(x[mask])) if bool(np.any(mask)) else 0.0
+
+        def ratio_when(cond: np.ndarray, mask: np.ndarray) -> float:
+            return float(np.mean(cond[mask])) if bool(np.any(mask)) else 0.0
+
+        def slope(y: np.ndarray) -> float:
+            ok = np.isfinite(time_arr) & np.isfinite(y)
+            if int(np.sum(ok)) < 3:
+                return 0.0
+            return float(np.polyfit(time_arr[ok], y[ok], 1)[0])
+
+        def sign_change_per_sec(y: np.ndarray) -> float:
+            if len(y) < 4:
+                return 0.0
+            dy = np.diff(y)
+            sign = np.sign(dy)
+            sign = sign[sign != 0]
+            if len(sign) < 2:
+                return 0.0
+            duration = max(float(time_arr[-1] - time_arr[0]), 1e-9)
+            return float(np.mean(sign[1:] != sign[:-1]) * len(sign) / duration)
+
+        def delta_abs_mean(y: np.ndarray) -> float:
+            return float(np.mean(np.abs(np.diff(y)))) if len(y) > 1 else 0.0
+
+        atm = 101.325
+        act_pos_near_atm = np.abs(act_pos - atm) < self.train_diag_atm_band
+        act_neg_near_atm = np.abs(act_neg - atm) < self.train_diag_atm_band
+
+        return dict(
+            epi=int(epi),
+            reward=float(reward),
+            n=int(len(infos)),
+            duration_sec=float(time_arr[-1] - time_arr[0]) if len(time_arr) > 1 else 0.0,
+            pos_rmse=rmse(pos_err),
+            neg_rmse=rmse(neg_err),
+            pos_bias=float(np.mean(pos_err)),
+            neg_bias=float(np.mean(neg_err)),
+            ch_pos_start=float(ch_pos[0]),
+            ch_pos_end=float(ch_pos[-1]),
+            ch_pos_max=float(np.max(ch_pos)),
+            ch_pos_slope=slope(ch_pos),
+            ch_neg_start=float(ch_neg[0]),
+            ch_neg_end=float(ch_neg[-1]),
+            ch_neg_min=float(np.min(ch_neg)),
+            ch_neg_slope=slope(ch_neg),
+            pos_conflict_mean=float(np.mean(u_pos_in * u_pos_out)),
+            neg_conflict_mean=float(np.mean(u_neg_in * u_neg_out)),
+            pos_need_up_ratio=float(np.mean(pos_need_up)),
+            pos_need_down_ratio=float(np.mean(pos_need_down)),
+            pos_wrong_out_when_need_up=mean_when(u_pos_out, pos_need_up),
+            pos_wrong_in_when_need_down=mean_when(u_pos_in, pos_need_down),
+            pos_wrong_gt_right_when_need_up=ratio_when(u_pos_out > u_pos_in, pos_need_up),
+            pos_wrong_gt_right_when_need_down=ratio_when(u_pos_in > u_pos_out, pos_need_down),
+            neg_need_up_ratio=float(np.mean(neg_need_up)),
+            neg_need_down_ratio=float(np.mean(neg_need_down)),
+            neg_wrong_in_when_need_up=mean_when(u_neg_in, neg_need_up),
+            neg_wrong_out_when_need_down=mean_when(u_neg_out, neg_need_down),
+            neg_wrong_gt_right_when_need_up=ratio_when(u_neg_in > u_neg_out, neg_need_up),
+            neg_wrong_gt_right_when_need_down=ratio_when(u_neg_out > u_neg_in, neg_need_down),
+            act_pos_near_atm_ratio=float(np.mean(act_pos_near_atm)),
+            act_neg_near_atm_ratio=float(np.mean(act_neg_near_atm)),
+            act_pos_sign_change_per_sec=sign_change_per_sec(act_pos),
+            act_neg_sign_change_per_sec=sign_change_per_sec(act_neg),
+            ch_pos_sign_change_per_sec=sign_change_per_sec(ch_pos),
+            ch_neg_sign_change_per_sec=sign_change_per_sec(ch_neg),
+            u_ch_pos_mean=float(np.mean(u_ch_pos)),
+            u_ch_neg_mean=float(np.mean(u_ch_neg)),
+            u_pos_in_mean=float(np.mean(u_pos_in)),
+            u_pos_out_mean=float(np.mean(u_pos_out)),
+            u_neg_in_mean=float(np.mean(u_neg_in)),
+            u_neg_out_mean=float(np.mean(u_neg_out)),
+            u_ch_pos_delta=delta_abs_mean(u_ch_pos),
+            u_ch_neg_delta=delta_abs_mean(u_ch_neg),
+            u_pos_in_delta=delta_abs_mean(u_pos_in),
+            u_pos_out_delta=delta_abs_mean(u_pos_out),
+            u_neg_in_delta=delta_abs_mean(u_neg_in),
+            u_neg_out_delta=delta_abs_mean(u_neg_out),
+        )
+
+    def _append_train_diagnostics(
+        self,
+        diag: dict[str, float],
+    ) -> None:
+        path = f"{self.logger.folder_path}/train_diagnostics.csv"
+        file_exists = os.path.isfile(path)
+        with open(path, "a", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=list(diag.keys()))
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(diag)
     
     def save_model(
         self,

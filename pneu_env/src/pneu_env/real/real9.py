@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 
-from env.real.real_act import PneuRealAct
+from pneu_env.real.real_act import PneuRealAct
 
 
 STD_RHO = 1.20411831637462
@@ -199,6 +199,8 @@ class PneuReal:
             curr_time=next_obs[0],
             sen_pos=next_obs[1],
             sen_neg=next_obs[2],
+            sen_act_pos=next_obs[3],
+            sen_act_neg=next_obs[4],
             P1_pos=next_obs[3],
             P1_neg=next_obs[4],
             ref_pos=float(goal_posneg[0]),
@@ -207,6 +209,10 @@ class PneuReal:
             ref_act_neg=float(obs.get("act_neg_ref", np.nan)),
             ctrl_pos=float(obs.get("pos_ctrl", np.nan)),
             ctrl_neg=float(obs.get("neg_ctrl", np.nan)),
+            ctrl_act_pos_in=float(obs.get("act_pos_ctrl1", np.nan)),
+            ctrl_act_pos_out=float(obs.get("act_pos_ctrl2", np.nan)),
+            ctrl_act_neg_in=float(obs.get("act_neg_ctrl1", np.nan)),
+            ctrl_act_neg_out=float(obs.get("act_neg_ctrl2", np.nan)),
             act_pos_ctrl1=float(obs.get("act_pos_ctrl1", np.nan)),
             act_pos_ctrl2=float(obs.get("act_pos_ctrl2", np.nan)),
             act_neg_ctrl1=float(obs.get("act_neg_ctrl1", np.nan)),

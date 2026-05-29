@@ -42,10 +42,10 @@ if train_mode == '1':
         ),
         # pred = None,
         rnd_ref = dict(
-            pos_min_off = 145,
+            pos_min_off = 140,
             pos_max_off = 210,
-            neg_min_off = 15,
-            neg_max_off = 35,
+            neg_min_off = 10,
+            neg_max_off = 32,
             pos_max_ts = 5,
             neg_max_ts = 5,
             pos_max_amp = 20,
@@ -70,7 +70,9 @@ if train_mode == '1':
                 neg_diff_rwd_coeff = 0.0,
             ),
             pos_pred_rnd_offset_range = 0, 
-            neg_pred_rnd_offset_range = 0, 
+            neg_pred_rnd_offset_range = 0,
+            action_low = 0.0,
+            action_high = 1.0,
         ),
         model = dict(
             learning_rate = 3e-4,
@@ -82,7 +84,7 @@ if train_mode == '1':
             buffer_size = 50e4,
             batch_size = 128,
             epoch = 1,
-            horizon = 512,
+            horizon = 2048,
             start_epi = 10,
             max_grad_norm = 0.5,
             log_std_min = -10,
@@ -91,7 +93,7 @@ if train_mode == '1':
             spatial_weight = 0.4,
             noise_std = 1.5
         ),
-        epi = 1500,
+        epi = 1000,
         pid_cfg = dict(
             Kp_pos = 0.0,
             Ki_pos = 0.01,
@@ -116,10 +118,10 @@ elif train_mode == '2':
         ),
         pred = None,
         rnd_ref = dict(
-            pos_min_off = 145,
+            pos_min_off = 140,
             pos_max_off = 240,
-            neg_min_off = 15,
-            neg_max_off = 35,
+            neg_min_off = 10,
+            neg_max_off = 32,
             pos_max_ts = 5,
             neg_max_ts = 5,
             pos_max_amp = 20,
@@ -146,7 +148,9 @@ elif train_mode == '2':
                 neg_diff_rwd_coeff = 0.0,
             ),
             pos_pred_rnd_offset_range = 0, 
-            neg_pred_rnd_offset_range = 0, 
+            neg_pred_rnd_offset_range = 0,
+            action_low = 0.0,
+            action_high = 1.0,
         ),
         model = dict(
             learning_rate = 3e-4,
@@ -158,7 +162,7 @@ elif train_mode == '2':
             buffer_size = 50e4,
             batch_size = 128,
             epoch = 1,
-            horizon = 512,
+            horizon = 2048,
             start_epi = 10,
             max_grad_norm = 0.5,
             log_std_min = -10,
@@ -168,7 +172,7 @@ elif train_mode == '2':
             spatial_weight = 0.0,
             noise_std = 0.0
         ),
-        epi = 1500,
+        epi = 1000,
         pid = None
     )
     print(f'[ INFO] Train mode: SAC')
@@ -219,7 +223,9 @@ elif train_mode == '3':
                 neg_diff_rwd_coeff = 0.0,
             ),
             pos_pred_rnd_offset_range = 0, 
-            neg_pred_rnd_offset_range = 0, 
+            neg_pred_rnd_offset_range = 0,
+            action_low = 0.0,
+            action_high = 1.0,
         ),
         model = dict(
             learning_rate = 3e-4,
@@ -286,7 +292,9 @@ elif train_mode == '4':
                 neg_diff_rwd_coeff = 0.0,
             ),
             pos_pred_rnd_offset_range = 0, 
-            neg_pred_rnd_offset_range = 0, 
+            neg_pred_rnd_offset_range = 0,
+            action_low = 0.0,
+            action_high = 1.0,
         ),
         model = dict(
             learning_rate = 3e-4,

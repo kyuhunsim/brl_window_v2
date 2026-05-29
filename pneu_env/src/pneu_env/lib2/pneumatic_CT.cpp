@@ -31,29 +31,16 @@ constexpr double LOG_GUARD = 700.0;
 constexpr double Z_LIMIT = 1e6;
 
 
-// const ValveModelParams CHAMBER_POS_PARAMS = {
-//     0.11474138114, 11.8497640179, 0.119532919877, -0.000402141757748, 0.209607189577,
-//     112304.608517, 1.53947593258, 0.0387346627007, 56.661504104,
-//     7, 1.2, 7, 1.2
-// };
-
-
-// const ValveModelParams CHAMBER_NEG_PARAMS = {
-//     0.188939015935, 72.5092276051, 0.135413566983, 0.000132147147669, -1.31086506147e-09,
-//     50025.8701174, 1169.54795755, 0.0855194996722, 19398.9809027,
-//     7, 1.2, 7, 1.2
-// };
-
 const ValveModelParams CHAMBER_POS_PARAMS = {
-    0.177722907799, 30.5227678788, 0.037918321473, -0.000311534389229, -2.41127082078e-06,
-    136147.863015, 8.78578862272e-05, 0.101260743403, 93.8023842274,
+    0.189962959216, 24.4423029881, 0.173060777479, -0.000316802308348, 5.07074108958e-07,
+    399328.764959, 0.249346256745, 0.147571552971, 3.15305176421,
     11, 0.6, 11, 0.6
 };
 
 const ValveModelParams CHAMBER_NEG_PARAMS = {
-    0.222972882056, 67.5946341463, 0.134697118175, -0.000141099120723, -0.000108112778366,
-    39554.0013834, 570.114878781, 0.4927461249, 1672.80421907,
-    11, 0.6, 11, 0.6
+    0.261316705043, 43.4114236342, 0.0797461875256, -4.96387095124e-06, 3.89955043849e-09,
+    130798.799672, 1104.99392402, 0.0321734708941, 2445.75756023,
+    25, 0.6, 11, 0.6
 };
 
 double clamp01(double value)
@@ -129,6 +116,8 @@ PneumaticCT::PneumaticCT()
     dxdt = new double[6];
     mass_flowrate = new double[6];
     for (int i = 0; i < 18; i++) valve_debug[i] = 0.0;
+    for (int i = 0; i < 20; i++) model_debug[i] = 0.0;
+    debug_enabled = false;
     reset_valve_states();
 }
 
@@ -164,6 +153,11 @@ void PneumaticCT::set_discharge_coeff(
     C1OUT = Cd1OUT;
     C2IN = Cd2IN;
     C2OUT = Cd2OUT;
+}
+
+void PneumaticCT::set_debug_enabled(bool enabled)
+{
+    debug_enabled = enabled;
 }
 
 double* PneumaticCT::model(double* x, double* u)
@@ -230,6 +224,29 @@ double* PneumaticCT::model(double* x, double* u)
     mass_flowrate[3] = mdot_neg_valve;
     mass_flowrate[4] = mdot_out;
     mass_flowrate[5] = mdot_in;
+
+    if (debug_enabled) {
+        model_debug[0] = Ppos;
+        model_debug[1] = Pneg;
+        model_debug[2] = angle;
+        model_debug[3] = P1;
+        model_debug[4] = P2;
+        model_debug[5] = pos_valve;
+        model_debug[6] = neg_valve;
+        model_debug[7] = dm1outdt;
+        model_debug[8] = dm1indt;
+        model_debug[9] = dm2outdt;
+        model_debug[10] = dm2indt;
+        model_debug[11] = mdot_pos_valve;
+        model_debug[12] = mdot_neg_valve;
+        model_debug[13] = mdot_out;
+        model_debug[14] = mdot_in;
+        model_debug[15] = dPposdt;
+        model_debug[16] = dPnegdt;
+        model_debug[17] = dP1dt;
+        model_debug[18] = dP2dt;
+        model_debug[19] = angular_velocity;
+    }
 
     return dxdt;
 }
@@ -368,3 +385,5 @@ double PneumaticCT::chamber(double dmdt, double V)
 double* PneumaticCT::get_mass_flowrate() { return mass_flowrate; }
 
 double* PneumaticCT::get_valve_debug() { return valve_debug; }
+
+double* PneumaticCT::get_model_debug() { return model_debug; }

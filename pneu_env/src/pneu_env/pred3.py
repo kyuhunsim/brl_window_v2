@@ -101,7 +101,7 @@ class PneuPred:
             if self.is_anti_windup:
                 original_ctrl = ctrl.copy()
 
-        ctrl = np.clip(ctrl, -1, 1)
+        ctrl = np.clip(ctrl, 0.0, 1.0)
 
         if self.is_anti_windup:
             self.pid.anti_windup(
@@ -110,9 +110,7 @@ class PneuPred:
             )
 
         if self.scale:
-            ctrl = 0.3 * 0.5 * (ctrl + 1) + 0.7
-        else:
-            ctrl = 0.5 * ctrl + 0.5
+            ctrl = 0.85 + 0.15 * ctrl
 
         time_step = 1 / self.freq
         next_obs = np.array(
