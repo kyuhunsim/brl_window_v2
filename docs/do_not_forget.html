@@ -1,0 +1,2528 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>연구주제 선정: 교수와 학생의 카카오톡 질답</title>
+  <style>
+    :root {
+      --kakao-yellow: #fee500;
+      --chat-bg: #b8c7d5;
+      --chat-bg-deep: #a9bac9;
+      --ink: #17202a;
+      --muted: #5d6975;
+      --line: rgba(23, 32, 42, 0.12);
+      --bubble-left: #ffffff;
+      --bubble-right: #ffeb3b;
+      --panel: #f7f8fa;
+      --accent: #2f5f8f;
+      --danger: #8f3f38;
+      --green: #256b4f;
+      --shadow: 0 22px 70px rgba(21, 35, 48, 0.22);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(254, 229, 0, 0.24), transparent 34rem),
+        linear-gradient(135deg, #eff3f7 0%, #dbe5ee 48%, #f7f8fa 100%);
+      letter-spacing: 0;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .page {
+      width: min(1180px, calc(100% - 32px));
+      margin: 28px auto;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 22px;
+      align-items: start;
+    }
+
+    .phone {
+      min-height: calc(100vh - 56px);
+      background: var(--chat-bg);
+      border: 1px solid rgba(20, 32, 44, 0.15);
+      border-radius: 26px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .statusbar {
+      height: 30px;
+      padding: 0 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 700;
+      color: rgba(0, 0, 0, 0.66);
+      background: var(--kakao-yellow);
+    }
+
+    .status-icons {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .signal {
+      width: 20px;
+      height: 10px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 2px;
+      align-items: end;
+    }
+
+    .signal i {
+      display: block;
+      width: 3px;
+      background: rgba(0, 0, 0, 0.62);
+      border-radius: 2px;
+    }
+
+    .signal i:nth-child(1) { height: 4px; }
+    .signal i:nth-child(2) { height: 6px; }
+    .signal i:nth-child(3) { height: 8px; }
+    .signal i:nth-child(4) { height: 10px; }
+
+    .battery {
+      width: 22px;
+      height: 10px;
+      border: 1.5px solid rgba(0, 0, 0, 0.62);
+      border-radius: 3px;
+      position: relative;
+    }
+
+    .battery::before {
+      content: "";
+      position: absolute;
+      right: -4px;
+      top: 2px;
+      width: 2px;
+      height: 4px;
+      border-radius: 0 2px 2px 0;
+      background: rgba(0, 0, 0, 0.62);
+    }
+
+    .battery::after {
+      content: "";
+      position: absolute;
+      left: 2px;
+      top: 2px;
+      width: 14px;
+      height: 4px;
+      border-radius: 1px;
+      background: rgba(0, 0, 0, 0.62);
+    }
+
+    .topbar {
+      background: var(--kakao-yellow);
+      padding: 16px 18px 18px;
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr) 34px;
+      gap: 12px;
+      align-items: center;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+    }
+
+    .top-icon {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.07);
+      color: #241f10;
+      font-weight: 900;
+      font-size: 20px;
+    }
+
+    .room-title {
+      min-width: 0;
+    }
+
+    .room-title h1 {
+      margin: 0;
+      font-size: clamp(18px, 2.4vw, 24px);
+      line-height: 1.2;
+      font-weight: 850;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .room-title p {
+      margin: 4px 0 0;
+      color: rgba(0, 0, 0, 0.56);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .view-tabs {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 10px 14px;
+      background: rgba(245, 247, 249, 0.94);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+      backdrop-filter: blur(10px);
+    }
+
+    .tab-button {
+      min-height: 42px;
+      border: 1px solid rgba(23, 32, 42, 0.12);
+      border-radius: 8px;
+      background: #ffffff;
+      color: #33475b;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 850;
+      cursor: pointer;
+    }
+
+    .tab-button.active {
+      border-color: rgba(0, 0, 0, 0.18);
+      background: var(--kakao-yellow);
+      color: #211c0c;
+      box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.12);
+    }
+
+    .chat-panel {
+      display: none;
+    }
+
+    .chat-panel.active {
+      display: block;
+    }
+
+    .original-panel {
+      min-height: calc(100vh - 190px);
+    }
+
+    .original-note {
+      width: min(900px, 100%);
+      margin: 0 auto 16px;
+      padding: 13px 15px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(23, 32, 42, 0.12);
+      color: #263646;
+      font-size: 14px;
+      line-height: 1.55;
+      font-weight: 750;
+    }
+
+    .original-text {
+      width: min(900px, 100%);
+      margin: 0 auto;
+      padding: 22px;
+      border-radius: 8px;
+      border: 1px solid rgba(23, 32, 42, 0.12);
+      background: rgba(255, 255, 255, 0.92);
+      color: #17202a;
+      box-shadow: 0 10px 26px rgba(21, 35, 48, 0.11);
+      font-family: "Apple SD Gothic Neo", "Malgun Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 15px;
+      line-height: 1.72;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .original-source {
+      display: none;
+    }
+
+    .markdown-body h1,
+    .markdown-body h2,
+    .markdown-body h3 {
+      margin: 28px 0 12px;
+      line-height: 1.32;
+      color: #12263a;
+      font-weight: 900;
+    }
+
+    .markdown-body h1 {
+      padding-top: 12px;
+      border-top: 1px solid rgba(23, 32, 42, 0.12);
+      font-size: 25px;
+    }
+
+    .markdown-body h2 {
+      font-size: 21px;
+    }
+
+    .markdown-body h3 {
+      font-size: 17px;
+    }
+
+    .markdown-body p {
+      margin: 0 0 13px;
+    }
+
+    .markdown-body strong {
+      font-weight: 900;
+      color: #0f263d;
+    }
+
+    .markdown-body blockquote {
+      margin: 14px 0;
+      padding: 12px 14px;
+      border-left: 5px solid var(--accent);
+      border-radius: 0 8px 8px 0;
+      background: rgba(47, 95, 143, 0.09);
+      color: #1e344a;
+      font-weight: 780;
+    }
+
+    .markdown-body ul,
+    .markdown-body ol {
+      margin: 8px 0 16px;
+      padding-left: 24px;
+    }
+
+    .markdown-body li {
+      margin: 6px 0;
+    }
+
+    .markdown-body hr {
+      margin: 26px 0;
+      border: 0;
+      border-top: 1px solid rgba(23, 32, 42, 0.16);
+    }
+
+    .markdown-body table {
+      width: 100%;
+      margin: 14px 0 18px;
+      border-collapse: collapse;
+      border-radius: 8px;
+      overflow: hidden;
+      font-size: 14px;
+      line-height: 1.5;
+      background: white;
+    }
+
+    .markdown-body th,
+    .markdown-body td {
+      padding: 10px 11px;
+      border: 1px solid rgba(23, 32, 42, 0.12);
+      vertical-align: top;
+    }
+
+    .markdown-body th {
+      background: #edf3f8;
+      color: #1c344c;
+      font-weight: 900;
+    }
+
+    .markdown-body code {
+      padding: 1px 5px;
+      border-radius: 5px;
+      background: rgba(23, 32, 42, 0.08);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    .chat {
+      padding: 22px 18px 26px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0)),
+        var(--chat-bg);
+    }
+
+    .day {
+      width: fit-content;
+      max-width: 100%;
+      margin: 0 auto 22px;
+      padding: 7px 13px;
+      background: rgba(69, 85, 101, 0.42);
+      color: white;
+      font-size: 12px;
+      font-weight: 750;
+      border-radius: 999px;
+    }
+
+    .message {
+      display: grid;
+      grid-template-columns: 44px minmax(0, 760px);
+      column-gap: 10px;
+      margin: 16px 0;
+      align-items: end;
+    }
+
+    .message.student {
+      grid-template-columns: minmax(0, 760px) 44px;
+      justify-content: end;
+      margin-left: auto;
+    }
+
+    .avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 15px;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      color: white;
+      background: #25364b;
+      border: 1px solid rgba(255, 255, 255, 0.48);
+      box-shadow: 0 8px 20px rgba(31, 45, 61, 0.18);
+    }
+
+    .student .avatar {
+      background: #6f5123;
+      color: #fff5c4;
+    }
+
+    .message-main {
+      min-width: 0;
+    }
+
+    .name {
+      margin: 0 0 6px 4px;
+      font-size: 13px;
+      font-weight: 800;
+      color: rgba(0, 0, 0, 0.62);
+    }
+
+    .student .name {
+      text-align: right;
+      margin-right: 4px;
+    }
+
+    .bubble-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 7px;
+    }
+
+    .student .bubble-row {
+      flex-direction: row-reverse;
+    }
+
+    .bubble {
+      position: relative;
+      width: fit-content;
+      max-width: 100%;
+      padding: 14px 16px;
+      background: var(--bubble-left);
+      border-radius: 6px 18px 18px 18px;
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+      line-height: 1.68;
+      font-size: 16px;
+    }
+
+    .student .bubble {
+      background: var(--bubble-right);
+      border-radius: 18px 6px 18px 18px;
+    }
+
+    .time {
+      flex: 0 0 auto;
+      color: rgba(0, 0, 0, 0.48);
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+      padding-bottom: 3px;
+    }
+
+    .bubble p {
+      margin: 0 0 11px;
+    }
+
+    .bubble p:last-child {
+      margin-bottom: 0;
+    }
+
+    .bubble strong {
+      font-weight: 850;
+    }
+
+    .quote {
+      margin: 8px 0 12px;
+      padding: 10px 12px;
+      border-left: 4px solid var(--accent);
+      background: rgba(47, 95, 143, 0.08);
+      border-radius: 5px;
+      font-weight: 780;
+    }
+
+    .student .quote {
+      border-left-color: rgba(0, 0, 0, 0.32);
+      background: rgba(255, 255, 255, 0.32);
+    }
+
+    .mini-title {
+      display: block;
+      margin-bottom: 7px;
+      color: #24384c;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 9px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: rgba(47, 95, 143, 0.1);
+      color: #183a5e;
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.25;
+    }
+
+    .student .chip {
+      background: rgba(255, 255, 255, 0.42);
+      color: #382d08;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 9px;
+      margin-top: 10px;
+    }
+
+    .card {
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(247, 248, 250, 0.84);
+    }
+
+    .card b {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+
+    .card span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.52;
+    }
+
+    .formula {
+      margin: 12px 0;
+      padding: 13px 14px;
+      border-radius: 8px;
+      color: #10253b;
+      background: linear-gradient(135deg, rgba(254, 229, 0, 0.34), rgba(255, 255, 255, 0.78));
+      border: 1px solid rgba(23, 32, 42, 0.12);
+      font-weight: 850;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+
+    .fraction {
+      display: inline-grid;
+      grid-template-rows: auto auto;
+      gap: 5px;
+      vertical-align: middle;
+      text-align: center;
+      min-width: 520px;
+    }
+
+    .fraction .top {
+      padding-bottom: 6px;
+      border-bottom: 2px solid rgba(16, 37, 59, 0.72);
+    }
+
+    .note-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 11px 0 2px;
+      overflow: hidden;
+      border-radius: 8px;
+      background: white;
+      font-size: 13px;
+    }
+
+    .note-table th,
+    .note-table td {
+      padding: 10px 9px;
+      border: 1px solid rgba(23, 32, 42, 0.11);
+      vertical-align: top;
+      line-height: 1.45;
+    }
+
+    .note-table th {
+      background: #eef3f7;
+      font-weight: 900;
+      color: #203347;
+    }
+
+    .routine {
+      margin: 10px 0 0;
+      padding: 0;
+      list-style: none;
+      counter-reset: step;
+    }
+
+    .routine li {
+      counter-increment: step;
+      position: relative;
+      margin: 8px 0;
+      padding: 9px 10px 9px 42px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.68);
+      line-height: 1.52;
+    }
+
+    .routine li::before {
+      content: counter(step);
+      position: absolute;
+      left: 10px;
+      top: 10px;
+      width: 22px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #223449;
+      color: white;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .warning {
+      margin-top: 11px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: rgba(143, 63, 56, 0.1);
+      border: 1px solid rgba(143, 63, 56, 0.2);
+      color: #65302d;
+      font-weight: 780;
+    }
+
+    .good {
+      margin-top: 11px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: rgba(37, 107, 79, 0.1);
+      border: 1px solid rgba(37, 107, 79, 0.2);
+      color: #1d553f;
+      font-weight: 780;
+    }
+
+    .inputbar {
+      position: sticky;
+      bottom: 0;
+      display: grid;
+      grid-template-columns: 40px minmax(0, 1fr) 44px;
+      gap: 9px;
+      padding: 12px 14px;
+      background: rgba(244, 246, 248, 0.94);
+      border-top: 1px solid rgba(0, 0, 0, 0.12);
+      backdrop-filter: blur(10px);
+    }
+
+    .inputbar span,
+    .inputbar button {
+      border: 0;
+      border-radius: 12px;
+      min-height: 38px;
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+      font-weight: 900;
+      color: #394857;
+      background: white;
+    }
+
+    .inputbar .fake-input {
+      place-items: center start;
+      padding: 0 12px;
+      color: #8a95a1;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .inputbar button {
+      background: var(--kakao-yellow);
+      color: #2e2811;
+      cursor: default;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 24px;
+      border-radius: 22px;
+      overflow: hidden;
+      border: 1px solid rgba(23, 32, 42, 0.12);
+      background: rgba(255, 255, 255, 0.82);
+      box-shadow: 0 18px 50px rgba(21, 35, 48, 0.13);
+      backdrop-filter: blur(14px);
+    }
+
+    .side-head {
+      padding: 18px;
+      background: var(--kakao-yellow);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+    }
+
+    .side-head h2 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.28;
+    }
+
+    .side-head p {
+      margin: 7px 0 0;
+      color: rgba(0, 0, 0, 0.58);
+      font-size: 13px;
+      line-height: 1.45;
+      font-weight: 650;
+    }
+
+    .side-body {
+      padding: 14px;
+    }
+
+    .side-body a {
+      display: block;
+      padding: 10px 11px;
+      border-radius: 8px;
+      color: #263646;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 770;
+      line-height: 1.35;
+    }
+
+    .side-body a:hover {
+      background: rgba(47, 95, 143, 0.08);
+    }
+
+    .side-box {
+      margin-top: 12px;
+      padding: 13px;
+      border-radius: 8px;
+      background: #f0f4f8;
+      color: #33475b;
+      font-size: 13px;
+      line-height: 1.55;
+      font-weight: 700;
+    }
+
+    @media (max-width: 960px) {
+      .page {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: static;
+        order: -1;
+      }
+
+      .side-body {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 4px;
+      }
+
+      .side-box {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .page {
+        width: 100%;
+        margin: 0;
+      }
+
+      .phone,
+      .sidebar {
+        border-radius: 0;
+        border-left: 0;
+        border-right: 0;
+      }
+
+      .message,
+      .message.student {
+        grid-template-columns: 36px minmax(0, 1fr);
+        column-gap: 8px;
+      }
+
+      .message.student {
+        grid-template-columns: minmax(0, 1fr) 36px;
+      }
+
+      .avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        font-size: 13px;
+      }
+
+      .bubble {
+        padding: 12px 13px;
+        font-size: 15px;
+        line-height: 1.62;
+      }
+
+      .cards {
+        grid-template-columns: 1fr;
+      }
+
+      .note-table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+
+      .original-text {
+        padding: 16px;
+        font-size: 14px;
+      }
+
+      .side-body {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="phone" aria-label="교수와 학생의 연구주제 선정 대화">
+      <div class="statusbar">
+        <span>오전 10:24</span>
+        <span class="status-icons" aria-hidden="true">
+          <span class="signal"><i></i><i></i><i></i><i></i></span>
+          <span>5G</span>
+          <span class="battery"></span>
+        </span>
+      </div>
+
+      <header class="topbar">
+        <div class="top-icon" aria-hidden="true">‹</div>
+        <div class="room-title">
+          <h1>연구주제 선정 상담방</h1>
+          <p>교수 1, 학생 1</p>
+        </div>
+        <div class="top-icon" aria-hidden="true">≡</div>
+      </header>
+
+      <div class="view-tabs" role="tablist" aria-label="보기 전환">
+        <button class="tab-button active" type="button" role="tab" aria-selected="true" aria-controls="dialogue-panel" data-tab-target="dialogue">카톡 질답</button>
+        <button class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="original-panel" data-tab-target="original">원문 분석</button>
+      </div>
+
+      <div class="chat chat-panel active" id="dialogue-panel" role="tabpanel" data-tab-panel="dialogue">
+        <div class="day">2026년 5월 17일 일요일</div>
+
+        <article id="intro" class="message student">
+          <div class="message-main">
+            <p class="name">학생</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <p>교수님, 연구주제를 고를 때 자꾸 “어떤 최신 방법을 적용할까?”로 생각하게 됩니다.</p>
+                <p>흔한 조언 말고, 연구주제 선정의 중심축을 바꿀 수 있는 관점이 있을까요?</p>
+              </div>
+              <time class="time">오전 10:24</time>
+            </div>
+          </div>
+          <div class="avatar">학</div>
+        </article>
+
+        <article class="message professor">
+          <div class="avatar">교</div>
+          <div class="message-main">
+            <p class="name">교수</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <div class="quote">좋은 연구주제는 새로운 해법을 찾는 것이 아니라, 사람들이 아직 이름 붙이지 못한 실패를 측정 가능하게 만드는 것이다.</div>
+                <p>대부분은 “어떤 문제를 풀까”, “어떤 최신 방법을 적용할까”, “어떤 분야가 뜰까”를 묻는다. 그런데 더 강한 질문은 이거다.</p>
+                <p><strong>“분야 전체가 반복해서 실패하는데, 그 실패를 부를 언어도, 측정법도, 벤치마크도 없는 지점은 어디인가?”</strong></p>
+                <p>그걸 찾으면 단순한 연구주제가 아니라 새로운 평가축을 만드는 것이다.</p>
+              </div>
+              <time class="time">오전 10:27</time>
+            </div>
+          </div>
+        </article>
+
+        <article id="crime" class="message student">
+          <div class="message-main">
+            <p class="name">학생</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <p>“새로운 평가축”이라는 말이 아직 좀 추상적입니다. 더 세게 말하면 어떤 뜻인가요?</p>
+              </div>
+              <time class="time">오전 10:29</time>
+            </div>
+          </div>
+          <div class="avatar">학</div>
+        </article>
+
+        <article class="message professor">
+          <div class="avatar">교</div>
+          <div class="message-main">
+            <p class="name">교수</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <span class="mini-title">1. 좋은 주제는 문제보다 “새로운 죄목”을 만든다</span>
+                <p>조금 과격하게 말하면, 좋은 연구주제는 분야에 새로운 죄목을 추가한다. 남들이 “accuracy가 높다”, “task success rate가 높다”고 말할 때 네가 이렇게 묻는 것이다.</p>
+                <div class="chips">
+                  <span class="chip">회복 가능성</span>
+                  <span class="chip">실패 예측 능력</span>
+                  <span class="chip">노화된 actuator 안정성</span>
+                  <span class="chip">control-relevant uncertainty</span>
+                  <span class="chip">manufacturing variation</span>
+                  <span class="chip">graceful degradation</span>
+                </div>
+                <p>그 순간부터 남들이 만든 방법은 네가 만든 기준으로도 심판받게 된다. 새 방법은 금방 대체되지만, 새 평가축은 분야의 언어가 된다.</p>
+              </div>
+              <time class="time">오전 10:32</time>
+            </div>
+          </div>
+        </article>
+
+        <article id="clocks" class="message student">
+          <div class="message-main">
+            <p class="name">학생</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <p>그런 평가축은 언제 생기나요? 너무 이르면 안 받아들여지고, 너무 늦으면 이미 경쟁장이 된 것 같습니다.</p>
+              </div>
+              <time class="time">오전 10:35</time>
+            </div>
+          </div>
+          <div class="avatar">학</div>
+        </article>
+
+        <article class="message professor">
+          <div class="avatar">교</div>
+          <div class="message-main">
+            <p class="name">교수</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <span class="mini-title">2. 세 개의 시계가 어긋나는 곳을 봐라</span>
+                <table class="note-table">
+                  <thead>
+                    <tr>
+                      <th>시계</th>
+                      <th>의미</th>
+                      <th>좋은 순간</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>현실의 시계</strong></td>
+                      <td>산업, 사회, 시스템이 겪는 압력</td>
+                      <td>문제가 더 이상 무시할 수 없을 만큼 커짐</td>
+                    </tr>
+                    <tr>
+                      <td><strong>도구의 시계</strong></td>
+                      <td>센서, 계산, 데이터, 시뮬레이터, 이론 도구</td>
+                      <td>예전엔 못 재던 것을 이제 겨우 잴 수 있게 됨</td>
+                    </tr>
+                    <tr>
+                      <td><strong>공동체의 시계</strong></td>
+                      <td>리뷰어 언어, funding narrative, 학계 수용성</td>
+                      <td>아직 붐은 아니지만 설득 가능함</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div class="good">가장 좋은 상태는 “현실에서는 이미 중요하고, 도구적으로는 이제 가능해졌고, 학계에서는 아직 이름이 굳지 않은” 지점이다.</div>
+              </div>
+              <time class="time">오전 10:38</time>
+            </div>
+          </div>
+        </article>
+
+        <article id="trend" class="message student">
+          <div class="message-main">
+            <p class="name">학생</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <p>그럼 foundation model, embodied AI, digital twin 같은 트렌드는 따라가면 안 되나요?</p>
+              </div>
+              <time class="time">오전 10:41</time>
+            </div>
+          </div>
+          <div class="avatar">학</div>
+        </article>
+
+        <article class="message professor">
+          <div class="avatar">교</div>
+          <div class="message-main">
+            <p class="name">교수</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <span class="mini-title">3. 트렌드가 숨기는 변수를 찾아라</span>
+                <p>트렌드를 고르는 게 아니라, 트렌드가 커질수록 반드시 터질 병목을 골라야 한다.</p>
+                <table class="note-table">
+                  <thead>
+                    <tr>
+                      <th>흔한 주제</th>
+                      <th>더 강한 질문</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>로봇에 foundation model 적용</td>
+                      <td>실패할 때 회복 가능성은 어떻게 측정할까?</td>
+                    </tr>
+                    <tr>
+                      <td>robot learning 성능 향상</td>
+                      <td>성공률은 높지만 실패 분포가 위험한 방향으로 이동하는지 어떻게 알까?</td>
+                    </tr>
+                    <tr>
+                      <td>digital twin 고도화</td>
+                      <td>어떤 mismatch가 의사결정에 치명적인지 어떻게 분류할까?</td>
+                    </tr>
+                    <tr>
+                      <td>vision model 정확도 향상</td>
+                      <td>vision uncertainty가 control action에 실제로 유용한지 어떻게 평가할까?</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <time class="time">오전 10:44</time>
+            </div>
+          </div>
+        </article>
+
+        <article id="metric" class="message student">
+          <div class="message-main">
+            <p class="name">학생</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <p>결국 “더 좋은 모델”보다 “우리가 뭘 잘못 재고 있는가”가 중요하다는 뜻인가요?</p>
+              </div>
+              <time class="time">오전 10:48</time>
+            </div>
+          </div>
+          <div class="avatar">학</div>
+        </article>
+
+        <article class="message professor">
+          <div class="avatar">교</div>
+          <div class="message-main">
+            <p class="name">교수</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <span class="mini-title">4. 남들이 잘못 재고 있는 문제를 찾아라</span>
+                <p>약한 질문은 “어떻게 성능을 더 올릴까?”다. 강한 질문은 “지금 우리가 성능이라고 부르는 것이 진짜 원하는 현상을 측정하고 있나?”다.</p>
+                <div class="cards">
+                  <div class="card"><b>accuracy</b><span>높지만 deployment failure가 크다.</span></div>
+                  <div class="card"><b>simulation success</b><span>높지만 real-world transfer가 낮다.</span></div>
+                  <div class="card"><b>task success</b><span>높지만 recovery가 불가능하다.</span></div>
+                  <div class="card"><b>model confidence</b><span>높지만 calibration이 맞지 않는다.</span></div>
+                </div>
+                <p>이런 순간에 좋은 주제는 “더 좋은 모델”이 아니라 <strong>“이 분야가 진짜 봐야 하는 metric은 무엇인가?”</strong>로 바뀐다.</p>
+              </div>
+              <time class="time">오전 10:51</time>
+            </div>
+          </div>
+        </article>
+
+        <article id="pipeline" class="message student">
+          <div class="message-main">
+            <p class="name">학생</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <p>주제가 논문 하나로 끝나지 않으려면 어떤 구조가 필요할까요?</p>
+              </div>
+              <time class="time">오전 10:55</time>
+            </div>
+          </div>
+          <div class="avatar">학</div>
+        </article>
+
+        <article class="message professor">
+          <div class="avatar">교</div>
+          <div class="message-main">
+            <p class="name">교수</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <span class="mini-title">5. 좋은 주제는 질문의 공급망을 만든다</span>
+                <ol class="routine">
+                  <li><strong>현상 발견</strong>: 기존 방법들이 특정 조건에서 반복적으로 실패한다.</li>
+                  <li><strong>측정법 제안</strong>: 그 실패를 정량화하는 metric 또는 protocol을 만든다.</li>
+                  <li><strong>원인 분석</strong>: 실패가 왜 생기는지 이론적, 실험적으로 설명한다.</li>
+                  <li><strong>해결법 제안</strong>: 그 실패를 줄이는 알고리즘, 설계, 제어, 시스템을 만든다.</li>
+                  <li><strong>일반화</strong>: 다른 task, system, scale에서도 적용한다.</li>
+                  <li><strong>표준화</strong>: benchmark, dataset, simulator, toolchain으로 만든다.</li>
+                </ol>
+                <p>이러면 논문 하나가 아니라 랩의 5년짜리 연구 프로그램이 된다.</p>
+              </div>
+              <time class="time">오전 10:58</time>
+            </div>
+          </div>
+        </article>
+
+        <article id="risk" class="message student">
+          <div class="message-main">
+            <p class="name">학생</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <p>가설이 틀리면 아무것도 안 남을까 봐 걱정됩니다. 위험한 주제와 좋은 주제를 어떻게 구분하죠?</p>
+              </div>
+              <time class="time">오전 11:03</time>
+            </div>
+          </div>
+          <div class="avatar">학</div>
+        </article>
+
+        <article class="message professor">
+          <div class="avatar">교</div>
+          <div class="message-main">
+            <p class="name">교수</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <span class="mini-title">6. “참이면 좋은가?”보다 “틀려도 남는가?”를 봐라</span>
+                <p><strong>“새 알고리즘 X가 기존보다 좋을 것이다”</strong>는 틀리면 위험하다.</p>
+                <p>반면 <strong>“현재 로봇 정책들은 contact-rich manipulation에서 recovery profile이 나쁘다. 이를 측정하는 benchmark와 taxonomy를 만들고 대표 방법을 비교한다”</strong>는 설령 네 방법이 최고 성능을 못 내도 남는 게 많다.</p>
+                <div class="chips">
+                  <span class="chip">benchmark</span>
+                  <span class="chip">dataset</span>
+                  <span class="chip">failure taxonomy</span>
+                  <span class="chip">baseline comparison</span>
+                  <span class="chip">negative result</span>
+                  <span class="chip">evaluation protocol</span>
+                </div>
+                <div class="good">좋은 주제는 hypothesis risk를 infrastructure value로 hedge한다.</div>
+              </div>
+              <time class="time">오전 11:07</time>
+            </div>
+          </div>
+        </article>
+
+        <article id="whynow" class="message student">
+          <div class="message-main">
+            <p class="name">학생</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <p>제안서나 introduction에서 “왜 지금인가?”를 어떻게 만들면 좋을까요?</p>
+              </div>
+              <time class="time">오전 11:12</time>
+            </div>
+          </div>
+          <div class="avatar">학</div>
+        </article>
+
+        <article class="message professor">
+          <div class="avatar">교</div>
+          <div class="message-main">
+            <p class="name">교수</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <span class="mini-title">7. “왜 지금인가?”가 없으면 약하다</span>
+                <p>“중요하다”는 부족하다. 중요한 문제는 원래 많다. 더 강한 논리는 이거다.</p>
+                <div class="quote">오래전부터 중요했지만 지금까지는 풀 수 없었다. 그런데 최근 A, B, C가 바뀌면서 이제 처음으로 제대로 다룰 수 있게 되었다.</div>
+                <div class="chips">
+                  <span class="chip">센서 가격 하락</span>
+                  <span class="chip">대규모 데이터</span>
+                  <span class="chip">simulation fidelity</span>
+                  <span class="chip">edge compute</span>
+                  <span class="chip">open-source ecosystem</span>
+                  <span class="chip">deployment 증가</span>
+                  <span class="chip">벤치마크 포화</span>
+                </div>
+                <p><strong>오래된 중요성 + 새로 생긴 가능성 = 좋은 연구 타이밍</strong>이다.</p>
+              </div>
+              <time class="time">오전 11:15</time>
+            </div>
+          </div>
+        </article>
+
+        <article id="bottleneck" class="message student">
+          <div class="message-main">
+            <p class="name">학생</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <p>융합연구는 어떻게 봐야 하나요? “기계공학 + AI” 같은 식으로 잡으면 약한가요?</p>
+              </div>
+              <time class="time">오전 11:20</time>
+            </div>
+          </div>
+          <div class="avatar">학</div>
+        </article>
+
+        <article class="message professor">
+          <div class="avatar">교</div>
+          <div class="message-main">
+            <p class="name">교수</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <span class="mini-title">8. 방법론의 교차점보다 병목의 교차점을 잡아라</span>
+                <table class="note-table">
+                  <thead>
+                    <tr>
+                      <th>분야</th>
+                      <th>겪는 병목</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td>로보틱스</td><td>sim-to-real gap</td></tr>
+                    <tr><td>컴퓨터비전</td><td>domain shift</td></tr>
+                    <tr><td>제어</td><td>model mismatch</td></tr>
+                    <tr><td>기계설계</td><td>manufacturing tolerance</td></tr>
+                    <tr><td>전자시스템</td><td>process variation</td></tr>
+                    <tr><td>머신러닝</td><td>distribution shift</td></tr>
+                  </tbody>
+                </table>
+                <p>겉으로는 다르지만 깊게 보면 같은 질문일 수 있다. <strong>모델과 현실 사이의 불일치를 어떻게 측정하고, 그 아래에서도 시스템이 안전하게 degrade되게 할 것인가?</strong></p>
+              </div>
+              <time class="time">오전 11:25</time>
+            </div>
+          </div>
+        </article>
+
+        <article id="formula" class="message student">
+          <div class="message-main">
+            <p class="name">학생</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <p>실제로 주제 후보를 점수화할 수 있는 기준이 있으면 좋겠습니다.</p>
+              </div>
+              <time class="time">오전 11:31</time>
+            </div>
+          </div>
+          <div class="avatar">학</div>
+        </article>
+
+        <article class="message professor">
+          <div class="avatar">교</div>
+          <div class="message-main">
+            <p class="name">교수</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <span class="mini-title">9. 연구주제 선정 공식</span>
+                <div class="formula">
+                  <span class="fraction">
+                    <span class="top">Problem Pressure × Measurability × Your Asymmetry × Compounding Potential</span>
+                    <span>Crowdedness × Execution Fragility × Review Ambiguity</span>
+                  </span>
+                </div>
+                <div class="cards">
+                  <div class="card"><b>Problem Pressure</b><span>현실에서 진짜 아픈 문제인가?</span></div>
+                  <div class="card"><b>Measurability</b><span>이제 측정 가능해졌는가?</span></div>
+                  <div class="card"><b>Your Asymmetry</b><span>우리 랩이 불공정한 우위를 갖는가?</span></div>
+                  <div class="card"><b>Compounding Potential</b><span>한 번 투자하면 계속 쌓이는가?</span></div>
+                  <div class="card"><b>Crowdedness</b><span>대형랩이 이미 인해전술로 밀고 있는가?</span></div>
+                  <div class="card"><b>Execution Fragility</b><span>성공 조건이 너무 많은가?</span></div>
+                  <div class="card"><b>Review Ambiguity</b><span>리뷰어가 “그래서 뭐?”라고 할 가능성이 큰가?</span></div>
+                </div>
+              </div>
+              <time class="time">오전 11:36</time>
+            </div>
+          </div>
+        </article>
+
+        <article id="shadow-map" class="message student">
+          <div class="message-main">
+            <p class="name">학생</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <p>논문을 읽을 때는 뭘 적어야 연구주제로 이어질까요?</p>
+              </div>
+              <time class="time">오전 11:43</time>
+            </div>
+          </div>
+          <div class="avatar">학</div>
+        </article>
+
+        <article class="message professor">
+          <div class="avatar">교</div>
+          <div class="message-main">
+            <p class="name">교수</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <span class="mini-title">10. “음영 지도”를 만들어라</span>
+                <p>논문 20편을 읽고 “무엇을 했는가”가 아니라 “무엇을 일부러 안 봤는가”를 적어라.</p>
+                <table class="note-table">
+                  <thead>
+                    <tr>
+                      <th>논문</th>
+                      <th>주장</th>
+                      <th>핵심 metric</th>
+                      <th>숨은 가정</th>
+                      <th>측정하지 않은 실패</th>
+                      <th>현실에서 깨질 조건</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Paper A</td>
+                      <td>성공률 향상</td>
+                      <td>Task success</td>
+                      <td>nominal condition</td>
+                      <td>failure recovery</td>
+                      <td>actuator degradation</td>
+                    </tr>
+                    <tr>
+                      <td>Paper B</td>
+                      <td>sim 결과 강함</td>
+                      <td>Sim score</td>
+                      <td>matched dynamics</td>
+                      <td>uncertainty budget</td>
+                      <td>real-world transfer</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p>마지막 세 열이 여러 논문에서 반복되면 그게 분야의 구조적 blind spot이다.</p>
+              </div>
+              <time class="time">오전 11:48</time>
+            </div>
+          </div>
+        </article>
+
+        <article id="sentence" class="message student">
+          <div class="message-main">
+            <p class="name">학생</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <p>주제 문장은 어떻게 쓰면 강해지나요?</p>
+              </div>
+              <time class="time">오후 12:02</time>
+            </div>
+          </div>
+          <div class="avatar">학</div>
+        </article>
+
+        <article class="message professor">
+          <div class="avatar">교</div>
+          <div class="message-main">
+            <p class="name">교수</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <span class="mini-title">11. 강한 주제 문장의 구조</span>
+                <div class="quote">현재 분야는 A를 최적화한다. 하지만 현실에서는 B가 더 중요하다. B는 지금까지 측정, 제어, 설계되지 않았다. 우리는 B를 관측 가능하고 최적화 가능한 대상으로 바꾼다.</div>
+                <p>예를 들면 이렇게 쓸 수 있다.</p>
+                <p><strong>현재 로봇 조작 연구는 nominal task success를 중심으로 평가되지만, 실제 deployment에서는 실패 후 회복 가능성, 손상 누적, uncertainty propagation이 더 중요하다. 본 연구는 contact-rich manipulation에서 recovery-aware autonomy를 정의하고, 이를 측정하는 benchmark와 제어/학습 방법론을 제안한다.</strong></p>
+              </div>
+              <time class="time">오후 12:06</time>
+            </div>
+          </div>
+        </article>
+
+        <article id="questions" class="message student">
+          <div class="message-main">
+            <p class="name">학생</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <p>후보가 생겼을 때 바로 검증할 수 있는 질문도 정리해주실 수 있을까요?</p>
+              </div>
+              <time class="time">오후 12:11</time>
+            </div>
+          </div>
+          <div class="avatar">학</div>
+        </article>
+
+        <article class="message professor">
+          <div class="avatar">교</div>
+          <div class="message-main">
+            <p class="name">교수</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <span class="mini-title">12. 좋은 연구주제의 7가지 판별 질문</span>
+                <ol class="routine">
+                  <li>새로운 metric을 만들 수 있나?</li>
+                  <li>실패 사례를 논문의 중심에 둘 수 있나?</li>
+                  <li>왜 기존 SOTA가 부족한지 공정하게 보여줄 수 있나?</li>
+                  <li>첫 논문이 작아도 후속 논문이 커질 수 있나?</li>
+                  <li>우리 랩의 장비, 데이터, 역량이 없으면 따라 하기 어렵나?</li>
+                  <li>과제 제안서로 바꿨을 때 국가, 산업적 언어가 생기나?</li>
+                  <li>가설이 틀려도 논문이 남나?</li>
+                </ol>
+              </div>
+              <time class="time">오후 12:15</time>
+            </div>
+          </div>
+        </article>
+
+        <article id="avoid" class="message student">
+          <div class="message-main">
+            <p class="name">학생</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <p>피해야 할 연구주제 유형도 있나요?</p>
+              </div>
+              <time class="time">오후 12:20</time>
+            </div>
+          </div>
+          <div class="avatar">학</div>
+        </article>
+
+        <article class="message professor">
+          <div class="avatar">교</div>
+          <div class="message-main">
+            <p class="name">교수</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <span class="mini-title">13. 피해야 할 연구주제 유형</span>
+                <div class="cards">
+                  <div class="card"><b>X를 Y에 적용</b><span>도구에서 novelty가 오면 도구가 낡는 순간 주제도 약해진다.</span></div>
+                  <div class="card"><b>성능 2% 향상</b><span>리더보드 경쟁은 대형랩이 유리하다.</span></div>
+                  <div class="card"><b>측정 불가능한 큰 단어</b><span>robust autonomy, trustworthy AI도 protocol이 없으면 공허하다.</span></div>
+                  <div class="card"><b>커뮤니티가 모호한 융합</b><span>처음부터 어느 리뷰어의 기준으로 평가받을지 정해야 한다.</span></div>
+                </div>
+                <div class="warning">강하게 바꾸려면 “Transformer를 결함 검출에 적용”이 아니라 “rare defect의 uncertainty calibration 문제”처럼 blind spot과 metric이 살아나야 한다.</div>
+              </div>
+              <time class="time">오후 12:24</time>
+            </div>
+          </div>
+        </article>
+
+        <article id="relation" class="message student">
+          <div class="message-main">
+            <p class="name">학생</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <p>키워드보다 관계로 표현하라는 말도 들었습니다. 그건 어떤 차이인가요?</p>
+              </div>
+              <time class="time">오후 12:28</time>
+            </div>
+          </div>
+          <div class="avatar">학</div>
+        </article>
+
+        <article class="message professor">
+          <div class="avatar">교</div>
+          <div class="message-main">
+            <p class="name">교수</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <span class="mini-title">14. 강한 주제는 명사보다 관계로 표현된다</span>
+                <p>약한 주제는 robot learning, foundation model, digital twin 같은 명사 중심이다. 강한 주제는 관계 중심이다.</p>
+                <div class="chips">
+                  <span class="chip">uncertainty → control cost</span>
+                  <span class="chip">simulation mismatch → policy failure mode</span>
+                  <span class="chip">morphology → sample efficiency</span>
+                  <span class="chip">actuator degradation → long-horizon autonomy</span>
+                  <span class="chip">human trust → failure recovery behavior</span>
+                </div>
+                <p>연구는 결국 관계를 밝히는 일이다. 명사는 유행을 타지만 관계는 오래 간다.</p>
+              </div>
+              <time class="time">오후 12:32</time>
+            </div>
+          </div>
+        </article>
+
+        <article id="lab" class="message student">
+          <div class="message-main">
+            <p class="name">학생</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <p>교수 입장에서는 랩 전체가 오래 가져갈 수 있는 주제가 더 중요하겠네요.</p>
+              </div>
+              <time class="time">오후 12:37</time>
+            </div>
+          </div>
+          <div class="avatar">학</div>
+        </article>
+
+        <article class="message professor">
+          <div class="avatar">교</div>
+          <div class="message-main">
+            <p class="name">교수</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <span class="mini-title">15. 학생 여러 명이 다른 깊이로 들어갈 수 있어야 한다</span>
+                <p>예를 들어 큰 주제를 <strong>Recovery-aware robot autonomy under real-world physical uncertainty</strong>로 잡으면 이렇게 쪼갤 수 있다.</p>
+                <table class="note-table">
+                  <thead>
+                    <tr>
+                      <th>역할</th>
+                      <th>sub-topic</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td>박사 A</td><td>recovery-aware control 이론</td></tr>
+                    <tr><td>박사 B</td><td>failure taxonomy와 benchmark</td></tr>
+                    <tr><td>박사 C</td><td>vision uncertainty와 manipulation failure 연결</td></tr>
+                    <tr><td>석사 A</td><td>simulation environment 구축</td></tr>
+                    <tr><td>석사 B</td><td>real robot 실험 자동화</td></tr>
+                    <tr><td>학부생</td><td>failure case annotation tool</td></tr>
+                    <tr><td>산학/국가과제</td><td>물류, 제조 현장 적용과 신뢰 가능한 자율로봇 플랫폼</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <time class="time">오후 12:42</time>
+            </div>
+          </div>
+        </article>
+
+        <article id="three-faces" class="message student">
+          <div class="message-main">
+            <p class="name">학생</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <p>과제 선정까지 고려하면 같은 주제를 다르게 말해야 하나요?</p>
+              </div>
+              <time class="time">오후 12:49</time>
+            </div>
+          </div>
+          <div class="avatar">학</div>
+        </article>
+
+        <article class="message professor">
+          <div class="avatar">교</div>
+          <div class="message-main">
+            <p class="name">교수</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <span class="mini-title">16. 좋은 주제는 세 개의 얼굴을 가진다</span>
+                <table class="note-table">
+                  <thead>
+                    <tr>
+                      <th>용도</th>
+                      <th>표현</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>논문</td>
+                      <td>Recovery-aware policy evaluation for contact-rich manipulation</td>
+                    </tr>
+                    <tr>
+                      <td>국가과제</td>
+                      <td>신뢰 가능한 물리 지능 로봇을 위한 실패 회복형 자율제어 원천기술</td>
+                    </tr>
+                    <tr>
+                      <td>회사과제</td>
+                      <td>현장 로봇의 작업 실패율 및 재시도 비용 저감을 위한 회복성 평가·제어 플랫폼</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p>학문적 질문과 실용적 narrative가 같은 뿌리를 공유해야 한다.</p>
+              </div>
+              <time class="time">오후 12:53</time>
+            </div>
+          </div>
+        </article>
+
+        <article id="routine" class="message student">
+          <div class="message-main">
+            <p class="name">학생</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <p>실제로 이번 달부터 해볼 수 있는 루틴으로 정리하면요?</p>
+              </div>
+              <time class="time">오후 1:02</time>
+            </div>
+          </div>
+          <div class="avatar">학</div>
+        </article>
+
+        <article class="message professor">
+          <div class="avatar">교</div>
+          <div class="message-main">
+            <p class="name">교수</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <span class="mini-title">17. 연구주제 발굴 루틴</span>
+                <ol class="routine">
+                  <li>분야의 상위 논문 30편을 고른다. 내가 하고 싶은 방법뿐 아니라 경쟁 방법과 응용 논문도 같이 본다.</li>
+                  <li>각 논문에서 안 본 것을 적는다. 제외한 조건, 분석하지 않은 실패, 사용한 metric, 숨은 가정을 본다.</li>
+                  <li>반복되는 blind spot을 찾는다. 10편 이상에서 반복되면 구조적 blind spot이다.</li>
+                  <li>그 blind spot에 이름을 붙인다. 이름 붙일 수 없으면 주제화하기 어렵다.</li>
+                  <li>첫 논문을 작게 만든다. formulation, benchmark, metric, taxonomy, empirical study면 충분하다.</li>
+                  <li>두 번째 논문에서 방법을 낸다. 먼저 문제의 중요성을 설득하고, 그다음 해결법을 제시한다.</li>
+                </ol>
+              </div>
+              <time class="time">오후 1:08</time>
+            </div>
+          </div>
+        </article>
+
+        <article id="one-sentence" class="message student">
+          <div class="message-main">
+            <p class="name">학생</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <p>최종적으로 주제 후보를 한 문장으로 검증하는 템플릿이 있으면 좋겠습니다.</p>
+              </div>
+              <time class="time">오후 1:15</time>
+            </div>
+          </div>
+          <div class="avatar">학</div>
+        </article>
+
+        <article class="message professor">
+          <div class="avatar">교</div>
+          <div class="message-main">
+            <p class="name">교수</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <span class="mini-title">18. 한 문장 검증법</span>
+                <div class="quote">현재 분야는 <strong>A</strong>를 기준으로 발전해왔지만, 실제 deployment에서는 <strong>B</strong>가 병목이다. 본 연구는 <strong>B</strong>를 처음으로 측정 가능하고 최적화 가능한 대상으로 만들며, 이를 통해 <strong>C</strong>라는 새로운 연구축을 제안한다.</div>
+                <p>예시로는 이렇게 된다.</p>
+                <p><strong>현재 robot manipulation은 task success rate를 기준으로 발전해왔지만, 실제 deployment에서는 failure recovery cost가 병목이다. 본 연구는 recovery cost를 측정 가능하고 최적화 가능한 대상으로 만들며, 이를 통해 recovery-aware manipulation이라는 새로운 연구축을 제안한다.</strong></p>
+              </div>
+              <time class="time">오후 1:19</time>
+            </div>
+          </div>
+        </article>
+
+        <article id="final" class="message student">
+          <div class="message-main">
+            <p class="name">학생</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <p>그럼 한 줄로 기억해야 할 기준은 뭘까요?</p>
+              </div>
+              <time class="time">오후 1:25</time>
+            </div>
+          </div>
+          <div class="avatar">학</div>
+        </article>
+
+        <article class="message professor">
+          <div class="avatar">교</div>
+          <div class="message-main">
+            <p class="name">교수</p>
+            <div class="bubble-row">
+              <div class="bubble">
+                <span class="mini-title">19. 최종 기준</span>
+                <div class="quote">좋은 연구주제는 “내가 답을 낼 수 있는 질문”이 아니라, “남들이 앞으로 피할 수 없게 될 질문”이다.</div>
+                <p>아직 유행어는 아니지만 곧 모두가 겪을 병목, 아직 벤치마크는 없지만 측정하면 차이가 드러날 현상, 아직 대형랩이 몰리지 않았지만 정의되면 커질 수밖에 없는 평가축을 잡아라.</p>
+                <div class="quote">연구주제를 고르지 말고, 분야가 앞으로 부끄러워하게 될 blind spot을 골라라. 그 blind spot에 이름을 붙이고, 측정법을 만들고, 첫 번째 지도를 그려라.</div>
+              </div>
+              <time class="time">오후 1:31</time>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <div class="chat chat-panel original-panel" id="original-panel" role="tabpanel" data-tab-panel="original" hidden>
+        <div class="day">원문 분석</div>
+        <div class="original-note">아래는 처음 제공한 분석 내용을 Markdown으로 렌더링한 원문 탭입니다. 원본 Markdown 소스는 같은 HTML 안에 그대로 보존되어 있습니다.</div>
+        <div class="original-text markdown-body" id="original-rendered"></div>
+        <pre class="original-source" id="original-markdown">완전히 “역사상 최초”라는 건 보장할 수 없지만, 흔한 조언 말고 **연구주제 선정의 중심축 자체를 바꾸는 관점**으로 말해볼게.
+
+## 핵심 통찰
+
+&gt; **좋은 연구주제는 ‘새로운 해법’을 찾는 게 아니라, 사람들이 아직 이름 붙이지 못한 실패를 측정 가능하게 만드는 거야.**
+
+대부분은 이렇게 생각해.
+
+&gt; “어떤 문제를 풀까?”
+&gt; “어떤 최신 방법을 적용할까?”
+&gt; “어떤 분야가 뜰까?”
+
+그런데 진짜 좋은 연구주제는 보통 여기서 안 나와.
+더 강한 질문은 이거야.
+
+&gt; **“지금 분야 전체가 반복해서 실패하고 있는데, 그 실패를 아직 제대로 부를 언어도, 측정할 방법도, 벤치마크도 없는 지점은 어디인가?”**
+
+그걸 찾으면 연구주제가 아니라 **새로운 평가축**을 만드는 거야.
+그리고 평가축을 만든 사람은 방법론을 만든 사람보다 오래 살아남아.
+
+---
+
+# 1. 좋은 주제는 “문제”가 아니라 “새로운 죄목”을 만든다
+
+조금 과격하게 말하면, 좋은 연구주제는 분야에 새로운 죄목을 추가해.
+
+예를 들어 기존에는 논문들이 이렇게 말했을 수 있어.
+
+&gt; “우리 방법은 accuracy가 높다.”
+&gt; “우리 로봇은 task success rate가 높다.”
+&gt; “우리 모델은 benchmark score가 좋다.”
+
+그런데 네가 이렇게 말하는 거야.
+
+&gt; “그런데 이 시스템은 **회복 가능성**이 낮다.”
+&gt; “그런데 이 모델은 **실패를 예측하는 능력**이 없다.”
+&gt; “그런데 이 로봇은 **노화된 actuator 조건에서의 성능 안정성**이 없다.”
+&gt; “그런데 이 vision model은 **control-relevant uncertainty**를 제공하지 않는다.”
+&gt; “그런데 이 설계는 **manufacturing variation에 대한 graceful degradation**이 없다.”
+
+이 순간부터 남들이 만든 방법은 네가 만든 죄목으로 심판받게 돼.
+
+이게 매우 강력해.
+왜냐하면 “새 방법”은 금방 대체되지만, **새 평가축**은 분야의 언어가 되기 때문이야.
+
+---
+
+# 2. 연구주제는 세 개의 시계가 어긋나는 곳에서 나온다
+
+좋은 주제는 보통 세 가지 시계가 동시에 맞물릴 때 나와.
+
+| 시계          | 의미                                      | 좋은 주제가 생기는 순간             |
+| ----------- | --------------------------------------- | ------------------------- |
+| **현실의 시계**  | 산업, 사회, 자연, 시스템이 실제로 겪는 압력              | 문제가 더 이상 무시할 수 없을 만큼 커짐   |
+| **도구의 시계**  | 센서, 계산, fabrication, 데이터, 시뮬레이터, 이론 도구  | 예전엔 못 재던 걸 이제 겨우 잴 수 있게 됨 |
+| **공동체의 시계** | 학계가 받아들일 준비, 리뷰어의 언어, funding narrative | 아직 완전히 붐은 아니지만 설득 가능함     |
+
+가장 좋은 연구주제는 보통 이런 상태야.
+
+&gt; **현실에서는 이미 중요하다.**
+&gt; **도구적으로는 이제 막 가능해졌다.**
+&gt; **학계에서는 아직 이름이 굳어지지 않았다.**
+
+반대로 이미 이름이 굳고, tutorial이 나오고, benchmark leaderboard가 있고, 대형랩들이 몰려 있으면 늦은 경우가 많아. 그때는 “좋은 연구주제”라기보다 “좋은 경쟁장”이야.
+
+---
+
+# 3. “트렌드”를 따라가지 말고 “트렌드가 숨기는 변수”를 찾아야 한다
+
+대부분 연구자는 뜨는 키워드를 따라가.
+
+예를 들면:
+
+* foundation model
+* embodied AI
+* digital twin
+* robot learning
+* neuromorphic computing
+* physics-informed learning
+* differentiable simulation
+* autonomous manufacturing
+* human-robot interaction
+
+이 자체는 나쁘지 않아.
+하지만 이 키워드를 그대로 연구주제로 삼으면 약해.
+
+강한 주제는 이렇게 나온다.
+
+&gt; “이 트렌드가 커질수록, 사람들이 일부러 보지 않으려는 변수가 무엇인가?”
+
+예를 들어:
+
+| 흔한 주제                   | 더 강한 질문                                                                               |
+| ----------------------- | ------------------------------------------------------------------------------------- |
+| 로봇에 foundation model 적용 | foundation model 기반 로봇이 실패할 때, **회복 가능성**은 어떻게 측정할까?                                  |
+| robot learning 성능 향상    | policy가 성공률은 높지만, **실패의 분포가 위험한 방향으로 이동하는지** 어떻게 알까?                                  |
+| digital twin 고도화        | twin이 실제 시스템과 다를 때, **어떤 mismatch가 의사결정에 치명적인지** 어떻게 분류할까?                            |
+| vision model 정확도 향상     | vision uncertainty가 control action에 실제로 유용한지 어떻게 평가할까?                                |
+| physics-informed ML     | physics constraint가 성능을 올리는 게 아니라, **out-of-distribution에서 어떤 종류의 실패를 막는지** 어떻게 증명할까? |
+
+즉, 트렌드를 고르는 게 아니라, **트렌드가 커질수록 반드시 터질 병목**을 고르는 거야.
+
+---
+
+# 4. “남들이 풀고 있는 문제”보다 “남들이 잘못 재고 있는 문제”가 더 좋다
+
+연구주제 선정에서 엄청 중요한 차이가 있어.
+
+## 약한 질문
+
+&gt; “어떻게 하면 성능을 더 올릴까?”
+
+## 강한 질문
+
+&gt; “지금 우리가 성능이라고 부르는 것이 진짜 원하는 현상을 측정하고 있나?”
+
+대부분 분야는 처음에는 쉬운 metric으로 발전해.
+그러다 어느 순간 metric이 현실을 배신해.
+
+그때가 기회야.
+
+예를 들어:
+
+* classification accuracy는 높지만 deployment failure가 큼
+* simulation success는 높지만 real-world transfer가 낮음
+* task success는 높지만 recovery가 불가능함
+* energy efficiency는 높지만 long-term degradation이 큼
+* model confidence는 높지만 calibration이 안 됨
+* human preference score는 높지만 실제 사용자의 trust dynamics와 다름
+
+이런 순간에 좋은 주제는 “더 좋은 모델”이 아니라,
+
+&gt; **“이 분야가 진짜 봐야 하는 metric은 무엇인가?”**
+
+로 바뀌어.
+
+벤치마크, 측정법, failure taxonomy, evaluation protocol을 만드는 연구는 화려하지 않아 보일 수 있지만, 잘 만들면 분야의 지도를 바꿔.
+
+---
+
+# 5. 좋은 연구주제는 “논문 하나”가 아니라 “질문의 공급망”을 만든다
+
+나쁜 주제는 논문 하나 쓰고 끝나.
+
+&gt; “A 방법을 B 문제에 적용했다.”
+&gt; “성능이 기존보다 3% 좋아졌다.”
+
+좋은 주제는 첫 논문이 끝나도 질문이 계속 나온다.
+
+예를 들어 좋은 주제는 이런 구조를 가져.
+
+1. **현상 발견**
+
+   * 기존 방법들이 특정 조건에서 반복적으로 실패한다.
+2. **측정법 제안**
+
+   * 그 실패를 정량화하는 metric 또는 protocol을 만든다.
+3. **원인 분석**
+
+   * 실패가 왜 생기는지 이론적/실험적으로 설명한다.
+4. **해결법 제안**
+
+   * 그 실패를 줄이는 알고리즘, 설계, 제어, 시스템을 만든다.
+5. **일반화**
+
+   * 다른 시스템, 다른 task, 다른 scale에서도 적용한다.
+6. **표준화**
+
+   * benchmark, dataset, simulator, toolchain으로 만든다.
+
+이러면 논문 하나가 아니라 **랩의 5년짜리 연구 프로그램**이 돼.
+
+---
+
+# 6. 연구주제를 고를 때 “참이면 좋은가?”보다 “틀려도 남는가?”를 봐야 한다
+
+이건 꽤 중요한 팁이야.
+
+많은 연구주제가 위험한 이유는 가설이 틀리면 아무것도 안 남기 때문이야.
+
+좋은 연구주제는 가설이 틀려도 뭔가 남아야 해.
+
+예를 들어:
+
+&gt; “새 알고리즘 X가 기존보다 좋을 것이다.”
+
+이건 틀리면 위험해.
+
+반면:
+
+&gt; “현재 로봇 정책들은 contact-rich manipulation에서 recovery profile이 나쁘다. 이를 측정하는 benchmark와 taxonomy를 만들고, 몇 가지 대표 방법을 비교한다.”
+
+이건 설령 네 방법이 최고 성능을 못 내도 남는 게 많아.
+
+* benchmark
+* dataset
+* failure taxonomy
+* baseline comparison
+* negative result
+* design principle
+* evaluation protocol
+
+즉, 좋은 주제는 **hypothesis risk를 infrastructure value로 hedge**해.
+
+연구주제는 과학적 도박이지만, 좋은 도박은 져도 데이터를 남겨.
+
+---
+
+# 7. “왜 지금인가?”가 없는 주제는 약하다
+
+좋은 연구주제에는 반드시 “why now?”가 있어야 해.
+
+단순히 “중요하다”는 부족해.
+중요한 문제는 원래 많아.
+
+더 강한 논리는 이거야.
+
+&gt; “이 문제는 오래전부터 중요했지만, 지금까지는 풀 수 없었다. 그런데 최근에 A, B, C가 바뀌면서 이제 처음으로 제대로 다룰 수 있게 되었다.”
+
+여기서 A, B, C는 보통 이런 것들이야.
+
+* 센서 가격 하락
+* 고속 실험 자동화
+* 대규모 데이터 축적
+* simulation fidelity 증가
+* differentiable programming 도구 발전
+* GPU/TPU/edge compute 발전
+* 제조공정 정밀도 향상
+* 새로운 material platform
+* 새로운 regulatory pressure
+* 산업 현장의 deployment 증가
+* foundation model 또는 generative model의 등장
+* open-source ecosystem 성숙
+* 벤치마크 포화
+
+주제 제안서나 논문 introduction에서 이 구조가 있으면 강해져.
+
+&gt; **오래된 중요성 + 새로 생긴 가능성 = 좋은 연구 타이밍**
+
+---
+
+# 8. 진짜 강한 주제는 “방법론의 교차점”이 아니라 “병목의 교차점”에 있다
+
+많은 사람들이 융합연구를 이렇게 생각해.
+
+&gt; “기계공학 + AI”
+&gt; “로보틱스 + foundation model”
+&gt; “컴퓨터비전 + 제어”
+&gt; “전자공학 + 딥러닝”
+
+이건 너무 표면적이야.
+
+더 좋은 융합은 이거야.
+
+&gt; “서로 다른 분야가 사실 같은 병목을 다른 이름으로 겪고 있는가?”
+
+예를 들어:
+
+| 분야    | 겪는 병목                   |
+| ----- | ----------------------- |
+| 로보틱스  | sim-to-real gap         |
+| 컴퓨터비전 | domain shift            |
+| 제어    | model mismatch          |
+| 기계설계  | manufacturing tolerance |
+| 전자시스템 | process variation       |
+| 머신러닝  | distribution shift      |
+
+겉으로는 다 다른 문제처럼 보이지만, 깊게 보면 전부 이런 질문일 수 있어.
+
+&gt; **“모델과 현실 사이의 불일치를 어떻게 측정하고, 그 불일치 아래에서도 시스템이 안전하게 degrade되게 할 것인가?”**
+
+이렇게 잡으면 엄청 강한 주제가 돼.
+
+왜냐하면 한 분야의 작은 문제가 아니라 여러 분야를 관통하는 **상위 병목**을 잡은 거니까.
+
+---
+
+# 9. 연구주제 선정 공식
+
+실제로 쓸 수 있는 식으로 만들면 이래.
+
+[
+\text{Topic Quality} =
+\frac{
+\text{Problem Pressure}
+\times
+\text{Measurability}
+\times
+\text{Your Asymmetry}
+\times
+\text{Compounding Potential}
+}{
+\text{Crowdedness}
+\times
+\text{Execution Fragility}
+\times
+\text{Review Ambiguity}
+}
+]
+
+각 항목은 이렇게 보면 돼.
+
+## 위쪽 항
+
+### 1. Problem Pressure
+
+현실에서 진짜 아픈 문제인가?
+
+* 산업계가 돈을 쓰는가?
+* 연구자들이 반복해서 회피하는가?
+* 기존 방법이 deployment에서 깨지는가?
+* 국가과제/회사과제 narrative로 연결되는가?
+
+### 2. Measurability
+
+이제 측정 가능해졌는가?
+
+* 실험 protocol을 만들 수 있는가?
+* simulator나 dataset을 만들 수 있는가?
+* metric을 정의할 수 있는가?
+* reviewer가 납득할 수 있는 evidence를 만들 수 있는가?
+
+### 3. Your Asymmetry
+
+내 랩이 남들보다 유리한가?
+
+* 장비
+* 데이터
+* 실험환경
+* fabrication capability
+* 도메인 지식
+* 산업 파트너
+* 학생 역량
+* 기존 코드/플랫폼
+* 논문 포트폴리오
+
+중요한 건 “좋은 주제인가?”보다 **“우리 랩이 이 주제에서 불공정한 우위를 갖는가?”**야.
+
+### 4. Compounding Potential
+
+한 번 투자하면 계속 쌓이는가?
+
+* benchmark가 쌓이는가?
+* platform이 쌓이는가?
+* dataset이 쌓이는가?
+* hardware/software stack이 쌓이는가?
+* 후속 논문들이 자연스럽게 나오는가?
+* 과제 제안서로 확장되는가?
+
+## 아래쪽 항
+
+### 5. Crowdedness
+
+대형랩이 이미 인해전술로 밀고 있는가?
+
+crowded topic이 무조건 나쁜 건 아니야.
+하지만 네가 그 주제에 들어갈 때는 **다른 축**으로 들어가야 해.
+
+예를 들어 “더 큰 모델” 경쟁은 어렵지만,
+“큰 모델이 로봇 제어에서 실패할 때의 recoverability metric”은 가능해.
+
+### 6. Execution Fragility
+
+성공 조건이 너무 많은가?
+
+위험한 주제는 이런 식이야.
+
+* 특정 장비가 반드시 잘 돌아가야 함
+* 특정 데이터셋이 반드시 확보돼야 함
+* 특정 학생 한 명의 능력에 지나치게 의존함
+* 실험 실패 시 대체 결과가 없음
+* reviewer가 납득할 baseline을 만들기 어려움
+
+### 7. Review Ambiguity
+
+리뷰어가 “그래서 뭐?”라고 할 가능성이 큰가?
+
+좋은 주제는 reviewer의 반론이 예상 가능해야 해.
+더 좋은 주제는 그 반론 자체가 실험 design으로 들어가 있어야 해.
+
+---
+
+# 10. 연구주제 발굴을 위한 실전 방법: “음영 지도”를 만들어라
+
+논문을 읽을 때 보통 사람들은 “무엇을 했는가?”를 본다.
+주제를 잘 고르는 사람은 “무엇을 일부러 안 봤는가?”를 본다.
+
+논문 20편을 읽고 아래 표를 만들어봐.
+
+| 논문 | 주장 | 핵심 metric | 숨은 가정 | 측정하지 않은 실패 | 현실 적용 시 깨질 조건 | 왜 저자들이 안 다뤘을까? |
+| -- | -- | --------- | ----- | ---------- | ------------- | -------------- |
+
+여기서 마지막 세 열이 중요해.
+
+* 숨은 가정
+* 측정하지 않은 실패
+* 현실 적용 시 깨질 조건
+
+이 세 개가 반복해서 나오면, 그게 네 연구주제 후보야.
+
+예를 들어 여러 논문에서 반복적으로 이런 게 보인다고 해보자.
+
+&gt; “성공률은 보고하지만 실패 후 recovery는 안 본다.”
+&gt; “nominal condition만 보고 actuator degradation은 안 본다.”
+&gt; “simulation result는 강하지만 real-world uncertainty budget이 없다.”
+&gt; “vision benchmark는 좋지만 downstream control cost와 연결이 안 된다.”
+
+그러면 주제는 자연스럽게 나와.
+
+&gt; **“Autonomous systems의 성능을 단순 success rate가 아니라 recovery-aware performance로 재정의하자.”**
+
+이건 단순한 방법론이 아니라 평가축이야.
+
+---
+
+# 11. 주제 문장을 이렇게 만들면 강해진다
+
+약한 주제 문장:
+
+&gt; “우리는 deep learning을 이용해 로봇 조작 성능을 향상시킨다.”
+
+강한 주제 문장:
+
+&gt; “현재 로봇 조작 연구는 nominal task success를 중심으로 평가되지만, 실제 deployment에서는 실패 후 회복 가능성, 손상 누적, uncertainty propagation이 더 중요하다. 본 연구는 contact-rich manipulation에서 recovery-aware autonomy를 정의하고, 이를 측정하는 benchmark와 제어/학습 방법론을 제안한다.”
+
+구조는 이거야.
+
+&gt; **현재 분야는 A를 최적화한다.**
+&gt; **하지만 현실에서는 B가 더 중요하다.**
+&gt; **B는 지금까지 측정/제어/설계되지 않았다.**
+&gt; **우리는 B를 관측 가능하고 최적화 가능한 대상으로 바꾼다.**
+
+이 구조가 매우 강해.
+
+---
+
+# 12. 좋은 연구주제의 7가지 판별 질문
+
+주제 후보가 있으면 아래 질문을 던져봐.
+
+## 1. 이 주제는 새로운 metric을 만들 수 있나?
+
+새 metric이 있으면 오래 간다.
+없으면 방법론 경쟁에 빨려 들어갈 가능성이 높다.
+
+## 2. 이 주제는 실패 사례를 논문의 중심에 둘 수 있나?
+
+성공 사례만 보여주는 주제는 약해.
+실패를 정교하게 분해할 수 있는 주제가 강해.
+
+## 3. 이 주제는 “왜 기존 SOTA가 부족한지”를 공정하게 보여줄 수 있나?
+
+기존 연구를 깎아내리는 게 아니라,
+기존 metric으로는 보이지 않던 한계를 보여줘야 해.
+
+## 4. 이 주제는 첫 논문이 작아도 후속 논문이 커질 수 있나?
+
+첫 논문은 taxonomy나 benchmark여도 돼.
+하지만 그 뒤에 theory, algorithm, system, application으로 확장돼야 해.
+
+## 5. 이 주제는 우리 랩의 장비/데이터/역량이 없으면 따라 하기 어렵나?
+
+좋은 주제는 단순히 clever하지 않고, **소유 가능**해야 해.
+
+## 6. 이 주제는 과제 제안서로 바꿨을 때 국가/산업적 언어가 생기나?
+
+예를 들어:
+
+* 신뢰성
+* 안전성
+* 자율성
+* 생산성
+* 에너지 효율
+* 제조 경쟁력
+* 고령화 대응
+* 국방/재난/의료/물류 응용
+* 초격차 플랫폼
+* 표준화 가능성
+
+이런 언어로 번역 가능해야 강해.
+
+## 7. 이 주제가 틀려도 논문이 남나?
+
+가설이 틀렸을 때도 benchmark, negative result, failure taxonomy, dataset, analysis가 남으면 좋은 주제야.
+
+---
+
+# 13. 피해야 할 연구주제 유형
+
+## 1. “X를 Y에 적용”형
+
+&gt; “Transformer를 결함 검출에 적용”
+&gt; “Diffusion model을 로봇 제어에 적용”
+&gt; “LLM을 제조공정 최적화에 적용”
+
+이런 건 출발점으로는 괜찮지만, 연구주제로는 약해.
+왜냐하면 novelty가 대부분 도구에서 오기 때문이야. 도구는 금방 낡아.
+
+더 강하게 바꾸려면 이렇게 해야 해.
+
+&gt; “제조 결함 검출에서 rare defect의 uncertainty calibration 문제”
+&gt; “diffusion policy의 failure recovery profile 분석”
+&gt; “LLM 기반 공정 계획에서 hallucination이 물리적 제약 위반으로 전파되는 경로 모델링”
+
+## 2. “성능 2% 향상”형
+
+리더보드 경쟁은 대형랩이 유리해.
+작은 랩이나 대학 연구실은 **새로운 축**을 만들어야 해.
+
+## 3. “좋아 보이지만 측정 불가능”형
+
+멋진 단어가 많은데 실험 protocol이 없으면 위험해.
+
+예:
+
+* general intelligence
+* robust autonomy
+* trustworthy AI
+* human-like reasoning
+* sustainable robotics
+
+이런 단어 자체는 좋지만, 측정법이 없으면 공허해져.
+좋은 연구자는 이걸 측정 가능한 작은 단위로 쪼갠다.
+
+## 4. “리뷰어가 어느 커뮤니티인지 모호한”형
+
+융합연구에서 자주 생기는 문제야.
+
+* ML 리뷰어는 engineering contribution이 약하다고 함
+* 로보틱스 리뷰어는 learning novelty가 약하다고 함
+* 기계공학 리뷰어는 physical insight가 약하다고 함
+* 제어 리뷰어는 이론 보장이 약하다고 함
+
+그래서 주제를 잡을 때는 처음부터 **어느 커뮤니티에서 어떤 기준으로 평가받을지** 정해야 해.
+
+---
+
+# 14. 정말 강한 연구주제는 “명사”보다 “관계”로 표현된다
+
+약한 주제는 보통 명사 중심이야.
+
+&gt; robot learning
+&gt; foundation model
+&gt; smart manufacturing
+&gt; digital twin
+&gt; soft robot
+&gt; autonomous system
+
+강한 주제는 관계 중심이야.
+
+&gt; uncertainty가 control cost로 어떻게 전파되는가
+&gt; simulation mismatch가 policy failure mode를 어떻게 바꾸는가
+&gt; morphology가 learning sample efficiency를 어떻게 바꾸는가
+&gt; actuator degradation이 long-horizon autonomy를 어떻게 제한하는가
+&gt; human trust가 robot failure recovery behavior에 어떻게 의존하는가
+&gt; physical constraint가 generative model의 extrapolation을 어떻게 제한하는가
+
+연구는 결국 관계를 밝히는 일이야.
+명사는 유행을 타지만, 관계는 오래 간다.
+
+---
+
+# 15. 교수 입장에서 특히 강한 주제는 “학생 여러 명이 다른 깊이로 들어갈 수 있는 주제”야
+
+좋은 랩 주제는 한 명의 천재 학생에게만 맞으면 안 돼.
+박사과정, 석사과정, 학부연구생, 공동연구자가 각자 다른 layer를 맡을 수 있어야 해.
+
+예를 들어 하나의 큰 주제를 이렇게 쪼갤 수 있으면 좋다.
+
+## 큰 주제
+
+&gt; Recovery-aware robot autonomy under real-world physical uncertainty
+
+## 학생별 sub-topic
+
+| 학생   | 주제                                          |
+| ---- | ------------------------------------------- |
+| 박사 A | recovery-aware control 이론                   |
+| 박사 B | failure taxonomy와 benchmark                 |
+| 박사 C | vision uncertainty와 manipulation failure 연결 |
+| 석사 A | simulation environment 구축                   |
+| 석사 B | real robot 실험 자동화                           |
+| 학부생  | failure case annotation tool                |
+| 산학과제 | 물류/제조 현장 적용                                 |
+| 국가과제 | 신뢰 가능한 자율로봇 플랫폼                             |
+
+이런 주제는 랩의 자산이 축적돼.
+반대로 학생 한 명이 졸업하면 사라지는 주제는 장기적으로 약해.
+
+---
+
+# 16. “과제 선정”까지 고려하면 주제는 세 개의 얼굴을 가져야 한다
+
+좋은 연구주제는 논문용 이름, 과제용 이름, 산업용 이름이 달라야 해.
+
+예를 들어 같은 내용이라도:
+
+| 용도   | 표현                                                             |
+| ---- | -------------------------------------------------------------- |
+| 논문   | Recovery-aware policy evaluation for contact-rich manipulation |
+| 국가과제 | 신뢰 가능한 물리 지능 로봇을 위한 실패 회복형 자율제어 원천기술                           |
+| 회사과제 | 현장 로봇의 작업 실패율 및 재시도 비용 저감을 위한 회복성 평가·제어 플랫폼                    |
+
+내용은 같지만 언어가 달라.
+이걸 처음부터 설계해야 해.
+
+연구주제가 논문으로만 좋아도 부족하고, 과제로만 좋아도 부족해.
+가장 좋은 건 **학문적 질문과 실용적 narrative가 같은 뿌리를 공유하는 주제**야.
+
+---
+
+# 17. 내가 추천하는 연구주제 선정 루틴
+
+실제로 해볼 수 있는 방식으로 정리하면 이래.
+
+## Step 1. 분야의 상위 논문 30편을 고른다
+
+단, “내가 하고 싶은 방법” 논문만 보지 말고, 경쟁 방법과 응용 논문도 같이 봐.
+
+## Step 2. 각 논문에서 안 본 것을 적는다
+
+특히 다음을 본다.
+
+* 어떤 조건은 제외했나?
+* 어떤 실패는 분석하지 않았나?
+* 어떤 metric만 보고 있나?
+* real-world deployment에서 무엇이 깨질까?
+* 저자의 claim이 성립하려면 어떤 숨은 가정이 필요한가?
+
+## Step 3. 반복되는 blind spot을 찾는다
+
+한두 편의 약점은 그냥 논문 약점이야.
+하지만 10편 이상에서 반복되면 그건 분야의 구조적 blind spot이야.
+
+## Step 4. 그 blind spot에 이름을 붙인다
+
+이름이 중요해.
+이름 붙일 수 없으면 주제화하기 어렵다.
+
+예:
+
+* recovery gap
+* control-relevant uncertainty
+* degradation-aware autonomy
+* sim-to-decision gap
+* embodied calibration
+* failure-contingent planning
+* morphology-induced learning bias
+* task-level robustness profile
+
+## Step 5. 첫 논문을 작게 만든다
+
+처음부터 모든 걸 풀려고 하지 마.
+첫 논문은 보통 아래 중 하나면 충분해.
+
+* problem formulation
+* benchmark
+* metric
+* taxonomy
+* surprising empirical study
+* simple but revealing baseline
+* impossibility/limitation analysis
+
+## Step 6. 두 번째 논문에서 방법을 낸다
+
+첫 논문에서 “이 문제가 진짜 중요하다”를 설득하고,
+두 번째 논문에서 “그래서 우리가 이렇게 푼다”로 가면 훨씬 강해.
+
+---
+
+# 18. 주제 후보를 한 문장으로 검증하는 법
+
+아래 문장에 넣어봤을 때 자연스러우면 좋은 주제일 가능성이 높아.
+
+&gt; “현재 분야는 **A**를 기준으로 발전해왔지만, 실제 deployment에서는 **B**가 병목이다. 본 연구는 **B**를 처음으로 측정 가능하고 최적화 가능한 대상으로 만들며, 이를 통해 **C**라는 새로운 연구축을 제안한다.”
+
+예시:
+
+&gt; 현재 robot manipulation은 task success rate를 기준으로 발전해왔지만, 실제 deployment에서는 failure recovery cost가 병목이다. 본 연구는 recovery cost를 측정 가능하고 최적화 가능한 대상으로 만들며, 이를 통해 recovery-aware manipulation이라는 새로운 연구축을 제안한다.
+
+이 문장이 되는 주제는 강해.
+
+---
+
+# 19. 최종적으로 가장 중요한 기준
+
+내가 하나만 고르라면 이거야.
+
+&gt; **좋은 연구주제는 “내가 답을 낼 수 있는 질문”이 아니라, “남들이 앞으로 피할 수 없게 될 질문”이다.**
+
+지금 답을 잘 내는 것도 중요하지만, 더 중요한 건 앞으로 그 분야 사람들이 계속 마주칠 질문을 먼저 붙잡는 거야.
+
+그러려면 이런 주제를 골라야 해.
+
+* 아직 유행어는 아니지만, 곧 모두가 겪을 병목
+* 아직 벤치마크는 없지만, 측정하면 충격적인 차이가 드러날 현상
+* 아직 리뷰어가 익숙하지 않지만, introduction을 읽으면 “이건 맞다”고 느낄 문제
+* 아직 대형랩이 몰리지 않았지만, 한번 정의되면 커질 수밖에 없는 평가축
+* 우리 랩의 장비, 데이터, 도메인 지식으로 소유권을 만들 수 있는 영역
+
+---
+
+# 20. 한 줄로 요약하면
+
+&gt; **연구주제를 고르지 말고, 분야가 앞으로 부끄러워하게 될 blind spot을 골라.**
+&gt; 그 blind spot에 이름을 붙이고, 측정법을 만들고, 첫 번째 지도를 그려.
+&gt; 그러면 너는 문제를 푼 사람이 아니라, 사람들이 문제를 보게 만든 사람이 돼.
+
+그게 오래가는 연구주제야.</pre>
+      </div>
+
+      <div class="inputbar" aria-hidden="true">
+        <span>＋</span>
+        <span class="fake-input">메시지 입력</span>
+        <button>전송</button>
+      </div>
+    </section>
+
+    <aside class="sidebar" aria-label="대화 목차">
+      <div class="side-head">
+        <h2>교수와 학생의 질답</h2>
+        <p>연구주제 선정의 중심축을 “새 방법”에서 “새 평가축”으로 옮기는 대화형 노트</p>
+      </div>
+      <nav class="side-body">
+        <a href="#intro">핵심 통찰</a>
+        <a href="#crime">새로운 죄목</a>
+        <a href="#clocks">세 개의 시계</a>
+        <a href="#trend">트렌드의 숨은 변수</a>
+        <a href="#metric">잘못 재는 문제</a>
+        <a href="#pipeline">질문의 공급망</a>
+        <a href="#risk">틀려도 남는 주제</a>
+        <a href="#whynow">Why Now</a>
+        <a href="#bottleneck">병목의 교차점</a>
+        <a href="#formula">주제 선정 공식</a>
+        <a href="#shadow-map">음영 지도</a>
+        <a href="#sentence">강한 주제 문장</a>
+        <a href="#questions">7가지 판별 질문</a>
+        <a href="#avoid">피해야 할 유형</a>
+        <a href="#relation">명사보다 관계</a>
+        <a href="#lab">랩 주제 구조</a>
+        <a href="#three-faces">세 개의 얼굴</a>
+        <a href="#routine">실전 루틴</a>
+        <a href="#one-sentence">한 문장 검증</a>
+        <a href="#final">최종 기준</a>
+        <div class="side-box">
+          핵심 문장: “현재 분야는 A를 기준으로 발전해왔지만, 실제 deployment에서는 B가 병목이다. 본 연구는 B를 측정 가능하고 최적화 가능한 대상으로 만든다.”
+        </div>
+      </nav>
+    </aside>
+  </main>
+  <script>
+    const tabButtons = document.querySelectorAll("[data-tab-target]");
+    const tabPanels = document.querySelectorAll("[data-tab-panel]");
+    const markdownSource = document.getElementById("original-markdown");
+    const markdownTarget = document.getElementById("original-rendered");
+
+    function escapeHtml(value) {
+      return value
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+    }
+
+    function renderInline(value) {
+      return escapeHtml(value)
+        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/`([^`]+)`/g, "<code>$1</code>");
+    }
+
+    function splitTableRow(line) {
+      const cells = line.trim().split("|");
+      if (cells[0] === "") cells.shift();
+      if (cells[cells.length - 1] === "") cells.pop();
+      return cells.map((cell) => cell.trim());
+    }
+
+    function isTableDivider(line) {
+      return /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(line);
+    }
+
+    function isSpecialLine(line, nextLine = "") {
+      return /^#{1,3}\s+/.test(line)
+        || /^---+$/.test(line.trim())
+        || /^>\s?/.test(line)
+        || /^\s*[*-]\s+/.test(line)
+        || /^\s*\d+\.\s+/.test(line)
+        || (/^\s*\|/.test(line) && isTableDivider(nextLine));
+    }
+
+    function renderMarkdown(markdown) {
+      const lines = markdown.replace(/\r\n/g, "\n").split("\n");
+      const html = [];
+      let index = 0;
+
+      while (index < lines.length) {
+        const line = lines[index];
+        const trimmed = line.trim();
+        const nextLine = lines[index + 1] || "";
+
+        if (!trimmed) {
+          index += 1;
+          continue;
+        }
+
+        if (/^---+$/.test(trimmed)) {
+          html.push("<hr>");
+          index += 1;
+          continue;
+        }
+
+        const heading = /^(#{1,3})\s+(.*)$/.exec(line);
+        if (heading) {
+          const level = heading[1].length;
+          html.push(`<h${level}>${renderInline(heading[2].trim())}</h${level}>`);
+          index += 1;
+          continue;
+        }
+
+        if (/^>\s?/.test(line)) {
+          const quoteLines = [];
+          while (index < lines.length && /^>\s?/.test(lines[index])) {
+            quoteLines.push(lines[index].replace(/^>\s?/, ""));
+            index += 1;
+          }
+          html.push(`<blockquote>${quoteLines.map(renderInline).join("<br>")}</blockquote>`);
+          continue;
+        }
+
+        if (/^\s*\|/.test(line) && isTableDivider(nextLine)) {
+          const rows = [];
+          while (index < lines.length && /^\s*\|/.test(lines[index])) {
+            rows.push(lines[index]);
+            index += 1;
+          }
+          const headerCells = splitTableRow(rows[0]);
+          const bodyRows = rows.slice(2).map(splitTableRow);
+          const header = headerCells.map((cell) => `<th>${renderInline(cell)}</th>`).join("");
+          const body = bodyRows
+            .map((row) => `<tr>${row.map((cell) => `<td>${renderInline(cell)}</td>`).join("")}</tr>`)
+            .join("");
+          html.push(`<table><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`);
+          continue;
+        }
+
+        if (/^\s*[*-]\s+/.test(line)) {
+          const items = [];
+          while (index < lines.length && /^\s*[*-]\s+/.test(lines[index])) {
+            items.push(lines[index].replace(/^\s*[*-]\s+/, ""));
+            index += 1;
+          }
+          html.push(`<ul>${items.map((item) => `<li>${renderInline(item)}</li>`).join("")}</ul>`);
+          continue;
+        }
+
+        if (/^\s*\d+\.\s+/.test(line)) {
+          const items = [];
+          while (index < lines.length && /^\s*\d+\.\s+/.test(lines[index])) {
+            items.push(lines[index].replace(/^\s*\d+\.\s+/, ""));
+            index += 1;
+          }
+          html.push(`<ol>${items.map((item) => `<li>${renderInline(item)}</li>`).join("")}</ol>`);
+          continue;
+        }
+
+        const paragraph = [trimmed];
+        index += 1;
+        while (
+          index < lines.length
+          && lines[index].trim()
+          && !isSpecialLine(lines[index], lines[index + 1] || "")
+        ) {
+          paragraph.push(lines[index].trim());
+          index += 1;
+        }
+        html.push(`<p>${renderInline(paragraph.join(" "))}</p>`);
+      }
+
+      return html.join("");
+    }
+
+    if (markdownSource && markdownTarget) {
+      markdownTarget.innerHTML = renderMarkdown(markdownSource.textContent.trim());
+    }
+
+    tabButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const target = button.dataset.tabTarget;
+
+        tabButtons.forEach((item) => {
+          const isActive = item === button;
+          item.classList.toggle("active", isActive);
+          item.setAttribute("aria-selected", String(isActive));
+        });
+
+        tabPanels.forEach((panel) => {
+          const isActive = panel.dataset.tabPanel === target;
+          panel.classList.toggle("active", isActive);
+          panel.hidden = !isActive;
+        });
+      });
+    });
+  </script>
+</body>
+</html>
