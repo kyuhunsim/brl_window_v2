@@ -45,17 +45,8 @@ kwargs["parent_model"] = model_name
 kwargs["retrain_epi"] = 50
 kwargs["type"] = "simulation" if obs_mode == "1" else "real"
 
-# Real sim2real starts from the same reference distribution as the selected model.
-# For 0528Ours this keeps PID disabled because cfg.yaml has pid: null.
-kwargs.setdefault("rnd_ref", {})
-kwargs["rnd_ref"]["pos_max_off"] = 220
-kwargs["rnd_ref"]["pos_min_off"] = 170
-kwargs["rnd_ref"]["neg_max_off"] = 35
-kwargs["rnd_ref"]["neg_min_off"] = 15
-kwargs["rnd_ref"]["pos_max_amp"] = 20
-kwargs["rnd_ref"]["neg_max_amp"] = 10
-kwargs["rnd_ref"]["pos_max_ts"] = 10
-kwargs["rnd_ref"]["neg_max_ts"] = 10
+# Keep the selected model's reference distribution for sim2real.
+# For 0528Ours this matches the no-PID simulation training condition.
 
 kwargs["temporal_weight_hardening"] = dict(
     initial_weight=1.25,
