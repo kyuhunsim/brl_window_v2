@@ -11,12 +11,20 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
+import sys
+from pathlib import Path
 from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
 
-from sim3 import PneuSim
+THIS_DIR = Path(__file__).resolve().parent
+SRC_DIR = THIS_DIR.parent
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from pneu_tune.sim3 import PneuSim
 
 STD_RHO = 1.20411831637462
 REQUIRED_INPUT_COLUMNS = [
@@ -111,7 +119,7 @@ def _convert_ctrl_to_unit(values: np.ndarray, domain: str) -> np.ndarray:
 
 
 def _unit_to_sim3_ctrl(ctrl_unit: np.ndarray) -> np.ndarray:
-    return np.clip(2.0 * np.asarray(ctrl_unit, dtype=np.float64) - 1.0, -1.0, 1.0)
+    return np.clip(np.asarray(ctrl_unit, dtype=np.float64), 0.0, 1.0)
 
 
 def _to_lpm_from_mdot(mdot: float) -> float:
@@ -127,6 +135,21 @@ def _mae_rmse(ref: np.ndarray, pred: np.ndarray) -> tuple[float, float]:
     return float(np.mean(np.abs(e))), float(np.sqrt(np.mean(e * e)))
 
 
+def _one_minus_mape(ref: np.ndarray, pred: np.ndarray, eps: float = 1e-6) -> float:
+    ref = np.asarray(ref, dtype=np.float64)
+    pred = np.asarray(pred, dtype=np.float64)
+    if ref.size == 0 or pred.size == 0:
+        return float("nan")
+    denom = np.maximum(np.abs(ref), eps)
+    return float(1.0 - np.mean(np.abs(ref - pred) / denom))
+
+
+def _fmt_pct(v: float) -> str:
+    if not np.isfinite(v):
+        return "nan"
+    return f"{100.0 * v:.2f}%"
+
+
 def _resolve_default_out_path(real_path: str, out_path: Optional[str]) -> str:
     path = out_path
     if not path:
@@ -135,6 +158,13 @@ def _resolve_default_out_path(real_path: str, out_path: Optional[str]) -> str:
     if os.path.splitext(path)[1] == "":
         path = f"{path}.csv"
     return path
+
+
+def _resolve_default_viz_prefix(sim_out_path: str, viz_prefix: Optional[str]) -> str:
+    if viz_prefix:
+        return viz_prefix
+    base, _ = os.path.splitext(sim_out_path)
+    return f"{base}_compare"
 
 
 def _has_real_flow(df: pd.DataFrame) -> bool:
@@ -335,6 +365,28 @@ def _print_netflow_quick_metrics(out_df: pd.DataFrame, *, has_real_flow: bool) -
     print(f"  - net_neg(flow5-flow6): MAE={mae_neg:.4g} RMSE={rmse_neg:.4g} (n={n})")
 
 
+def _print_pressure_quick_metrics(real_df: pd.DataFrame, sim_df: pd.DataFrame) -> None:
+    pressure_pairs = [
+        ("press_pos", "sim_press_pos"),
+        ("press_neg", "sim_press_neg"),
+        ("act_pos_press", "sim_act_pos_press"),
+        ("act_neg_press", "sim_act_neg_press"),
+    ]
+    n = min(len(real_df), len(sim_df))
+    if n <= 0:
+        return
+    print("[INFO] Pressure quick metrics (raw index-aligned):")
+    for real_col, sim_col in pressure_pairs:
+        real = real_df[real_col].to_numpy(dtype=np.float64)[:n]
+        sim = sim_df[sim_col].to_numpy(dtype=np.float64)[:n]
+        mae, rmse = _mae_rmse(real, sim)
+        acc = _one_minus_mape(real, sim)
+        print(
+            f"  - {real_col}: MAE={mae:.4g} RMSE={rmse:.4g} "
+            f"1-MAPE={_fmt_pct(acc)} (n={n})"
+        )
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--real", required=True, help="real csv path (e.g. exp/sliced_output.csv)")
@@ -344,7 +396,7 @@ def main() -> None:
     ap.add_argument(
         "--scale",
         action="store_true",
-        help="use sim3 compressed action scaling [-1,1] -> [0.7,1.0]",
+        help="enable sim3 optional ctrl scaling; normally leave off for exact real CSV replay",
     )
     ap.add_argument("--clip-start-sec", type=float, default=None)
     ap.add_argument("--clip-end-sec", type=float, default=None)
@@ -353,6 +405,14 @@ def main() -> None:
     ap.add_argument("--sim-log", action="store_true", help="enable lib3 C++ runtime logging")
     ap.add_argument("--ctrl-domain", choices=["unit", "bipolar"], default="unit")
     ap.add_argument("--debug-input-check", action="store_true")
+    ap.add_argument("--no-viz", action="store_true", help="do not run sim-real visualization after replay")
+    ap.add_argument("--save-viz", action="store_true", help="save visualization PNG files")
+    ap.add_argument("--no-show-viz", action="store_true", help="do not open matplotlib windows for visualization")
+    ap.add_argument(
+        "--viz-prefix",
+        default=None,
+        help="visualization output prefix; default is <sim_csv_without_ext>_compare",
+    )
     args = ap.parse_args()
 
     df = _load_real_csv(
@@ -377,7 +437,7 @@ def main() -> None:
     )
 
     base_out_path = _resolve_default_out_path(args.real, args.out)
-    print("[INFO] Using raw control replay (lib3 smoothing is fixed at 1)")
+    print("[INFO] Using exact unit control replay: CSV ctrl1~6 -> sim3 ctrl1~6 in [0, 1]")
     out_df, dt, has_real_flow = _run_single_replay(
         df=df,
         traj_time=traj_time,
@@ -396,7 +456,35 @@ def main() -> None:
         "[INFO] Replay finished with fixed input-time stepping "
         f"(dt={dt:.6f}s, delay={float(args.delay):.6f}s)"
     )
+    _print_pressure_quick_metrics(df, out_df)
     _print_netflow_quick_metrics(out_df, has_real_flow=has_real_flow)
+
+    if not args.no_viz:
+        viz_script = THIS_DIR / "viz_compare_sim_real_csv.py"
+        cmd = [
+            sys.executable,
+            str(viz_script),
+            "--sim",
+            base_out_path,
+            "--real",
+            args.real,
+        ]
+        if args.clip_start_sec is not None:
+            cmd.extend(["--real-start", str(args.clip_start_sec)])
+        if args.clip_end_sec is not None:
+            cmd.extend(["--real-end", str(args.clip_end_sec)])
+        if args.save_viz:
+            cmd.append("--save")
+            cmd.extend(["--out-prefix", _resolve_default_viz_prefix(base_out_path, args.viz_prefix)])
+        elif args.viz_prefix:
+            cmd.extend(["--out-prefix", args.viz_prefix])
+        if args.no_show_viz:
+            cmd.append("--no-show")
+
+        print("[INFO] Launching sim-real visualization:")
+        print("       " + " ".join(cmd))
+        sys.stdout.flush()
+        subprocess.run(cmd, check=True)
 
 
 if __name__ == "__main__":

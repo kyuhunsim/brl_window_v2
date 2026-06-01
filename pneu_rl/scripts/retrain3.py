@@ -15,6 +15,23 @@ from pneu_utils.utils import (
 )
 
 
+REAL_RETRAIN_PID = dict(
+    Kp_act_pos_in=0.0,
+    Ki_act_pos_in=0.0,
+    Kd_act_pos_in=0.0,
+    Kp_act_pos_out=0.0,
+    Ki_act_pos_out=0.0,
+    Kd_act_pos_out=0.0,
+    Kp_act_neg_in=0.001,
+    Ki_act_neg_in=0.001,
+    Kd_act_neg_in=0.001,
+    Kp_act_neg_out=0.001,
+    Ki_act_neg_out=0.001,
+    Kd_act_neg_out=0.001,
+    Ka=1,
+)
+
+
 print(color("[INPUT] Retrain Model:", "blue"))
 models = sorted(os.listdir(f"{get_pkg_path('pneu_rl')}/models"))
 for i, model in enumerate(models):
@@ -44,6 +61,22 @@ kwargs = load_yaml(model_name)
 kwargs["parent_model"] = model_name
 kwargs["retrain_epi"] = 200
 kwargs["type"] = "simulation" if obs_mode == "1" else "real"
+
+if obs_mode == "2":
+    print(color("[INPUT] PID on for this real retrain?", "blue"))
+    print(color("\t1. Yes", "yellow"))
+    print(color("\t2. No", "yellow"))
+    print(color("\t---", "blue"))
+    pid_mode = input(color("\tPID: ", "blue"))
+    delete_lines(5)
+    if pid_mode == "1":
+        kwargs["pid"] = REAL_RETRAIN_PID.copy()
+        print("[ INFO] PID: enabled for this real retrain")
+    elif pid_mode == "2":
+        kwargs["pid"] = None
+        print("[ INFO] PID: disabled for this real retrain")
+    else:
+        raise ValueError(color(f"[ERROR] Unknown PID mode: {pid_mode}", "red"))
 
 # Keep the selected model's reference distribution for sim2real.
 # For 0528Ours this matches the no-PID simulation training condition.

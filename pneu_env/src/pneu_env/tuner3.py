@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from scipy import optimize
 
-from pneu_tune.sim2 import PneuSim
+from pneu_tune.sim3 import PneuSim
 from pneu_tune.utils import get_pkg_path
 
 
@@ -30,24 +30,13 @@ OPTIMIZER_OPTIONS = dict(
 ERROR_WEIGHTS = dict(
     press_pos=1.5,
     press_neg=1.0,
-    flow_out=0.1,
-    flow_in=0.1,
+    flow1=0.1,
+    flow2=0.1,
 )
 COEFF_MIN = 1e-12
-PUMP_INIT_BOUNDS = (1.0, 300.0)
 
 
-class PneuSimTuner2:
-    """
-    Discharge-coefficient tuner for lib2/sim2.
-
-    Assumptions:
-    - real flow1 measures positive chamber outflow to atmosphere (valve_pos)
-    - real flow2 measures negative chamber inflow from atmosphere (valve_neg)
-    - real ctrl1/ctrl2 are physical valve commands in [0, 1]
-    - sim2 consumes the same physical control commands directly in [0, 1]
-    """
-
+class PneuSimTuner3:
     def __init__(
         self,
         data_names: List[str],
@@ -55,64 +44,24 @@ class PneuSimTuner2:
         clip_start_sec: Optional[float] = None,
         clip_end_sec: Optional[float] = None,
         clip_tail_sec: Optional[float] = None,
-        fixed_pump_init: Optional[tuple[float, float]] = None,
-        pump_init_bounds: tuple[float, float] = PUMP_INIT_BOUNDS,
         verbose: bool = True,
     ):
         self.clip_start_sec = clip_start_sec
         self.clip_end_sec = clip_end_sec
         self.clip_tail_sec = clip_tail_sec
-        self.fixed_pump_init = fixed_pump_init
-        self.pump_init_bounds = self._validate_pump_init_bounds(pump_init_bounds)
         self.verbose = bool(verbose)
 
         self.datas = self.load_datas(data_names)
         self.iter_num = 0
-        self.params = self._default_param_guess()
+        self.params = np.asarray(INITIAL_GUESS, dtype=np.float64)
         self._sims = {data_name: self._make_sim(data) for data_name, data in self.datas.items()}
-
-    def _default_pump_state_guess(self) -> tuple[float, float]:
-        first_key = next(iter(self.datas))
-        data = self.datas[first_key]
-        pos_press = float(data["press_pos"][0])
-        neg_press = float(data["press_neg"][0])
-        p1_init = 0.98947 * pos_press + 0.27407 * neg_press - 0.30175
-        p2_init = 0.023686 * pos_press + 0.017746 * neg_press + 0.47436
-        return p1_init, p2_init
-
-    def _default_param_guess(self) -> np.ndarray:
-        p1_init, p2_init = self._default_pump_state_guess()
-        return np.asarray([INITIAL_GUESS[0], INITIAL_GUESS[1], p1_init, p2_init], dtype=np.float64)
-
-    def _validate_pump_init_bounds(self, bounds: tuple[float, float]) -> tuple[float, float]:
-        low, high = (float(bounds[0]), float(bounds[1]))
-        if not np.isfinite(low) or not np.isfinite(high) or low <= 0.0 or low >= high:
-            raise ValueError(f"pump_init_bounds must satisfy 0 < low < high, got: {bounds}")
-        return low, high
-
-    def _sanitize_coeffs(self, params: np.ndarray) -> np.ndarray:
-        arr = np.asarray(params, dtype=np.float64).copy()
-        if arr.shape != (4,):
-            raise ValueError(f"Pump coeff params must have shape (4,), got {arr.shape}")
-        arr[0] = max(float(arr[0]), COEFF_MIN)
-        arr[1] = max(float(arr[1]), COEFF_MIN)
-        arr[2] = float(np.clip(arr[2], self.pump_init_bounds[0], self.pump_init_bounds[1]))
-        arr[3] = float(np.clip(arr[3], self.pump_init_bounds[0], self.pump_init_bounds[1]))
-        return arr
-
-    def _expand_params(self, params: np.ndarray) -> np.ndarray:
-        arr = np.asarray(params, dtype=np.float64)
-        if arr.shape == (2,) and self.fixed_pump_init is not None:
-            p1_init, p2_init = self.fixed_pump_init
-            arr = np.asarray([arr[0], arr[1], p1_init, p2_init], dtype=np.float64)
-        return self._sanitize_coeffs(arr)
 
     def _resolve_data_path(self, data_name: str) -> Path:
         candidate = Path(data_name)
         if candidate.exists():
             return candidate
 
-        exp_dir = Path(get_pkg_path("pneu_env")) / "exp"
+        exp_dir = Path(get_pkg_path("pneu_tune")) / "exp"
         resolved = exp_dir / (candidate.name if candidate.suffix.lower() == ".csv" else f"{candidate.name}.csv")
         if resolved.exists():
             return resolved
@@ -126,7 +75,7 @@ class PneuSimTuner2:
             return "time"
         raise ValueError(f"{path}: missing required time column: curr_time/time")
 
-    def _unit_to_sim2_ctrl(self, ctrl_unit: np.ndarray) -> np.ndarray:
+    def _unit_to_sim3_ctrl(self, ctrl_unit: np.ndarray) -> np.ndarray:
         return np.clip(np.asarray(ctrl_unit, dtype=np.float64), 0.0, 1.0)
 
     def _ctrl_at_time(
@@ -143,7 +92,7 @@ class PneuSimTuner2:
         while idx + 1 < n and t >= float(traj_time[idx + 1]):
             idx += 1
 
-        return self._unit_to_sim2_ctrl(ctrls_unit[idx]), idx
+        return self._unit_to_sim3_ctrl(ctrls_unit[idx]), idx
 
     def _make_sim(self, data: Dict[str, np.ndarray]) -> PneuSim:
         return PneuSim(
@@ -153,25 +102,27 @@ class PneuSimTuner2:
             scale=False,
             init_pos_press=float(data["press_pos"][0]),
             init_neg_press=float(data["press_neg"][0]),
+            init_act_pos_press=float(data["act_pos_press"][0]),
+            init_act_neg_press=float(data["act_neg_press"][0]),
         )
 
     def _reset_sim(self, sim: PneuSim, data: Dict[str, np.ndarray]) -> None:
-        sim.set_init_press_with_pump_state(
+        sim.set_init_press(
             init_pos_press=float(data["press_pos"][0]),
             init_neg_press=float(data["press_neg"][0]),
-            p1_init=float(self.params[2]),
-            p2_init=float(self.params[3]),
+            init_act_pos_press=float(data["act_pos_press"][0]),
+            init_act_neg_press=float(data["act_neg_press"][0]),
         )
         sim.obs_buf.clear()
 
-    def _flow_labels(self) -> tuple[str, str]:
-        return "positive chamber valve outflow", "negative chamber valve inflow"
+    def _sim_flow1_flow2_lpm(self, sim: PneuSim) -> tuple[float, float]:
+        mf = sim.get_mass_flowrate()
+        if len(mf) < 6:
+            raise ValueError(f"sim3 mass-flow vector must have at least 6 values, got {len(mf)}")
 
-    def _sim_target_flows_lpm(self, sim: PneuSim) -> tuple[float, float]:
-        mf = sim.get_mean_mass_flowrate()
-        flow_out = float(mf["valve_pos"] * 60000.0 / STD_RHO)
-        flow_in = float(mf["valve_neg"] * 60000.0 / STD_RHO)
-        return flow_out, flow_in
+        flow1 = float(mf[4] * 60000.0 / STD_RHO)
+        flow2 = float(mf[5] * 60000.0 / STD_RHO)
+        return flow1, flow2
 
     def tune(
         self,
@@ -182,50 +133,25 @@ class PneuSimTuner2:
         if options:
             tune_options.update(options)
 
-        initial_guess = np.asarray(initial_guess, dtype=np.float64)
-        if initial_guess.shape == (2,) and self.fixed_pump_init is None:
-            p1_init, p2_init = self._default_pump_state_guess()
-            initial_guess = np.asarray([initial_guess[0], initial_guess[1], p1_init, p2_init], dtype=np.float64)
-        elif initial_guess.shape == (4,) and self.fixed_pump_init is not None:
-            initial_guess = initial_guess[:2]
-        elif initial_guess.shape not in ((2,), (4,)):
-            raise ValueError(
-                f"initial_guess must have shape (2,) or (4,), got {initial_guess.shape}"
-            )
-
-        if self.fixed_pump_init is not None:
-            initial_guess = np.maximum(initial_guess, COEFF_MIN)
-            bounds = optimize.Bounds(
-                [COEFF_MIN, COEFF_MIN],
-                [np.inf, np.inf],
-            )
-        else:
-            initial_guess = self._expand_params(initial_guess)
-            bounds = optimize.Bounds(
-                [COEFF_MIN, COEFF_MIN, self.pump_init_bounds[0], self.pump_init_bounds[0]],
-                [np.inf, np.inf, self.pump_init_bounds[1], self.pump_init_bounds[1]],
-            )
-
-        self.params = self._expand_params(initial_guess)
-
+        initial_guess = np.maximum(np.asarray(initial_guess, dtype=np.float64), COEFF_MIN)
         return optimize.minimize(
             self.objective_function,
             initial_guess,
             method="Nelder-Mead",
-            bounds=bounds,
+            bounds=optimize.Bounds([COEFF_MIN, COEFF_MIN], [np.inf, np.inf]),
             tol=1e-3,
             options=tune_options,
         )
 
     def objective_function(self, params: np.ndarray) -> float:
         self.iter_num += 1
-        self.params = self._expand_params(params)
+        self.params = np.maximum(np.asarray(params, dtype=np.float64), COEFF_MIN)
         total_error = 0.0
 
         for data_name, data in self.datas.items():
             if self.verbose:
                 print()
-                print(f"[ INFO] Tuner2 ==> Data name: {data_name}")
+                print(f"[ INFO] Tuner3 ==> Data name: {data_name}")
 
             sim = self._sims[data_name]
             sim.set_discharge_coeff(
@@ -237,7 +163,7 @@ class PneuSimTuner2:
 
         if self.verbose:
             print()
-            print(f"[ INFO] Tuner2 (iter: {self.iter_num}) ==> Coeff: {self.params} err: {total_error}")
+            print(f"[ INFO] Tuner3 (iter: {self.iter_num}) ==> Coeff: {self.params} err: {total_error}")
             print()
 
         return float(total_error)
@@ -247,16 +173,16 @@ class PneuSimTuner2:
         ctrls_unit = data["ctrls_unit"]
         real_press_pos = data["press_pos"]
         real_press_neg = data["press_neg"]
-        real_flow_out = data["flow1"]
-        real_flow_in = data["flow2"]
+        real_flow1 = data["flow1"]
+        real_flow2 = data["flow2"]
         t_end = float(traj_time[-1])
 
         n_est = max(1, int(np.ceil(t_end * SIM_FREQ)) + 4)
         sim_time = np.empty(n_est, dtype=np.float64)
         sim_press_pos = np.empty(n_est, dtype=np.float64)
         sim_press_neg = np.empty(n_est, dtype=np.float64)
-        sim_flow_out = np.empty(n_est, dtype=np.float64)
-        sim_flow_in = np.empty(n_est, dtype=np.float64)
+        sim_flow1 = np.empty(n_est, dtype=np.float64)
+        sim_flow2 = np.empty(n_est, dtype=np.float64)
 
         idx = 0
         curr_time = 0.0
@@ -265,21 +191,21 @@ class PneuSimTuner2:
         while curr_time < t_end:
             act, idx = self._ctrl_at_time(traj_time, ctrls_unit, curr_time, idx)
             curr_obs, _ = sim.observe(act)
-            flow_out, flow_in = self._sim_target_flows_lpm(sim)
+            flow1, flow2 = self._sim_flow1_flow2_lpm(sim)
 
             if k >= n_est:
                 sim_time = np.resize(sim_time, n_est * 2)
                 sim_press_pos = np.resize(sim_press_pos, n_est * 2)
                 sim_press_neg = np.resize(sim_press_neg, n_est * 2)
-                sim_flow_out = np.resize(sim_flow_out, n_est * 2)
-                sim_flow_in = np.resize(sim_flow_in, n_est * 2)
+                sim_flow1 = np.resize(sim_flow1, n_est * 2)
+                sim_flow2 = np.resize(sim_flow2, n_est * 2)
                 n_est *= 2
 
             sim_time[k] = float(curr_obs[0])
             sim_press_pos[k] = float(curr_obs[1])
             sim_press_neg[k] = float(curr_obs[2])
-            sim_flow_out[k] = flow_out
-            sim_flow_in[k] = flow_in
+            sim_flow1[k] = flow1
+            sim_flow2[k] = flow2
 
             curr_time = sim_time[k]
             k += 1
@@ -288,17 +214,16 @@ class PneuSimTuner2:
 
         press_pos_error = ERROR_WEIGHTS["press_pos"] * np.mean(np.abs(sim_press_pos[:k][sim_idx] - real_press_pos[real_idx]))
         press_neg_error = ERROR_WEIGHTS["press_neg"] * np.mean(np.abs(sim_press_neg[:k][sim_idx] - real_press_neg[real_idx]))
-        flow_out_error = ERROR_WEIGHTS["flow_out"] * np.mean(np.abs(sim_flow_out[:k][sim_idx] - real_flow_out[real_idx]))
-        flow_in_error = ERROR_WEIGHTS["flow_in"] * np.mean(np.abs(sim_flow_in[:k][sim_idx] - real_flow_in[real_idx]))
-        error = press_pos_error + press_neg_error + flow_out_error + flow_in_error
+        flow1_error = ERROR_WEIGHTS["flow1"] * np.mean(np.abs(sim_flow1[:k][sim_idx] - real_flow1[real_idx]))
+        flow2_error = ERROR_WEIGHTS["flow2"] * np.mean(np.abs(sim_flow2[:k][sim_idx] - real_flow2[real_idx]))
+        error = press_pos_error + press_neg_error + flow1_error + flow2_error
 
         if self.verbose:
-            flow_out_label, flow_in_label = self._flow_labels()
-            print(f"[ INFO] Tuner2 ==> Pressure pos error: {press_pos_error}")
-            print(f"[ INFO] Tuner2 ==> Pressure neg error: {press_neg_error}")
-            print(f"[ INFO] Tuner2 ==> {flow_out_label} error: {flow_out_error}")
-            print(f"[ INFO] Tuner2 ==> {flow_in_label} error: {flow_in_error}")
-            print(f"[ INFO] Tuner2 ==> Total error: {error}")
+            print(f"[ INFO] Tuner3 ==> Pressure pos error: {press_pos_error}")
+            print(f"[ INFO] Tuner3 ==> Pressure neg error: {press_neg_error}")
+            print(f"[ INFO] Tuner3 ==> flow1 error: {flow1_error}")
+            print(f"[ INFO] Tuner3 ==> flow2 error: {flow2_error}")
+            print(f"[ INFO] Tuner3 ==> Total error: {error}")
 
         return float(error)
 
@@ -331,7 +256,7 @@ class PneuSimTuner2:
         return choose, short_idx
 
     def get_coeff(self) -> list[float]:
-        return list(self._sanitize_coeffs(self.params))
+        return list(np.maximum(np.asarray(self.params, dtype=np.float64), COEFF_MIN))
 
     def load_datas(self, data_names: List[str]) -> Dict[str, Dict[str, np.ndarray]]:
         datas: Dict[str, Dict[str, np.ndarray]] = {}
@@ -345,14 +270,17 @@ class PneuSimTuner2:
                 time_col,
                 "press_pos",
                 "press_neg",
-                "ctrl1",
-                "ctrl2",
-                "flow1",
-                "flow2",
+                "ctrl1", "ctrl2", "ctrl3", "ctrl4", "ctrl5", "ctrl6",
+                "flow1", "flow2",
             ]
             missing = [c for c in required_cols if c not in df.columns]
             if missing:
                 raise ValueError(f"{path}: missing required columns: {missing}")
+
+            if "act_pos_press" not in df.columns:
+                df["act_pos_press"] = 101.325
+            if "act_neg_press" not in df.columns:
+                df["act_neg_press"] = 101.325
 
             df = df.sort_values(time_col).reset_index(drop=True)
             t0 = float(df[time_col].iloc[0])
@@ -377,12 +305,18 @@ class PneuSimTuner2:
             ctrls_unit = np.column_stack([
                 np.clip(df["ctrl1"].to_numpy(dtype=np.float64), 0.0, 1.0),
                 np.clip(df["ctrl2"].to_numpy(dtype=np.float64), 0.0, 1.0),
+                np.clip(df["ctrl3"].to_numpy(dtype=np.float64), 0.0, 1.0),
+                np.clip(df["ctrl4"].to_numpy(dtype=np.float64), 0.0, 1.0),
+                np.clip(df["ctrl5"].to_numpy(dtype=np.float64), 0.0, 1.0),
+                np.clip(df["ctrl6"].to_numpy(dtype=np.float64), 0.0, 1.0),
             ]).astype(np.float64)
 
             datas[path.stem] = {
                 "curr_time": curr_time,
                 "press_pos": df["press_pos"].to_numpy(dtype=np.float64),
                 "press_neg": df["press_neg"].to_numpy(dtype=np.float64),
+                "act_pos_press": df["act_pos_press"].to_numpy(dtype=np.float64),
+                "act_neg_press": df["act_neg_press"].to_numpy(dtype=np.float64),
                 "ctrls_unit": ctrls_unit,
                 "flow1": df["flow1"].to_numpy(dtype=np.float64),
                 "flow2": df["flow2"].to_numpy(dtype=np.float64),
@@ -402,7 +336,7 @@ class PneuSimTuner2:
 
         for data_name, data in self.datas.items():
             print()
-            print(f"[ INFO] Tuner2 ==> Data name: {data_name}")
+            print(f"[ INFO] Tuner3 ==> Data name: {data_name}")
 
             sim = self._sims[data_name]
             sim.set_discharge_coeff(
@@ -419,8 +353,8 @@ class PneuSimTuner2:
             sim_time = np.empty(n_est, dtype=np.float64)
             sim_press_pos = np.empty(n_est, dtype=np.float64)
             sim_press_neg = np.empty(n_est, dtype=np.float64)
-            sim_flow_out = np.empty(n_est, dtype=np.float64)
-            sim_flow_in = np.empty(n_est, dtype=np.float64)
+            sim_flow1 = np.empty(n_est, dtype=np.float64)
+            sim_flow2 = np.empty(n_est, dtype=np.float64)
 
             idx = 0
             curr_time = 0.0
@@ -429,29 +363,29 @@ class PneuSimTuner2:
             while curr_time < t_end:
                 act, idx = self._ctrl_at_time(traj_time, ctrls_unit, curr_time, idx)
                 curr_obs, _ = sim.observe(act)
-                flow_out, flow_in = self._sim_target_flows_lpm(sim)
+                flow1, flow2 = self._sim_flow1_flow2_lpm(sim)
 
                 if k >= n_est:
                     sim_time = np.resize(sim_time, n_est * 2)
                     sim_press_pos = np.resize(sim_press_pos, n_est * 2)
                     sim_press_neg = np.resize(sim_press_neg, n_est * 2)
-                    sim_flow_out = np.resize(sim_flow_out, n_est * 2)
-                    sim_flow_in = np.resize(sim_flow_in, n_est * 2)
+                    sim_flow1 = np.resize(sim_flow1, n_est * 2)
+                    sim_flow2 = np.resize(sim_flow2, n_est * 2)
                     n_est *= 2
 
                 sim_time[k] = float(curr_obs[0])
                 sim_press_pos[k] = float(curr_obs[1])
                 sim_press_neg[k] = float(curr_obs[2])
-                sim_flow_out[k] = flow_out
-                sim_flow_in[k] = flow_in
+                sim_flow1[k] = flow1
+                sim_flow2[k] = flow2
                 curr_time = sim_time[k]
                 k += 1
 
             sim_time = sim_time[:k]
             sim_press_pos = sim_press_pos[:k]
             sim_press_neg = sim_press_neg[:k]
-            sim_flow_out = sim_flow_out[:k]
-            sim_flow_in = sim_flow_in[:k]
+            sim_flow1 = sim_flow1[:k]
+            sim_flow2 = sim_flow2[:k]
 
             fig1 = plt.figure(figsize=(12, 6))
             ax1 = fig1.add_subplot(2, 1, 1)
@@ -470,22 +404,21 @@ class PneuSimTuner2:
             fig2 = plt.figure(figsize=(12, 6))
             ax3 = fig2.add_subplot(2, 1, 1)
             ax4 = fig2.add_subplot(2, 1, 2)
-            flow_out_label, flow_in_label = self._flow_labels()
-            ax3.plot(traj_time, data["flow1"], label=f"real_{flow_out_label}")
-            ax3.plot(sim_time, sim_flow_out, label=f"sim_{flow_out_label}")
-            ax3.set_title(f"{data_name} - {flow_out_label}")
+            ax3.plot(traj_time, data["flow1"], label="real_flow1")
+            ax3.plot(sim_time, sim_flow1, label="sim_flow1")
+            ax3.set_title(f"{data_name} - Flow1")
             ax3.grid(True)
             ax3.legend()
-            ax4.plot(traj_time, data["flow2"], label=f"real_{flow_in_label}")
-            ax4.plot(sim_time, sim_flow_in, label=f"sim_{flow_in_label}")
-            ax4.set_title(f"{data_name} - {flow_in_label}")
+            ax4.plot(traj_time, data["flow2"], label="real_flow2")
+            ax4.plot(sim_time, sim_flow2, label="sim_flow2")
+            ax4.set_title(f"{data_name} - Flow2")
             ax4.grid(True)
             ax4.legend()
 
             fig_handles.extend([fig1, fig2])
 
         if save_name is not None:
-            save_dir = Path(get_pkg_path("pneu_env")) / "data" / "discharge_coeff_result" / save_name
+            save_dir = Path(get_pkg_path("pneu_tune")) / "data" / "discharge_coeff_result" / save_name
             save_dir.mkdir(parents=True, exist_ok=True)
             for i, fig in enumerate(fig_handles, start=1):
                 fig.savefig(save_dir / f"verify_{i}.png", dpi=150, bbox_inches="tight")

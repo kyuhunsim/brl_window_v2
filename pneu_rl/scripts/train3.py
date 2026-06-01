@@ -76,8 +76,8 @@ if train_mode == '1':
                 neg_diff_rwd_coeff = 0.0,
                 # 2026-05-28:
                 # lib3에서 RL+PID의 tracking은 유지하면서도 제어 진동과 chamber drift를 줄이기 위한 약한 보상 항
-                action_delta_rwd_coeff = 0.02,
-                conflict_rwd_coeff = 0.03,
+                action_delta_rwd_coeff = 0.08,
+                conflict_rwd_coeff = 0.15,
                 chamber_reserve_rwd_coeff = 0.002,
                 chamber_margin_kpa = 15.0,
                 chamber_deadband_kpa = 5.0,
@@ -95,7 +95,7 @@ if train_mode == '1':
             buffer_size = 50e4,
             batch_size = 128,
             epoch = 1,
-            horizon = 512,
+            horizon = 2048,
             start_epi = 10,
             max_grad_norm = 0.5,
             log_std_min = -10,

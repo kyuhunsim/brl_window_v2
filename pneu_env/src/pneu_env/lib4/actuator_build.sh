@@ -1,0 +1,1 @@
+g++ -shared -o libactuator.so -fPIC soft_actuator_wrapper.cpp soft_actuator.cpp

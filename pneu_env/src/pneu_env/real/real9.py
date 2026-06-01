@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 
+from pneu_env.pid import ActuatorPressurePID
 from pneu_env.real.real_act import PneuRealAct
 
 
@@ -58,6 +59,17 @@ class PneuReal:
         self._debug_every = int(
             os.getenv("PNEU_REAL9_DEBUG_EVERY", os.getenv("PNEU_REAL8_DEBUG_EVERY", "0"))
         )
+        self.is_pid = False
+        self.is_anti_windup = False
+        self.obs = np.array(
+            [
+                init_pos_press,
+                init_neg_press,
+                init_act_pos_press,
+                init_act_neg_press,
+            ],
+            dtype=np.float64,
+        )
         self.set_init_press(
             init_pos_press,
             init_neg_press,
@@ -69,7 +81,7 @@ class PneuReal:
         return getattr(self.backend, name)
 
     def _split_ctrl(self, ctrl: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        ctrl = np.asarray(ctrl, dtype=np.float64).reshape(-1)
+        ctrl = np.asarray(ctrl, dtype=np.float64).reshape(-1).copy()
         if ctrl.size == 2:
             ctrl = np.array([ctrl[0], ctrl[1], 0.0, 0.0, 0.0, 0.0], dtype=np.float64)
         elif ctrl.size != 6:
@@ -104,6 +116,27 @@ class PneuReal:
             goal_posneg = goal[:2]
         else:
             goal_posneg = np.array([101.325, 101.325], dtype=np.float64)
+
+        ctrl = np.asarray(ctrl, dtype=np.float64).reshape(-1).copy()
+        if ctrl.size == 2:
+            ctrl = np.array([ctrl[0], ctrl[1], 0.0, 0.0, 0.0, 0.0], dtype=np.float64)
+        elif ctrl.size != 6:
+            raise ValueError(f"ctrl must be length 2 or 6, got {ctrl.size}")
+        if not np.all(np.isfinite(ctrl)):
+            ctrl = np.nan_to_num(ctrl, nan=0.0, posinf=1.0, neginf=0.0)
+
+        if self.is_pid:
+            pid_delta = self.pid.get_action(obs=self.obs[2:4], ref=goal_posneg)
+            ctrl[2:6] += pid_delta
+            if self.is_anti_windup:
+                original_ctrl = ctrl.copy()
+
+        ctrl = np.clip(ctrl, 0.0, 1.0)
+        if self.is_anti_windup:
+            self.pid.anti_windup(
+                ctrl=original_ctrl[2:6],
+                sat_ctrl=ctrl[2:6],
+            )
 
         main_ctrl, act_ctrls = self._split_ctrl(ctrl)
         ctrl_unit = np.r_[main_ctrl, act_ctrls]
@@ -159,6 +192,7 @@ class PneuReal:
             ],
             dtype=np.float64,
         )
+        self.obs = next_obs[1:5].copy()
 
         press_vec = next_obs[1:5].copy()
         if np.all(np.isfinite(press_vec)):
@@ -294,6 +328,15 @@ class PneuReal:
             [self.backend.pos_press, self.backend.neg_press],
             dtype=np.float32,
         )
+        self.obs = np.array(
+            [
+                self.backend.pos_press,
+                self.backend.neg_press,
+                self.backend.act_pos_press,
+                self.backend.act_neg_press,
+            ],
+            dtype=np.float64,
+        )
 
     def set_offset(
         self,
@@ -306,3 +349,45 @@ class PneuReal:
 
     def set_volume(self, vol1: float, vol2: float) -> None:
         del vol1, vol2
+
+    def set_pid(
+        self,
+        Kp_act_pos_in: float,
+        Ki_act_pos_in: float,
+        Kd_act_pos_in: float,
+        Kp_act_pos_out: float,
+        Ki_act_pos_out: float,
+        Kd_act_pos_out: float,
+        Kp_act_neg_in: float,
+        Ki_act_neg_in: float,
+        Kd_act_neg_in: float,
+        Kp_act_neg_out: float,
+        Ki_act_neg_out: float,
+        Kd_act_neg_out: float,
+    ) -> None:
+        self.is_pid = True
+        self.pid = ActuatorPressurePID(
+            Kp_act_pos_in,
+            Ki_act_pos_in,
+            Kd_act_pos_in,
+            Kp_act_pos_out,
+            Ki_act_pos_out,
+            Kd_act_pos_out,
+            Kp_act_neg_in,
+            Ki_act_neg_in,
+            Kd_act_neg_in,
+            Kp_act_neg_out,
+            Ki_act_neg_out,
+            Kd_act_neg_out,
+            freq=self.freq,
+        )
+
+    def set_anti_windup(self, Ka: float) -> None:
+        if not self.is_pid:
+            raise RuntimeError("PID controller is not turned on.")
+        self.is_anti_windup = True
+        self.pid.set_anti_windup(Ka)
+
+    def reset_pid(self) -> None:
+        if self.is_pid:
+            self.pid.reset()

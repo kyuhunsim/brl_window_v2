@@ -1,3 +1,4 @@
+import copy
 import os
 
 from collections import deque
@@ -71,17 +72,17 @@ viz_kwargs = dict(
         ),
         pid = dict(
             Kp_act_pos_in = 0.0,
-            Ki_act_pos_in = 0.01,
+            Ki_act_pos_in = 0.0,
             Kd_act_pos_in = 0.0,
             Kp_act_pos_out = 0.0,
-            Ki_act_pos_out = 0.01,
+            Ki_act_pos_out = 0.0,
             Kd_act_pos_out = 0.0,
-            Kp_act_neg_in = 0.0,
-            Ki_act_neg_in = 0.01,
-            Kd_act_neg_in = 0.0,
-            Kp_act_neg_out = 0.0,
-            Ki_act_neg_out = 0.01,
-            Kd_act_neg_out = 0.0,
+            Kp_act_neg_in = 0.001,
+            Ki_act_neg_in = 0.001,
+            Kd_act_neg_in = 0.001,
+            Kp_act_neg_out = 0.001,
+            Ki_act_neg_out = 0.001,
+            Kd_act_neg_out = 0.001,
             Ka = 1
         )
     ),
@@ -194,7 +195,15 @@ def infos_to_datas(infos: deque):
 def calc_metrics(datas):
     return compute_tracking_metrics(datas)
 
-def save_datas(datas, model_name, obs_mode, ref_mode, save_name=None, kwargs=None):
+def save_datas(
+    datas,
+    model_name,
+    obs_mode,
+    ref_mode,
+    save_name=None,
+    kwargs=None,
+    pid_enabled=False,
+):
     if save_name is not None:
         print('[ INFO] Saving data starts ...')
     
@@ -209,14 +218,22 @@ def save_datas(datas, model_name, obs_mode, ref_mode, save_name=None, kwargs=Non
     metrics = calc_metrics(datas)
     print_tracking_metrics(metrics)
 
-    kwargs["model_name"] = model_name
-    kwargs["obs_mode"] = obs_mode
-    kwargs["ref_mode"] = ref_mode
-    kwargs["metrics"] = metrics
+    save_cfg = copy.deepcopy(kwargs) if kwargs is not None else {}
+    save_cfg["model_name"] = model_name
+    save_cfg["obs_mode"] = obs_mode
+    save_cfg["ref_mode"] = ref_mode
+    save_cfg["metrics"] = metrics
+    save_cfg["runtime"] = dict(
+        pid_enabled=bool(pid_enabled),
+        pid_label="On" if pid_enabled else "Off",
+    )
+    if "env" not in save_cfg:
+        save_cfg["env"] = {}
+    save_cfg["env"]["pid_enabled"] = bool(pid_enabled)
 
     if save_name is not None:
         with open(f'{get_pkg_path("pneu_rl")}/exp/{save_name}/cfg.yaml', 'w') as f:
-            yaml.dump(kwargs, f)
+            yaml.dump(save_cfg, f)
     
     if save_name is not None:
         print('[ INFO] Saving data Done!')
@@ -404,7 +421,9 @@ if __name__ == '__main__':
     pid_mode = input(color('\tPID: ', 'blue')) 
     delete_lines(5)
 
-    if pid_mode == '1':
+    pid_enabled = pid_mode == '1'
+
+    if pid_enabled:
         print(f'[ INFO] PID: On')
     else:
         print(f'[ INFO] PID: Off')
@@ -434,7 +453,7 @@ if __name__ == '__main__':
         **kwargs['env']
     )
     
-    if pid_mode == '1':
+    if pid_enabled:
         env.set_pid(**viz_kwargs['env']['pid'])
     
 
@@ -464,14 +483,30 @@ if __name__ == '__main__':
         env.close()
 
         datas = infos_to_datas(infos)
-        save_datas(datas, model_name, obs_type, ref_type, save_name, viz_kwargs)
+        save_datas(
+            datas,
+            model_name,
+            obs_type,
+            ref_type,
+            save_name,
+            viz_kwargs,
+            pid_enabled=pid_enabled,
+        )
         plot_datas(datas, save_name)
 
     except KeyboardInterrupt:
         print()
         print(color('[ INFO] Keyboard interrupt received.', 'red'))
         datas = infos_to_datas(infos)
-        save_datas(datas, model_name, obs_type, ref_type, save_name, viz_kwargs)
+        save_datas(
+            datas,
+            model_name,
+            obs_type,
+            ref_type,
+            save_name,
+            viz_kwargs,
+            pid_enabled=pid_enabled,
+        )
         plot_datas(datas, save_name)
     
     finally:
