@@ -17,6 +17,7 @@ from pneu_ref.traj_ref import TrajRef
 from pneu_env.env3 import PneuEnv3
 from pneu_env.sim3 import PneuSim
 from pneu_env.pred3 import PneuPred
+from pneu_env.real.real9 import PneuReal
 from pneu_rl.sac_with_loss import SAC
 from pneu_utils.utils import (
     delete_lines, 
@@ -51,6 +52,10 @@ viz_kwargs = dict(
             offset_neg = 0,
             offset_act_pos = 0,
             offset_act_neg = 0,
+            scale = True
+        ),
+        real = dict(
+            freq = 50,
             scale = True
         ),
         pred = dict(
@@ -174,6 +179,12 @@ def infos_to_datas(infos: deque):
         ctrl_act_pos_out = deque(),
         ctrl_act_neg_in = deque(),
         ctrl_act_neg_out = deque(),
+        flowrate1 = deque(),
+        flowrate2 = deque(),
+        flowrate3 = deque(),
+        flowrate4 = deque(),
+        flowrate5 = deque(),
+        flowrate6 = deque(),
     )
     for entry in infos:
         obs = entry["obs"] if "obs" in entry else entry
@@ -190,6 +201,8 @@ def infos_to_datas(infos: deque):
         datas['ctrl_act_pos_out'].append(obs['ctrl_act_pos_out'])
         datas['ctrl_act_neg_in'].append(obs['ctrl_act_neg_in'])
         datas['ctrl_act_neg_out'].append(obs['ctrl_act_neg_out'])
+        for key in ('flowrate1', 'flowrate2', 'flowrate3', 'flowrate4', 'flowrate5', 'flowrate6'):
+            datas[key].append(obs.get(key, np.nan))
     return datas
 
 def calc_metrics(datas):
@@ -207,7 +220,7 @@ def save_datas(
     if save_name is not None:
         print('[ INFO] Saving data starts ...')
     
-    obs_mode = "simulation" 
+    obs_mode = "real" if obs_mode.lower() == "real" else "simulation"
 
     if save_name is not None:
         os.makedirs(f'{get_pkg_path("pneu_rl")}/exp/{save_name}')
@@ -406,13 +419,17 @@ if __name__ == '__main__':
 
     print(color('[INPUT] Observation Mode:', 'blue'))
     print(color('\t1. Sim', 'yellow'))
+    print(color('\t2. Real', 'yellow'))
     print(color('\t---', 'blue'))
     obs_mode = input(color('\tOBS: ', 'blue')) 
-    obs_type = 'Simulation'
-    delete_lines(4)
-    if obs_mode != '1':
-        raise ValueError(color('[ERROR] quick_viz3 currently supports Simulation only.', 'red'))
-    print(f'[ INFO] Observation Mode: Simulation')
+    delete_lines(5)
+    if obs_mode == '1':
+        obs_type = 'Simulation'
+    elif obs_mode == '2':
+        obs_type = 'Real'
+    else:
+        raise ValueError(color(f'[ERROR] Unknown observation mode: {obs_mode}', 'red'))
+    print(f'[ INFO] Observation Mode: {obs_type}')
 
     print(color('[INPUT] PID on?', 'blue'))
     print(color('\t1. Yes', 'yellow'))
@@ -442,7 +459,10 @@ if __name__ == '__main__':
         save_name = None
     print(f'[ INFO] Data logging: {"False" if data_log == "2" else f"{save_name}.csv"}')
 
-    obs = PneuSim(**viz_kwargs["env"]["sim"])
+    if obs_mode == '1':
+        obs = PneuSim(**viz_kwargs["env"]["sim"])
+    else:
+        obs = PneuReal(**viz_kwargs["env"]["real"])
     pred = PneuPred(**viz_kwargs["env"]["pred"])
 
     obs.set_init_press(**viz_kwargs["env"]["init_press"] )

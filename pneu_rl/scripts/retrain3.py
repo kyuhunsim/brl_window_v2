@@ -58,6 +58,11 @@ delete_lines(5)
 
 kwargs = load_yaml(model_name)
 
+kwargs["env"]["rwd_kwargs"].update(
+    action_delta_rwd_coeff=0.08,
+    conflict_rwd_coeff=0.15,
+)
+
 kwargs["parent_model"] = model_name
 kwargs["retrain_epi"] = 200
 kwargs["type"] = "simulation" if obs_mode == "1" else "real"

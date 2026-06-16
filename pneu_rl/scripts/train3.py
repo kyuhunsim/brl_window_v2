@@ -28,6 +28,32 @@ delete_lines(5)
 episode_carry_state = episode_carry_mode != '2'
 print(f'[ INFO] Episode carry state: {"On" if episode_carry_state else "Off"}')
 
+print(color('[INPUT] Chamber control mode?', 'blue'))
+print(color('\t1. RL control (6-control policy)', 'yellow'))
+print(color('\t2. Steady pressure regulator (4-control policy)', 'yellow'))
+print(color('\t---', 'blue'))
+chamber_ctrl_mode = input(color('\tCH: ', 'blue'))
+delete_lines(5)
+if chamber_ctrl_mode == '1':
+    fixed_chamber_ctrl = None
+    steady_chamber_ctrl = None
+    print('[ INFO] Chamber control: RL policy output')
+elif chamber_ctrl_mode == '2':
+    fixed_chamber_ctrl = None
+    steady_chamber_ctrl = dict(
+        pos_target=180.0,
+        neg_target=25.0,
+        kp=0.04,
+        ki=0.01,
+        deadband=1.0,
+        integral_limit=100.0,
+        min_open=0.15,
+        max_open=0.85,
+    )
+    print('[ INFO] Chamber control: steady pressure regulator (pos 180.0 kPa, neg 25.0 kPa)')
+else:
+    raise ValueError(color(f'[ERROR] Unknown chamber control mode: {chamber_ctrl_mode}', 'red'))
+
 # ==> My model <==
 if train_mode == '1':
     kwargs = dict(
@@ -95,7 +121,7 @@ if train_mode == '1':
             buffer_size = 50e4,
             batch_size = 128,
             epoch = 1,
-            horizon = 2048,
+            horizon = 512,
             start_epi = 10,
             max_grad_norm = 0.5,
             log_std_min = -10,
@@ -108,22 +134,22 @@ if train_mode == '1':
         ),
         epi = 1000,
         # sim3 actuator-pressure PID:
-        # pid = dict(
-            # Kp_act_pos_in = 0.0,
-            # Ki_act_pos_in = 0.01,
-            # Kd_act_pos_in = 0.0,
-            # Kp_act_pos_out = 0.0,
-            # Ki_act_pos_out = 0.01,
-            # Kd_act_pos_out = 0.0,
-            # Kp_act_neg_in = 0.0,
-            # Ki_act_neg_in = 0.01,
-            # Kd_act_neg_in = 0.0,
-            # Kp_act_neg_out = 0.0,
-            # Ki_act_neg_out = 0.01,
-            # Kd_act_neg_out = 0.0,
-            # Ka = 1
-        # )
-        pid = None
+        pid = dict(
+            Kp_act_pos_in = 0.0,
+            Ki_act_pos_in = 0.002,
+            Kd_act_pos_in = 0.0,
+            Kp_act_pos_out = 0.0,
+            Ki_act_pos_out = 0.002,
+            Kd_act_pos_out = 0.0,
+            Kp_act_neg_in = 0.0,
+            Ki_act_neg_in = 0.002,
+            Kd_act_neg_in = 0.0,
+            Kp_act_neg_out = 0.0,
+            Ki_act_neg_out = 0.002,
+            Kd_act_neg_out = 0.0,
+            Ka = 1
+        )
+        # pid = None
     )
     print(f'[ INFO] Train mode: Ours')
 
@@ -365,6 +391,8 @@ elif train_mode == '4':
 else:
     raise ValueError(color(f'[ERROR] Unknown train mode: {train_mode}', 'red'))
 
+kwargs["env"]["fixed_chamber_ctrl"] = fixed_chamber_ctrl
+kwargs["env"]["steady_chamber_ctrl"] = steady_chamber_ctrl
 
 obs = PneuSim(**kwargs['obs'])
 print(f"[ DBG] Loaded obs simulator library: {obs.lib._name}")

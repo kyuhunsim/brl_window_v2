@@ -40,6 +40,8 @@ class PneuEnv3:
         action_low: float = 0.0,
         action_high: float = 1.0,
         episode_carry_state: bool = True,
+        fixed_chamber_ctrl: Optional[Tuple[float, float]] = None,
+        steady_chamber_ctrl: Optional[Dict[str, float]] = None,
     ):
         self.obs = obs
         self.goal = PneuRef(
@@ -60,11 +62,51 @@ class PneuEnv3:
         self.dim_obs = 4
         self.dim_ref = 2
         self.dim_act = 6
+        self.fixed_chamber_ctrl = None
+        self.steady_chamber_ctrl = None
+        if fixed_chamber_ctrl is not None and steady_chamber_ctrl is not None:
+            raise ValueError("fixed_chamber_ctrl and steady_chamber_ctrl are mutually exclusive")
+        if fixed_chamber_ctrl is not None:
+            fixed_chamber_ctrl_arr = np.asarray(fixed_chamber_ctrl, dtype=np.float64)
+            if fixed_chamber_ctrl_arr.shape != (2,):
+                raise ValueError(
+                    "fixed_chamber_ctrl must contain two normalized controls "
+                    f"for the positive/negative chamber valves, got shape {fixed_chamber_ctrl_arr.shape}"
+                )
+            if np.any(fixed_chamber_ctrl_arr < action_low) or np.any(fixed_chamber_ctrl_arr > action_high):
+                raise ValueError(
+                    f"fixed_chamber_ctrl must be within [{action_low}, {action_high}], "
+                    f"got {fixed_chamber_ctrl_arr}"
+                )
+            self.fixed_chamber_ctrl = fixed_chamber_ctrl_arr
+        if steady_chamber_ctrl is not None:
+            required_keys = {
+                "pos_target",
+                "neg_target",
+                "kp",
+                "ki",
+                "deadband",
+                "integral_limit",
+                "min_open",
+                "max_open",
+            }
+            missing_keys = required_keys - set(steady_chamber_ctrl)
+            if missing_keys:
+                raise ValueError(f"steady_chamber_ctrl is missing keys: {sorted(missing_keys)}")
+            self.steady_chamber_ctrl = {
+                key: float(steady_chamber_ctrl[key])
+                for key in required_keys
+            }
+        self.dim_policy_act = (
+            4
+            if self.fixed_chamber_ctrl is not None or self.steady_chamber_ctrl is not None
+            else self.dim_act
+        )
 
         self.dim_obs_traj = self.num_obs * self.dim_obs
         self.dim_fut_traj = self.num_act * self.dim_obs if pred is not None else 0
         self.dim_ref_traj = self.num_ref * self.dim_ref
-        self.dim_act_traj = self.num_act * self.dim_act
+        self.dim_act_traj = self.num_act * self.dim_policy_act
         self.dim_state = self.dim_obs_traj + self.dim_fut_traj + self.dim_ref_traj
 
         self.observation_space = Box(
@@ -102,7 +144,76 @@ class PneuEnv3:
         self.verbose_enabled = bool(verbose)
         self.episode_carry_state = bool(episode_carry_state)
         self.has_episode_state = False
-        self.prev_action = np.full(self.dim_act, action_low, dtype=np.float64)
+        self.chamber_integral_err = np.zeros(2, dtype=np.float64)
+        self.prev_action = self._expand_ctrl_traj(self.action_space.low)[0]
+
+    def _expand_ctrl_traj(
+        self,
+        ctrl: np.ndarray,
+        update_chamber_integral: bool = False,
+    ) -> np.ndarray:
+        ctrl_traj = np.asarray(ctrl, dtype=np.float64).reshape(-1, self.dim_policy_act)
+        if self.fixed_chamber_ctrl is None and self.steady_chamber_ctrl is None:
+            return ctrl_traj
+        chamber_ctrl = np.tile(
+            self._get_chamber_ctrl(update_integral=update_chamber_integral),
+            (len(ctrl_traj), 1),
+        )
+        return np.c_[chamber_ctrl, ctrl_traj]
+
+    def _compute_steady_chamber_ctrl(
+        self,
+        chamber_press: np.ndarray,
+        integral_err: np.ndarray,
+        integrate: bool,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        cfg = self.steady_chamber_ctrl
+        if cfg is None:
+            raise RuntimeError("steady chamber controller is not configured")
+
+        ch_pos, ch_neg = np.asarray(chamber_press, dtype=np.float64)
+        signed_err = np.array(
+            [
+                ch_pos - cfg["pos_target"],
+                cfg["neg_target"] - ch_neg,
+            ],
+            dtype=np.float64,
+        )
+        if integrate:
+            integral_err = np.clip(
+                integral_err + signed_err / self.obs.freq,
+                0.0,
+                cfg["integral_limit"],
+            )
+        proportional_err = np.where(signed_err > cfg["deadband"], signed_err, 0.0)
+        effort = cfg["kp"] * proportional_err + cfg["ki"] * integral_err
+        ctrl = np.where(
+            effort > 0.0,
+            np.clip(effort, cfg["min_open"], cfg["max_open"]),
+            0.0,
+        )
+        return ctrl, integral_err
+
+    def _get_chamber_ctrl(
+        self,
+        chamber_press: Optional[np.ndarray] = None,
+        update_integral: bool = False,
+    ) -> np.ndarray:
+        if self.fixed_chamber_ctrl is not None:
+            return self.fixed_chamber_ctrl.copy()
+        if self.steady_chamber_ctrl is None:
+            raise RuntimeError("chamber controller is not configured")
+
+        if chamber_press is None:
+            chamber_press = self.curr_full_press[0:2]
+        ctrl, integral_err = self._compute_steady_chamber_ctrl(
+            chamber_press,
+            self.chamber_integral_err,
+            integrate=update_integral,
+        )
+        if update_integral:
+            self.chamber_integral_err = integral_err
+        return ctrl
 
     def reset(self) -> Tuple[np.ndarray, Dict[str, Any]]:
         base_init_press = np.array(
@@ -130,7 +241,8 @@ class PneuEnv3:
         self.obs_traj = np.tile(init_press, (self.num_obs, 1))
         self.curr_full_press = init_press.copy()
         self.t = 0.0
-        self.prev_action = np.full(self.dim_act, self.action_space.low[0], dtype=np.float64)
+        self.chamber_integral_err = np.zeros(2, dtype=np.float64)
+        self.prev_action = self._expand_ctrl_traj(self.action_space.low)[0]
 
         if self.is_pid:
             self.obs.reset_pid()
@@ -162,7 +274,7 @@ class PneuEnv3:
         if self.publish_obs:
             self.publish_observation(info)
 
-        self.prev_action = np.asarray(action, dtype=np.float64).reshape(-1, self.dim_act)[0].copy()
+        self.prev_action = np.asarray(state_info["ctrl"], dtype=np.float64)[0].copy()
 
         return state, reward, terminated, truncated, info
 
@@ -175,7 +287,7 @@ class PneuEnv3:
         self,
         ctrl: np.ndarray,
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
-        ctrl_traj = np.asarray(ctrl, dtype=np.float64).reshape(-1, self.dim_act)
+        ctrl_traj = self._expand_ctrl_traj(ctrl, update_chamber_integral=True)
         goal_traj = self.goal.get_ref(self.t).reshape(-1, self.dim_ref)
 
         obs, obs_info = self.obs.observe(
@@ -210,7 +322,7 @@ class PneuEnv3:
         self.obs_traj = obs_traj
         self.curr_full_press = obs_traj[-1].copy()
         self.has_episode_state = True
-        obs_info["ctrl"] = ctrl
+        obs_info["ctrl"] = ctrl_traj
         obs_info["pred"] = pred_info
         obs_info["goal_traj"] = goal_traj
         obs_info["full_press"] = self.curr_full_press.copy()
@@ -238,13 +350,25 @@ class PneuEnv3:
             )
 
         preds = np.array([], dtype=np.float64)
+        pred_ctrls = []
+        chamber_press = init_press[0:2]
+        chamber_integral_err = self.chamber_integral_err.copy()
         for ctrl, goal in zip(ctrl_traj, ref_traj):
-            pred, _ = self.pred.observe(ctrl, goal)
+            pred_ctrl = ctrl.copy()
+            if self.steady_chamber_ctrl is not None:
+                pred_ctrl[0:2], chamber_integral_err = self._compute_steady_chamber_ctrl(
+                    chamber_press,
+                    chamber_integral_err,
+                    integrate=True,
+                )
+            pred, _ = self.pred.observe(pred_ctrl, goal)
             preds = np.r_[preds, pred[1:5]]
+            pred_ctrls.append(pred_ctrl)
+            chamber_press = pred[1:3]
 
         pred_press = preds.reshape(-1, self.dim_obs)
         pred_info = dict(
-            pred_act=ctrl_traj,
+            pred_act=np.asarray(pred_ctrls, dtype=np.float64),
             pred_ref=ref_traj,
             pred_press=pred_press,
         )
@@ -318,7 +442,7 @@ class PneuEnv3:
             pos_pred_reward = 0.0
             neg_pred_reward = 0.0
 
-        curr_ctrl = np.asarray(action, dtype=np.float64).reshape(-1, self.dim_act)[0]
+        curr_ctrl = self._expand_ctrl_traj(action)[0]
 
         # 2026-05-28:
         # lib3의 RL+PID 제어가 tracking은 되지만 밸브 동시 개방과 chamber drift로 인해
@@ -394,7 +518,7 @@ class PneuEnv3:
             ],
             dtype=np.float64,
         )
-        raw_ctrl = np.asarray(info["ctrl_input"], dtype=np.float64)[0:self.dim_act]
+        raw_ctrl = np.asarray(info["ctrl_input"], dtype=np.float64).reshape(-1, self.dim_act)[0]
         ctrl_str = np.array2string(
             applied_ctrl,
             precision=4,
@@ -457,6 +581,7 @@ class PneuEnv3:
                 f'{info["reward"]["chamber_reserve_reward"]:.4f}\t'
                 f'err={info["reward"]["chamber_reserve_error"]:.4f}'
             ),
+            f'\t    : Total\t{sum(value for key, value in info["reward"].items() if key.endswith("_reward")):.4f}',
         ]
         output = "\n".join(lines)
         print(output)
