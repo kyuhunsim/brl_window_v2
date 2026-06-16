@@ -163,7 +163,6 @@ cython_debug/
 .vscode
 tester
 pneu_rl/archive
-pneu_rl/exp
 pneu_pid/exp
 pneu_pid/test
 pneu_env/ref
