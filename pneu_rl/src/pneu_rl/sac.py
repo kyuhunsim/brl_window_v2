@@ -162,6 +162,18 @@ class SAC():
             action, _, _ = self.policy.sample(state)
         
         return action.detach().numpy()[0]
+
+    def select_action(
+        self,
+        state: np.ndarray,
+    ):
+        return self.predict(state, evaluate=False)
+
+    def evaluate_action(
+        self,
+        state: np.ndarray,
+    ):
+        return self.predict(state, evaluate=True)
     
     def update_parameters(
         self,
@@ -246,7 +258,7 @@ class SAC():
                 if self.start_epi > self.last_epi + epi:
                     action = self.env.action_space.sample()
                 else:
-                    action = self.predict(state)
+                    action = self.select_action(state)
                 
                 next_state, reward, done, _, info = self.env.step(action)
                 self.buffer.add(state, action, reward, next_state, done)

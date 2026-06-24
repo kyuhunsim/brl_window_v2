@@ -15,8 +15,11 @@ public:
     double getContractionRatio(double current_L) const;
     double getRodMass() const;
     double getInitialLength() const;
+    double getMinimumLength() const;
+    double clampLength(double current_L) const;
+    void setMinimumLength(double minimum_length);
 private:
-    double L0, D, n_fold, shaft_radius, m_rod;
+    double L0, D, n_fold, shaft_radius, m_rod, min_length;
     double L_to_theta(double current_L) const;
 };
 #endif

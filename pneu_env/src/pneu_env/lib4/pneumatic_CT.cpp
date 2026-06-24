@@ -36,34 +36,34 @@ constexpr double LOG_GUARD = 700.0;
 constexpr double Z_LIMIT = 1e6;
 
 const ValveModelParams CHAMBER_POS_PARAMS = {
-    0.19894303291, 31.7172181606, 0.194962266427, -5.68685026066e-06, 3.23578144865e-06,
-    29027.0356546, 0.338844793172, 0.000826633684367, 9.41735107961,
+    0.182088009151, 38.5935820143, 0.222495326173, -0.00024259434466, 1.17749602593e-06,
+    133401.60873, 0.317323941447, 0.108264934791, 1.72343412436,
     11, 0.6, 11, 0.6
 };
 const ValveModelParams CHAMBER_NEG_PARAMS = {
-    0.239169164564, 48.518620906, 0.0700924875331, 0.000135888575828, -2.32481437758e-09,
-    0.0507762901747, 1435.46402399, 0.321098083025, 13321.2772422,
-    11, 0.6, 11, 0.6
+    0.230596704456, 49.2349823439, 0.077360350444, 0.000126358883866, 0.000601866716225,
+    9.58924983462e-06, 811.479927158, 0.129990958936, 8684.05676053,
+    25, 0.6, 22.8693861168, 0.6
 };
 const ValveModelParams ACT_POS_IN_PARAMS = {
-    0.158726064226, 58.1040771774, 0.0639074588174, -0.000134164335495, -2.44680270341e-08,
-    636076.392414, 11.7383266067, 0.22163825519, 49442.1108384,
-    11, 0.6, 11, 0.6
+    0.119192679043, 49.2936789273, 0.0558727179485, -4.09778610123e-05, 3.88446743246e-06,
+    22741.1187614, 1.77940442906, 0.42122526239, 51214.1648005,
+    11.0167425688, 0.6, 11, 0.6
 };
 const ValveModelParams ACT_POS_OUT_PARAMS = {
-    0.164792215402, 47.2199676354, 0.068454298723, -0.000263494384174, 7.45208724224e-06,
-    2.96590269622e-09, 6.92033753208, 0.0910547602345, 1460.15672543,
-    11, 0.6, 11, 0.6
+    0.266034385508, 23.2030505728, 0.0295736756483, -7.40609568515e-05, 6.01411586558e-07,
+    326660.429485, 2.45774688444, 0.0124443885432, 67.6271687104,
+    11.3601006694, 0.6, 25, 0.6
 };
 const ValveModelParams ACT_NEG_IN_PARAMS = {
-    0.182330496938, 46.1883492334, 0.0681161027831, 4.68555949625e-05, 6.33623577564e-07,
-    139898.737565, 1.10699393845, 1.14001146149, 17561.4973492,
+    0.186920013518, 44.5908169431, 0.0823299570369, 1.62453098374e-05, 1.13064900337e-06,
+    123908.654969, 1.51294915451, 1.3484821451, 6346.0154244,
     11, 0.6, 11, 0.6
 };
 const ValveModelParams ACT_NEG_OUT_PARAMS = {
-    0.208997209267, 38.9210250875, 0.0129116104922, -0.000197660796598, 0.00012448624898,
-    530.826123437, 2.23407111407, 4.40916708332, 7237.76861615,
-    25, 0.6, 11, 0.6
+    0.227395697276, 28.4795871901, 0.0137302587747, -0.000493432450588, 0.000219131995948,
+    633.338396595, 1.70729273937, 2.43765129498, 261.227981819,
+    11, 0.6, 25, 0.6
 };
 
 double clamp01(double value)
@@ -123,6 +123,9 @@ PneumaticCT::PneumaticCT() {
     // Coeffs are dimensionless
     C1IN = 1e-6 * CIN_; C1OUT = 1e-6 * COUT_; 
     C2IN = 1e-6 * CIN_; C2OUT = 1e-6 * COUT_;
+    leak_pos_atm = 0.0;
+    leak_neg_atm = 4.003162042168857e-09;
+    leak_cross = 8.424896141149943e-10;
 
     actuator1.initializeParameters(0.02, 0.02, 2.0, 0.005, 5.0);
 
@@ -144,6 +147,10 @@ void PneumaticCT::set_actuator_parameters(
     actuator1.initializeParameters(initial_length, dimension_D, num_folds, shaft_r, rod_mass);
 }
 
+void PneumaticCT::set_actuator_min_length(double min_length) {
+    actuator1.setMinimumLength(min_length);
+}
+
 void PneumaticCT::set_volume(double volume1_m3, double volume2_m3) { 
     this->V1 = volume1_m3 / 1000.0;
     this->V2 = volume2_m3/ 1000.0;
@@ -153,6 +160,12 @@ void PneumaticCT::set_discharge_coeff(double c1i, double c1o, double c2i, double
     // Updated on 2026-01-10: keep direct Cd convention (same as sim4/lib4 wrapper).
     this->C1IN = c1i; this->C1OUT = c1o;
     this->C2IN = c2i; this->C2OUT = c2o;
+}
+
+void PneumaticCT::set_leak_coefficients(double pos_atm, double neg_atm, double cross) {
+    this->leak_pos_atm = std::max(0.0, pos_atm);
+    this->leak_neg_atm = std::max(0.0, neg_atm);
+    this->leak_cross = std::max(0.0, cross);
 }
 
 void PneumaticCT::reset_valve_state(ValveRuntimeState* state)
@@ -177,6 +190,7 @@ void PneumaticCT::reset_valve_states()
 void PneumaticCT::model(const double* x, const double* u, double* dxdt, int step_num) {
     // 1. 상태 및 제어 벡터 읽기 (단일 액추에이터 모델)
     const double L_max_model = actuator1.getInitialLength();
+    const double L_min_model = actuator1.getMinimumLength();
 
     double Pch_pos_Pa = std::max(x[1], MIN_ABS_PRESSURE_PA);
     double Pch_neg_Pa = std::max(x[2], MIN_ABS_PRESSURE_PA);
@@ -185,7 +199,7 @@ void PneumaticCT::model(const double* x, const double* u, double* dxdt, int step
     double Ppis2_Pa   = std::max(x[5], MIN_ABS_PRESSURE_PA);
     double P1_pos_Pa  = std::max(x[6], MIN_ABS_PRESSURE_PA);
     double P1_neg_Pa  = std::max(x[7], MIN_ABS_PRESSURE_PA);
-    double L1_m       = std::min(std::max(x[8], 0.0), L_max_model);
+    double L1_m       = std::min(std::max(x[8], L_min_model), L_max_model);
     double v1_ms      = std::isfinite(x[9]) ? x[9] : 0.0;
 
     double u_ch_pos = u[0], u_ch_neg = u[1], u11_pos = u[2], u12_pos = u[3];
@@ -235,7 +249,7 @@ void PneumaticCT::model(const double* x, const double* u, double* dxdt, int step
     double F_support = 0.0;
 
     const double L_max = L_max_model;
-    const double L_min = 0.0;
+    const double L_min = L_min_model;
     
     if ((L1_m - L_max) > EPSILON_CT ) {
         // 액추에이터가 최대 길이를 '초과'했을 때
@@ -276,8 +290,11 @@ void PneumaticCT::model(const double* x, const double* u, double* dxdt, int step
     double m_dot_net_neg_ch = m_sv_cn + m_sv12n - (m_pi1 + m_pi2);
     double m_dot_net_pis1 = m_pi1 - m_po1;
     double m_dot_net_pis2 = m_pi2 - m_po2;
-    double m_dot_net_act1_pos = m_sv11p - m_sv12p;
-    double m_dot_net_act1_neg = m_sv11n - m_sv12n;
+    const double m_leak_pos_atm = leak_pos_atm * (P1_pos_Pa - ATM);
+    const double m_leak_neg_atm = leak_neg_atm * (P1_neg_Pa - ATM);
+    const double m_leak_cross = leak_cross * (P1_pos_Pa - P1_neg_Pa);
+    double m_dot_net_act1_pos = m_sv11p - m_sv12p - m_leak_pos_atm - m_leak_cross;
+    double m_dot_net_act1_neg = m_sv11n - m_sv12n - m_leak_neg_atm + m_leak_cross;
 
     // 압력 변화율 [Pa/s]
     double dPch_p = chamber(m_dot_net_pos_ch, V1);
@@ -314,6 +331,7 @@ void PneumaticCT::model(const double* x, const double* u, double* dxdt, int step
         std::cout << "  m_dot_net_neg_ch = " << m_sv_cn << " + " << m_sv12n << " - (" << m_pi1 << " + " << m_pi2 << ") = " << m_dot_net_neg_ch << std::endl;
         std::cout << "  - Chamber->Atmos: m_sv_cp=" << m_sv_cp << ", m_sv_cn=" << m_sv_cn << std::endl;
         std::cout << "  - Act1 Valves: m_sv11p=" << m_sv11p << ", m_sv12p=" << m_sv12p << ", m_sv11n=" << m_sv11n << ", m_sv12n=" << m_sv12n << std::endl;
+        std::cout << "  - Act1 Leaks: pos_atm=" << m_leak_pos_atm << ", neg_atm=" << m_leak_neg_atm << ", cross_pos_to_neg=" << m_leak_cross << std::endl;
 
         // --- 3. 액추에이터 동역학 계산 결과 출력 ---
         std::cout << "ACTUATOR DYNAMICS:" << std::endl;

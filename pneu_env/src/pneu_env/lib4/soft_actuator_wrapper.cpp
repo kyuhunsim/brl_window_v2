@@ -60,6 +60,15 @@ extern "C" {
         return PneumaticSimulator::get_instance().get_initial_length();
     }
 
+    double get_min_length_c() {
+        return PneumaticSimulator::get_instance().get_min_length();
+    }
+
+    void set_actuator_min_length_c(double min_length) {
+        actuator.setMinimumLength(min_length);
+        PneumaticSimulator::get_instance().set_actuator_min_length(min_length);
+    }
+
     double get_volume_pos(double current_L) {
         return actuator.getVolume_pos(current_L);
     }

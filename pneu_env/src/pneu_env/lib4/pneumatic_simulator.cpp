@@ -1,4 +1,5 @@
 #include "pneumatic_simulator.h"
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 
@@ -65,8 +66,25 @@ void PneumaticSimulator::set_actuator_parameters(
     xk0[8] = pneumaticCT->getActuator1().getInitialLength();
 }
 
+void PneumaticSimulator::set_actuator_min_length(double min_length) {
+    pneumaticCT->set_actuator_min_length(min_length);
+    const double L_min = pneumaticCT->getActuator1().getMinimumLength();
+    const double L_max = pneumaticCT->getActuator1().getInitialLength();
+    if (!std::isfinite(xk0[8]) || xk0[8] < L_min) {
+        xk0[8] = L_min;
+        xk0[9] = 0.0;
+    } else if (xk0[8] > L_max) {
+        xk0[8] = L_max;
+        xk0[9] = 0.0;
+    }
+}
+
 double PneumaticSimulator::get_initial_length() {
     return pneumaticCT->getActuator1().getInitialLength();
+}
+
+double PneumaticSimulator::get_min_length() {
+    return pneumaticCT->getActuator1().getMinimumLength();
 }
 
 void PneumaticSimulator::set_init_env(double pos_press_kPa, double neg_press_kPa, double p1_pos_kPa, double p1_neg_kPa) {
@@ -94,8 +112,10 @@ void PneumaticSimulator::set_init_state(
     double vel_ms
 ) {
     set_init_env(pos_press_kPa, neg_press_kPa, p1_pos_kPa, p1_neg_kPa);
-    xk0[8] = length_m;
-    xk0[9] = vel_ms;
+    const double L_min = pneumaticCT->getActuator1().getMinimumLength();
+    const double L_max = pneumaticCT->getActuator1().getInitialLength();
+    xk0[8] = std::min(std::max(length_m, L_min), L_max);
+    xk0[9] = std::isfinite(vel_ms) ? vel_ms : 0.0;
 }
 
 void PneumaticSimulator::pneumaticDT(double* xk, double* uk, double Ts, double* xk1) {
@@ -121,9 +141,10 @@ void PneumaticSimulator::pneumaticDT(double* xk, double* uk, double Ts, double* 
         }
     }
 
+    const double L_min = pneumaticCT->getActuator1().getMinimumLength();
     const double L0 = pneumaticCT->getActuator1().getInitialLength();
-    if (!std::isfinite(xk1[8]) || xk1[8] < 0.0) {
-        xk1[8] = 0.0;
+    if (!std::isfinite(xk1[8]) || xk1[8] < L_min) {
+        xk1[8] = L_min;
         xk1[9] = 0.0;
     } else if (xk1[8] > L0) {
         xk1[8] = L0;
@@ -185,6 +206,10 @@ void PneumaticSimulator::set_volume(double v1, double v2) {
 
 void PneumaticSimulator::set_discharge_coeff(double c1i, double c1o, double c2i, double c2o) {
     pneumaticCT->set_discharge_coeff(c1i, c1o, c2i, c2o);
+}
+
+void PneumaticSimulator::set_leak_coefficients(double pos_atm, double neg_atm, double cross) {
+    pneumaticCT->set_leak_coefficients(pos_atm, neg_atm, cross);
 }
 
 double PneumaticSimulator::get_time() {
@@ -270,6 +295,10 @@ extern "C" {
 
     void set_discharge_coeff_c(double c1i, double c1o, double c2i, double c2o) {
         PneumaticSimulator::get_instance().set_discharge_coeff(c1i, c1o, c2i, c2o);
+    }
+
+    void set_leak_coefficients_c(double pos_atm, double neg_atm, double cross) {
+        PneumaticSimulator::get_instance().set_leak_coefficients(pos_atm, neg_atm, cross);
     }
 
     void time_reset_c() {

@@ -36,8 +36,8 @@
 #define SV_G_ 0.16          //       [mm] Solenoid valve gap (
 #define POS_VALVE_NUM 1      //       [-] Number of positive valves
 #define NEG_VALVE_NUM 1      //       [-] Number of negative valves
-#define CIN_ 3.6198491         //       [-] Inlet discharge coeff, matched to lib3
-#define COUT_ 7.49941545       //       [-] Outlet discharge coeff, matched to lib3
+#define CIN_ 3.5414570189218374   //       [-] Inlet discharge coeff, tuned with soft actuator data
+#define COUT_ 17.719671893162565  //       [-] Outlet discharge coeff, tuned with soft actuator data
 // Paper parameter
 // #define CIN_ 1.464271612858397
 // #define COUT_ 33.47453817004828
@@ -60,7 +60,9 @@ public:
     ~PneumaticSimulator();
     static PneumaticSimulator& get_instance();
     void set_actuator_parameters(double initial_length, double dimension_D, double num_folds, double shaft_r, double rod_mass);
+    void set_actuator_min_length(double min_length);
     double get_initial_length();
+    double get_min_length();
     void set_init_env(double pos_press_kPa, double neg_press_kPa, double p1_pos_kPa, double p1_neg_kPa);
     void set_init_state(
         double pos_press_kPa,
@@ -78,6 +80,7 @@ public:
     double* get_valve_debug();
     void set_volume(double volume1_L, double volume2_L);
     void set_discharge_coeff(double c1i, double c1o, double c2i, double c2o);
+    void set_leak_coefficients(double pos_atm, double neg_atm, double cross);
     void time_reset();
     void set_logging(bool enable);
 
@@ -106,6 +109,7 @@ private:
     double M_W_RPM, SC_R, SC_L, V_D, V_S, V_DV, V_MAX_V;
     double O_S, SV_D, SV_G, T, V1, V2;
     double C1OUT, C1IN, C2OUT, C2IN;
+    double leak_pos_atm, leak_neg_atm, leak_cross;
     
     // System state & derivatives
     double* dxdt;
@@ -133,8 +137,10 @@ public:
     PneumaticCT();
     ~PneumaticCT();
     void set_actuator_parameters(double initial_length, double dimension_D, double num_folds, double shaft_r, double rod_mass);
+    void set_actuator_min_length(double min_length);
     void set_volume(double volume1_m3, double volume2_m3);
     void set_discharge_coeff(double Cd1IN, double Cd1OUT, double Cd2IN, double Cd2OUT);
+    void set_leak_coefficients(double pos_atm, double neg_atm, double cross);
     void model(const double* x, const double* u, double* dxdt, int step_num);
     double* get_mass_flowrate();
     double* get_valve_debug();

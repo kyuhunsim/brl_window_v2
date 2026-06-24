@@ -11,14 +11,16 @@
 
 const double EPSILON = 1e-9;
 
-// Constructor: Initializes with default SI unit values (m_rod updated to 5.0)
-SoftActuator::SoftActuator() : L0(0.02), D(0.02), n_fold(2.0), shaft_radius(0.005), m_rod(5.0) {}
+// Constructor: Initializes with default SI unit values.
+SoftActuator::SoftActuator()
+    : L0(0.02), D(0.02), n_fold(2.0), shaft_radius(0.005), m_rod(5.0), min_length(0.0) {}
 
 SoftActuator::~SoftActuator() {}
 
 // Initializes parameters with provided SI unit values
 void SoftActuator::initializeParameters(double il, double d, double nf, double sr, double rm) {
     this->L0 = il; this->D = d; this->n_fold = nf; this->shaft_radius = sr; this->m_rod = rm;
+    this->min_length = std::min(std::max(this->min_length, 0.0), this->L0);
 }
 
 // Returns dimensionless contraction ratio
@@ -26,7 +28,7 @@ double SoftActuator::getContractionRatio(double cL) const {
     if (L0 < EPSILON) {
         return 0.0;
     }
-    return (L0 - cL) / L0;
+    return (L0 - clampLength(cL)) / L0;
 }
 
 // Returns rod mass in [kg]
@@ -39,8 +41,24 @@ double SoftActuator::getInitialLength() const {
     return this->L0;
 }
 
+// Returns minimum physically reachable cell length in [m]
+double SoftActuator::getMinimumLength() const {
+    return this->min_length;
+}
+
+// Sets minimum physically reachable cell length in [m]
+void SoftActuator::setMinimumLength(double minimum_length) {
+    this->min_length = std::min(std::max(minimum_length, 0.0), this->L0);
+}
+
+// Clamps cell length to the actuator's physical model range
+double SoftActuator::clampLength(double cL) const {
+    return std::min(std::max(cL, this->min_length), this->L0);
+}
+
 // Returns negative chamber volume in [m^3] - No logical change
 double SoftActuator::getVolume_neg(double cL) const {
+    cL = clampLength(cL);
     double r = getContractionRatio(cL);
 
     if (r <= 0.3634) {
@@ -59,6 +77,7 @@ double SoftActuator::getVolume_neg(double cL) const {
 
 // Returns positive chamber volume in [m^3] - No logical change
 double SoftActuator::getVolume_pos(double cL) const {
+    cL = clampLength(cL);
     const double V_DEAD_SPACE = 6.19761e-5;
 
     double th = L_to_theta(cL);
@@ -87,6 +106,7 @@ double SoftActuator::getVolume_pos(double cL) const {
 
 // Returns dV_neg/dL in [m^2] - MODIFIED
 double SoftActuator::getVolumeDerivative_neg(double cL) const {
+    cL = clampLength(cL);
     double r = getContractionRatio(cL);
     if (r <= 0.3634) {
         double th = L_to_theta(cL);
@@ -115,6 +135,7 @@ double SoftActuator::getVolumeDerivative_neg(double cL) const {
 
 // Returns dV_pos/dL in [m^2] - MODIFIED
 double SoftActuator::getVolumeDerivative_pos(double cL) const {
+    cL = clampLength(cL);
     double r = getContractionRatio(cL);
     if (r <= 0.3634) {
         double th = L_to_theta(cL);
@@ -141,6 +162,7 @@ double SoftActuator::getVolumeDerivative_pos(double cL) const {
 
 // Returns force from negative chamber in [N]
 double SoftActuator::getForce_neg(double cL, double Pna_abs) const {
+    cL = clampLength(cL);
     const double P_atm = 101325; // ATM constant from header
     double Pna = Pna_abs - P_atm; // Gauge pressure
 
@@ -149,6 +171,7 @@ double SoftActuator::getForce_neg(double cL, double Pna_abs) const {
 
 // Returns force from positive chamber in [N]
 double SoftActuator::getForce_pos(double cL, double Ppa_abs) const {
+    cL = clampLength(cL);
     const double P_atm = 101325; // ATM constant from header
     double Ppa = Ppa_abs - P_atm; // Gauge pressure
 
@@ -157,6 +180,7 @@ double SoftActuator::getForce_pos(double cL, double Ppa_abs) const {
 
 // Returns theta [rad] from length L [m]
 double SoftActuator::L_to_theta(double cL) const {
+    cL = clampLength(cL);
     if (cL >= L0 - EPSILON) {
         if (cL > L0 + EPSILON) { // Add tolerance
             // std::cerr << "[WARNING] cL > L0. Safety rail triggered. cL=" << cL << ", L0=" << L0 << std::endl;
