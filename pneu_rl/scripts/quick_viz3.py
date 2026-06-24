@@ -76,10 +76,10 @@ viz_kwargs = dict(
             init_act_neg_press = ATM
         ),
         pid = dict(
-            Kp_act_pos_in = 0.0,
+            Kp_act_pos_in = 0.001,
             Ki_act_pos_in = 0.0,
             Kd_act_pos_in = 0.0,
-            Kp_act_pos_out = 0.0,
+            Kp_act_pos_out = 0.001,
             Ki_act_pos_out = 0.0,
             Kd_act_pos_out = 0.0,
             Kp_act_neg_in = 0.001,
@@ -109,10 +109,12 @@ viz_kwargs = dict(
             file = "241113_16_09_05_PID_Real"
         ),
         random = dict(
-            pos_max_off = 140,
+            # pos_max_off = 140,
+            pos_max_off = 125,
             pos_min_off = 115,
             neg_max_off = 80,
-            neg_min_off = 60,
+            neg_min_off = 65,
+            # neg_min_off = 60,
             pos_max_ts = 10,
             neg_max_ts = 10,
             pos_max_amp = 10,
@@ -489,7 +491,7 @@ if __name__ == '__main__':
         curr_time = 0
         if ref.max_time == float('inf'):
             # ref.max_time = 100
-            ref.max_time = 40
+            ref.max_time = 100
         
         infos = deque()
         time_flag = 0
