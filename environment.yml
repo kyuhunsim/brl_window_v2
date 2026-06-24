@@ -1,0 +1,17 @@
+name: env_1
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - numpy
+  - scipy
+  - pandas
+  - pyyaml
+  - gymnasium
+  - matplotlib
+  - scikit-learn
+  - pytorch
+  - tensorboard
+  - ipykernel
