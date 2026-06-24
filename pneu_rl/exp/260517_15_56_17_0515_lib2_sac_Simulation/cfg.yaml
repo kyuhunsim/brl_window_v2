@@ -1,0 +1,85 @@
+env:
+  init_press:
+    init_neg_press: 101.325
+    init_pos_press: 101.325
+  pid:
+    Ka: 10
+    Kd_neg: 0.0
+    Kd_pos: 0.0
+    Ki_neg: 0.01
+    Ki_pos: 0.01
+    Kp_neg: 0.0
+    Kp_pos: 0.0
+  pred:
+    delay: 0
+    freq: 50
+    noise: false
+    scale: true
+  real:
+    freq: 50
+    scale: true
+  sim:
+    delay: 0.1
+    freq: 50
+    noise: false
+    noise_std: 0
+    offset_neg: 0
+    offset_pos: 0
+    scale: true
+metrics:
+  mae_neg: 2.9772652185218966
+  mae_pos: 29.306691976987032
+  rmse_neg: 4.60653340891249
+  rmse_pos: 48.77420087881442
+model_name: 0515_lib2_sac
+obs_mode: simulation
+ref:
+  center_step:
+    neg_amp: 2
+    neg_center_step: -5
+    neg_init_press: 51.325
+    neg_per: 6
+    neg_time_step: 10
+    pos_amp: 5
+    pos_center_step: 15
+    pos_init_press: 151.325
+    pos_per: 5
+    pos_time_step: 10
+    trans_time: 40
+  dynamic:
+    neg_amp: 3
+    neg_final_press: 21.325000000000003
+    neg_init_press: 31.325000000000003
+    neg_per: 10
+    pos_amp: 5
+    pos_final_press: 211.325
+    pos_init_press: 181.325
+    pos_per: 8
+    trans_time: 60
+  random:
+    neg_max_amp: 10
+    neg_max_off: 30
+    neg_max_ts: 10
+    neg_min_off: 15
+    pos_max_amp: 10
+    pos_max_off: 300
+    pos_max_ts: 10
+    pos_min_off: 160
+    seed: 61098
+  sine:
+    iter: 2
+    neg_amp: 10
+    neg_off: 21.325000000000003
+    neg_per: 10
+    pos_amp: 10
+    pos_off: 181.325
+    pos_per: 10
+  stepcases:
+    ref_neg_max: 45
+    ref_neg_min: 15
+    ref_pos_max: 180
+    ref_pos_min: 160
+    time_step: 5
+  traj:
+    file: 241113_16_09_05_PID_Real
+ref_mode: random

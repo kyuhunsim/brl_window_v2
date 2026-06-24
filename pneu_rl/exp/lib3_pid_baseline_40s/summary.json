@@ -1,0 +1,118 @@
+{
+  "args": {
+    "controllers": [
+      "pid"
+    ],
+    "ref": "random",
+    "max_time": 40.0,
+    "freq": 50.0,
+    "delay": 0.1,
+    "scale": true,
+    "constant_raw": 0.5,
+    "chamber_raw": 0.0,
+    "chamber_mode": "reserve",
+    "chamber_margin": 35.0,
+    "chamber_kp": 0.04,
+    "chamber_deadband": 1.0,
+    "chamber_min_open": 0.15,
+    "chamber_max_open": 0.85,
+    "ch_pos_min": 101.325,
+    "ch_pos_max": 200.0,
+    "ch_neg_min": 15.0,
+    "ch_neg_max": 101.325,
+    "deadband": null,
+    "min_open": 0.15,
+    "max_open": null,
+    "bangbang_kp": 0.08,
+    "pid_kp": null,
+    "pid_ki": null,
+    "pid_kd": null,
+    "integral_limit": null,
+    "ctrl4_off": false,
+    "sat_thr": 0.95,
+    "raw_from_scaled_report": false,
+    "window_start": null,
+    "window_end": null,
+    "valve_debug": true,
+    "plot": true,
+    "show": true,
+    "save_name": "lib3_pid_baseline_40s"
+  },
+  "baseline_config": {
+    "chamber": {
+      "mode": "fixed",
+      "raw": 0.0,
+      "margin": 35.0,
+      "kp": 0.04,
+      "ki": 0.001,
+      "deadband": 1.0,
+      "min_open": 0.15,
+      "max_open": 0.85,
+      "ch_pos_min": 101.325,
+      "ch_pos_max": 200.0,
+      "ch_neg_min": 15.0,
+      "ch_neg_max": 101.325
+    },
+    "pid": {
+      "act_pos_in": {
+        "kp": 0.01,
+        "ki": 0.004,
+        "kd": 0.001
+      },
+      "act_pos_out": {
+        "kp": 0.05,
+        "ki": 0.001,
+        "kd": 0.001
+      },
+      "act_neg_in": {
+        "kp": 0.019,
+        "ki": 0.0018,
+        "kd": 0.001
+      },
+      "act_neg_out": {
+        "kp": 0.025,
+        "ki": 0.0008,
+        "kd": 0.001
+      },
+      "deadband": 0.5,
+      "integral_limit": 100.0,
+      "max_open": 1.0
+    }
+  },
+  "resolved_pid_config": {
+    "act_pos_in": {
+      "kp": 0.01,
+      "ki": 0.004,
+      "kd": 0.001
+    },
+    "act_pos_out": {
+      "kp": 0.05,
+      "ki": 0.001,
+      "kd": 0.001
+    },
+    "act_neg_in": {
+      "kp": 0.019,
+      "ki": 0.0018,
+      "kd": 0.001
+    },
+    "act_neg_out": {
+      "kp": 0.025,
+      "ki": 0.0008,
+      "kd": 0.001
+    },
+    "deadband": 0.5,
+    "integral_limit": 100.0,
+    "max_open": 1.0
+  },
+  "reports": [
+    {
+      "csv": "/home/rise/test/brl_window/pneu_rl/exp/lib3_pid_baseline_40s/pid.csv",
+      "sample_count": 2006,
+      "rmse_pos": 6.999131959714322,
+      "rmse_neg": 5.3350587835888135,
+      "mae_pos": 4.18419125002705,
+      "mae_neg": 3.5707256752788497,
+      "controller": "pid"
+    }
+  ]
+}

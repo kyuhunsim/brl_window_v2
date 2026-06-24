@@ -1,0 +1,121 @@
+env:
+  init_press:
+    init_act_neg_press: 101.325
+    init_act_pos_press: 101.325
+    init_neg_press: 101.325
+    init_pos_press: 101.325
+  pid:
+    Ka: 1
+    Kd_act_neg_in: 0.001
+    Kd_act_neg_out: 0.001
+    Kd_act_pos_in: 0.0
+    Kd_act_pos_out: 0.0
+    Ki_act_neg_in: 0.001
+    Ki_act_neg_out: 0.001
+    Ki_act_pos_in: 0.0
+    Ki_act_pos_out: 0.0
+    Kp_act_neg_in: 0.001
+    Kp_act_neg_out: 0.001
+    Kp_act_pos_in: 0.0
+    Kp_act_pos_out: 0.0
+  pid_enabled: true
+  pred:
+    delay: 0
+    freq: 50
+    noise: false
+    noise_std: 0
+    offset_act_neg: 0
+    offset_act_pos: 0
+    offset_neg: 0
+    offset_pos: 0
+    scale: true
+  sim:
+    delay: 0.1
+    freq: 50
+    noise: false
+    noise_std: 0
+    offset_act_neg: 0
+    offset_act_pos: 0
+    offset_neg: 0
+    offset_pos: 0
+    scale: true
+metrics:
+  columns:
+    obs_neg: act_neg_press
+    obs_pos: act_pos_press
+    ref_neg: ref_act_neg
+    ref_pos: ref_act_pos
+  full:
+    bias_neg: -1.1131801200698346
+    bias_pos: 4.029286142851362
+    mae_neg: 2.343199213653829
+    mae_pos: 4.489437403007366
+    rmse_neg: 3.347248187748239
+    rmse_pos: 5.4298959646567
+  sample_count: 2005
+  tracking_pair: Actuator
+  window:
+    bias_neg: -1.8118848312644136
+    bias_pos: 3.8217977552879745
+    end_sec: 90.0
+    mae_neg: 2.678716043075896
+    mae_pos: 4.496367043385312
+    rmse_neg: 2.9747874158777443
+    rmse_pos: 4.989187864200424
+    sample_count: 502
+    start_sec: 30.0
+model_name: 0531_lib3_Ours2
+obs_mode: simulation
+ref:
+  center_step:
+    neg_amp: 2
+    neg_center_step: -5
+    neg_init_press: 51.325
+    neg_per: 6
+    neg_time_step: 10
+    pos_amp: 5
+    pos_center_step: 15
+    pos_init_press: 151.325
+    pos_per: 5
+    pos_time_step: 10
+    trans_time: 40
+  dynamic:
+    neg_amp: 3
+    neg_final_press: 21.325000000000003
+    neg_init_press: 31.325000000000003
+    neg_per: 10
+    pos_amp: 5
+    pos_final_press: 211.325
+    pos_init_press: 181.325
+    pos_per: 8
+    trans_time: 60
+  random:
+    neg_max_amp: 5
+    neg_max_off: 80
+    neg_max_ts: 10
+    neg_min_off: 60
+    pos_max_amp: 10
+    pos_max_off: 140
+    pos_max_ts: 10
+    pos_min_off: 115
+    seed: 61098
+  sine:
+    iter: 2
+    neg_amp: 5
+    neg_off: 70
+    neg_per: 10
+    pos_amp: 10
+    pos_off: 130
+    pos_per: 10
+  stepcases:
+    ref_neg_max: 80
+    ref_neg_min: 60
+    ref_pos_max: 140
+    ref_pos_min: 115
+    time_step: 5
+  traj:
+    file: 241113_16_09_05_PID_Real
+ref_mode: random
+runtime:
+  pid_enabled: true
+  pid_label: 'On'
