@@ -26,8 +26,6 @@ class PneuEnv():
             neg_fut_rwd_coeff = 0.0,
             pos_pred_rwd_coeff = 0.0,
             neg_pred_rwd_coeff = 0.0,
-            pos_diff_rwd_coeff = 0.0,
-            neg_diff_rwd_coeff = 0.0,
         ),
         pos_pred_rnd_offset_range: float = 0,
         neg_pred_rnd_offset_range: float = 0,
@@ -263,13 +261,6 @@ class PneuEnv():
             neg_pred_reward *= - self.rwd_kwargs['neg_pred_rwd_coeff']
             reward += pos_pred_reward + neg_pred_reward
 
-        # diff_errs = errs[1:] - errs[:-1]
-        # pos_diff_reward = np.sum(np.abs(diff_errs[:,0]))
-        # pos_diff_reward *= - self.rwd_kwargs['pos_diff_rwd_coeff']
-        # neg_diff_reward = np.sum(np.abs(diff_errs[:,1]))
-        # neg_diff_reward *= - self.rwd_kwargs['neg_diff_rwd_coeff']
-        # reward += pos_diff_reward + neg_diff_reward
-
         if self.pred is None:
             pos_fut_reward = 0
             neg_fut_reward = 0
@@ -286,8 +277,6 @@ class PneuEnv():
             'neg_fut_reward': neg_fut_reward,
             'pos_pred_reward': pos_pred_reward,
             'neg_pred_reward': neg_pred_reward,
-            # 'pos_diff_reward': pos_diff_reward,
-            # 'neg_diff_reward': neg_diff_reward,
         }
 
         return reward, info
@@ -323,11 +312,6 @@ class PneuEnv():
             f'\t    : Fut  \t{info["reward"]["pos_fut_reward"]:.4f}\t{info["reward"]["neg_fut_reward"]:.4f}\n'
             f'\t    : Pred \t{info["reward"]["pos_pred_reward"]:.4f}\t{info["reward"]["neg_pred_reward"]:.4f}\n'
         )
-            # f'\tPRED:\n'
-            # f'   ACT              PRESS             REF\n'
-            # f'{np.hstack((info["pred"]["pred_act"].reshape(-1,2), info["pred"]["pred_press"].reshape(-1,2), info["pred"]["pred_ref"].reshape(-1,2)))}'
-            # f'\t      Act\t{info["reward"]["pos_act_reward"]}\t{info["reward"]["neg_act_reward"]}\n'
-            # f'\t      Diff\t{info["reward"]["pos_diff_reward"]}\t{info["reward"]["neg_diff_reward"]}'
         # )
         for _ in range(12):
             sys.stdout.write('\x1b[1A')  # move the cursor up one line

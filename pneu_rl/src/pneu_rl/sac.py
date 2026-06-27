@@ -312,7 +312,7 @@ class SAC():
         path: str = 'model.pth',
         evaluate: bool = True
     ) -> None:
-        state_dict = torch.load(path)
+        state_dict = torch.load(path, weights_only=True)
         self.policy.load_state_dict(state_dict['policy_state_dict'])
         self.critic.load_state_dict(state_dict['critic_state_dict'])
         self.critic_target.load_state_dict(state_dict['critic_target_state_dict'])

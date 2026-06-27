@@ -5,6 +5,7 @@ channels:
   - defaults
 dependencies:
   - python=3.9
+  - pip
   - numpy
   - scipy
   - pandas
@@ -15,3 +16,8 @@ dependencies:
   - pytorch
   - tensorboard
   - ipykernel
+  - pip:
+      - -e ./pneu_utils
+      - -e ./pneu_ref
+      - -e ./pneu_env
+      - -e ./pneu_rl

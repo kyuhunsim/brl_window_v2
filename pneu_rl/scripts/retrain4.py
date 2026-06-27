@@ -26,10 +26,10 @@ DEFAULT_DISP_REF = dict(
 )
 
 DEFAULT_PRESSURE_DIFF_DISP_REF = dict(
-    dp_to_disp_slope=0.6011927721229401,
-    dp_to_disp_intercept=-5.325254604545463,
-    min_disp=7.0,
-    max_disp=21.0,
+    dp_to_disp_slope=0.6537588686709214,
+    dp_to_disp_intercept=-1.7580850354058029,
+    min_disp=None,
+    max_disp=None,
 )
 
 DISP_REWARD_DEFAULTS = dict(
@@ -37,7 +37,7 @@ DISP_REWARD_DEFAULTS = dict(
     disp_curr_rwd_coeff=0.2,
     disp_fut_rwd_coeff=0.0,
     disp_pred_rwd_coeff=0.0,
-    disp_vel_rwd_coeff=0.001,
+    disp_vel_rwd_coeff=0.0,
 )
 
 DISP_REWARD_WITH_PRED = dict(
@@ -45,7 +45,7 @@ DISP_REWARD_WITH_PRED = dict(
     disp_curr_rwd_coeff=0.2,
     disp_fut_rwd_coeff=0.005,
     disp_pred_rwd_coeff=0.08,
-    disp_vel_rwd_coeff=0.001,
+    disp_vel_rwd_coeff=0.0,
 )
 
 REAL_RETRAIN_PID = dict(

@@ -36,7 +36,10 @@ import matplotlib.gridspec as gridspec
 import matplotlib.font_manager as fm
 
 font_path = '/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf'
-Times_New_Roman = fm.FontProperties(fname=font_path)
+if os.path.isfile(font_path):
+    Times_New_Roman = fm.FontProperties(fname=font_path)
+else:
+    Times_New_Roman = fm.FontProperties(family='serif')
 
 
 ATM = 101.325
@@ -102,17 +105,17 @@ viz_kwargs = dict(
         ),
         pid = dict(
             Kp_act_pos_in = 0.0,
-            Ki_act_pos_in = 0.0,
+            Ki_act_pos_in = 0.002,
             Kd_act_pos_in = 0.0,
             Kp_act_pos_out = 0.0,
-            Ki_act_pos_out = 0.0,
+            Ki_act_pos_out = 0.002,
             Kd_act_pos_out = 0.0,
-            Kp_act_neg_in = 0.001,
-            Ki_act_neg_in = 0.001,
-            Kd_act_neg_in = 0.001,
-            Kp_act_neg_out = 0.001,
-            Ki_act_neg_out = 0.001,
-            Kd_act_neg_out = 0.001,
+            Kp_act_neg_in = 0.02,
+            Ki_act_neg_in = 0.002,
+            Kd_act_neg_in = 0.00,
+            Kp_act_neg_out = 0.000,
+            Ki_act_neg_out = 0.002,
+            Kd_act_neg_out = 0.000,
             Ka = 1
         )
     ),
@@ -153,10 +156,10 @@ viz_kwargs = dict(
             seed = 61099
         ),
         pressure_diff_displacement = dict(
-            dp_to_disp_slope = 0.6011927721229401,
-            dp_to_disp_intercept = -5.325254604545463,
-            min_disp = 7.0,
-            max_disp = 21.0
+            dp_to_disp_slope = 0.6537588686709214,
+            dp_to_disp_intercept = -1.7580850354058029,
+            min_disp = None,
+            max_disp = None
         ),
         sine = dict(
             pos_amp = 10,

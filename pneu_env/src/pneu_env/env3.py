@@ -26,8 +26,6 @@ class PneuEnv3:
             neg_fut_rwd_coeff=0.0,
             pos_pred_rwd_coeff=0.0,
             neg_pred_rwd_coeff=0.0,
-            pos_diff_rwd_coeff=0.0,
-            neg_diff_rwd_coeff=0.0,
             action_delta_rwd_coeff=0.0,
             conflict_rwd_coeff=0.0,
             chamber_reserve_rwd_coeff=0.0,

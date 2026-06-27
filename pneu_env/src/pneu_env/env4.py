@@ -26,18 +26,15 @@ class PneuEnv4:
             neg_fut_rwd_coeff=0.0,
             pos_pred_rwd_coeff=0.0,
             neg_pred_rwd_coeff=0.0,
-            pos_diff_rwd_coeff=0.0,
-            neg_diff_rwd_coeff=0.0,
-            action_delta_rwd_coeff=0.0,
-            conflict_rwd_coeff=0.0,
-            chamber_reserve_rwd_coeff=0.0,
+            diff_curr_rwd_coeff=0.0,
+            diff_fut_rwd_coeff=0.0,
+            diff_pred_rwd_coeff=0.0,
             disp_prev_rwd_coeff=0.0,
             disp_curr_rwd_coeff=0.0,
             disp_fut_rwd_coeff=0.0,
             disp_pred_rwd_coeff=0.0,
             disp_vel_rwd_coeff=0.0,
-            chamber_margin_kpa=15.0,
-            chamber_deadband_kpa=5.0,
+            action_delta_rwd_coeff=0.0,
         ),
         pos_pred_rnd_offset_range: float = 0,
         neg_pred_rnd_offset_range: float = 0,
@@ -50,6 +47,9 @@ class PneuEnv4:
         displacement_obs_key: str = "sen_total_contraction_from_rest",
         displacement_scale: float = 1000.0,
         velocity_scale: float = 1000.0,
+        include_displacement_velocity_obs: bool = True,
+        include_prev_action_obs: bool = False,
+        include_pressure_diff_velocity_obs: bool = False,
     ):
         self.obs = obs
         self.goal = PneuRefND(
@@ -67,9 +67,22 @@ class PneuEnv4:
         self.num_obs = num_prev + 1
         self.num_ref = num_prev + num_pred + 1
 
-        self.dim_obs = 6
+        self.include_displacement_velocity_obs = bool(include_displacement_velocity_obs)
+        self.press_idx = slice(0, 4)
+        self.disp_idx = 4
+        self.vel_idx = 5 if self.include_displacement_velocity_obs else None
+        self.base_obs_dim = 5 + (1 if self.include_displacement_velocity_obs else 0)
         self.dim_ref = 3
         self.dim_act = 6
+        self.include_prev_action_obs = bool(include_prev_action_obs)
+        self.include_pressure_diff_velocity_obs = bool(include_pressure_diff_velocity_obs)
+        self.prev_action_obs_dim = self.dim_act if self.include_prev_action_obs else 0
+        self.pressure_diff_velocity_obs_dim = 1 if self.include_pressure_diff_velocity_obs else 0
+        self.dim_obs = (
+            self.base_obs_dim
+            + self.prev_action_obs_dim
+            + self.pressure_diff_velocity_obs_dim
+        )
         if self.goal.dim_ref != self.dim_ref:
             raise ValueError(
                 f"PneuEnv4 expects 3D refs [act_pos, act_neg, displacement], "
@@ -156,7 +169,7 @@ class PneuEnv4:
         self.prev_action = self._expand_ctrl_traj(self.action_space.low)[0]
 
     def _initial_obs_vector(self) -> np.ndarray:
-        return np.array(
+        base_obs = np.array(
             [
                 getattr(self.obs, "init_pos_press", 101.325),
                 getattr(self.obs, "init_neg_press", 101.325),
@@ -166,10 +179,40 @@ class PneuEnv4:
                     getattr(self.obs, "init_length", getattr(self.obs, "initial_length", 0.0)),
                     self.obs,
                 ),
-                0.0,
             ],
             dtype=np.float64,
         )
+        if self.include_displacement_velocity_obs:
+            base_obs = np.r_[base_obs, 0.0]
+        return self._augment_obs(
+            base_obs,
+            prev_base_obs=None,
+            applied_ctrl=np.zeros(self.dim_act, dtype=np.float64),
+        )
+
+    def _augment_obs(
+        self,
+        base_obs: np.ndarray,
+        prev_base_obs: Optional[np.ndarray],
+        applied_ctrl: Optional[np.ndarray],
+    ) -> np.ndarray:
+        components = [np.asarray(base_obs, dtype=np.float64)]
+
+        if self.include_prev_action_obs:
+            if applied_ctrl is None:
+                applied_ctrl = np.zeros(self.dim_act, dtype=np.float64)
+            components.append(np.asarray(applied_ctrl, dtype=np.float64).reshape(self.dim_act))
+
+        if self.include_pressure_diff_velocity_obs:
+            if prev_base_obs is None:
+                diff_velocity = 0.0
+            else:
+                curr_diff = float(base_obs[2] - base_obs[3])
+                prev_diff = float(prev_base_obs[2] - prev_base_obs[3])
+                diff_velocity = (curr_diff - prev_diff) * float(self.obs.freq)
+            components.append(np.array([diff_velocity], dtype=np.float64))
+
+        return np.concatenate(components, dtype=np.float64)
 
     def _sim_cell_length_to_ref_disp(self, cell_length: float, sim: Any) -> float:
         if self.displacement_obs_key == "sen_total_length":
@@ -181,7 +224,7 @@ class PneuEnv4:
             value_m = sim.total_length_to_contraction(total_length)
         return float(value_m) * self.displacement_scale
 
-    def _sim_obs_to_env_obs(
+    def _sim_obs_to_base_obs(
         self,
         obs: np.ndarray,
         obs_info: Dict[str, Any],
@@ -192,20 +235,34 @@ class PneuEnv4:
         else:
             displacement_m = self._sim_cell_length_to_ref_disp(obs[5], self.obs) / self.displacement_scale
 
-        total_velocity_m_s = float(observation.get("sen_total_velocity", obs[6]))
-        if "contraction" in self.displacement_obs_key:
-            displacement_velocity_m_s = -total_velocity_m_s
-        else:
-            displacement_velocity_m_s = total_velocity_m_s
+        components = [
+            obs[1],
+            obs[2],
+            obs[3],
+            obs[4],
+            displacement_m * self.displacement_scale,
+        ]
 
+        if self.include_displacement_velocity_obs:
+            total_velocity_m_s = float(observation.get("sen_total_velocity", obs[6]))
+            if "contraction" in self.displacement_obs_key:
+                displacement_velocity_m_s = -total_velocity_m_s
+            else:
+                displacement_velocity_m_s = total_velocity_m_s
+            components.append(displacement_velocity_m_s * self.velocity_scale)
+
+        return np.array(components, dtype=np.float64)
+
+    def _extract_applied_ctrl(self, obs_info: Dict[str, Any]) -> np.ndarray:
+        observation = obs_info.get("Observation", {})
         return np.array(
             [
-                obs[1],
-                obs[2],
-                obs[3],
-                obs[4],
-                displacement_m * self.displacement_scale,
-                displacement_velocity_m_s * self.velocity_scale,
+                observation["ctrl_pos"],
+                observation["ctrl_neg"],
+                observation["ctrl_act_pos_in"],
+                observation["ctrl_act_pos_out"],
+                observation["ctrl_act_neg_in"],
+                observation["ctrl_act_neg_out"],
             ],
             dtype=np.float64,
         )
@@ -216,7 +273,10 @@ class PneuEnv4:
         sim: Any,
     ) -> Tuple[float, float]:
         displacement_m = float(motion_obs[0]) / self.displacement_scale
-        displacement_velocity_m_s = float(motion_obs[1]) / self.velocity_scale
+        if self.include_displacement_velocity_obs and len(motion_obs) > 1:
+            displacement_velocity_m_s = float(motion_obs[1]) / self.velocity_scale
+        else:
+            displacement_velocity_m_s = 0.0
 
         if self.displacement_obs_key == "sen_total_length":
             total_length = displacement_m
@@ -309,7 +369,10 @@ class PneuEnv4:
         else:
             init_press = base_init_press
         if hasattr(self.obs, "set_init_press"):
-            init_length, init_velocity = self._env_motion_to_sim_state(init_press[4:6], self.obs)
+            init_length, init_velocity = self._env_motion_to_sim_state(
+                init_press[self.disp_idx:self.base_obs_dim],
+                self.obs,
+            )
             self.obs.set_init_press(
                 init_press[0],
                 init_press[1],
@@ -371,12 +434,15 @@ class PneuEnv4:
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
         ctrl_traj = self._expand_ctrl_traj(ctrl, update_chamber_integral=True)
         goal_traj = self.goal.get_ref(self.t).reshape(-1, self.dim_ref)
+        prev_base_obs = self.obs_traj[-1, :self.base_obs_dim].copy()
 
         obs, obs_info = self.obs.observe(
             ctrl_traj.copy()[0],
             goal_traj.copy()[self.num_obs - 1],
         )
-        full_press = self._sim_obs_to_env_obs(obs, obs_info).reshape(1, self.dim_obs)
+        base_obs = self._sim_obs_to_base_obs(obs, obs_info)
+        applied_ctrl = self._extract_applied_ctrl(obs_info)
+        full_press = self._augment_obs(base_obs, prev_base_obs, applied_ctrl).reshape(1, self.dim_obs)
         obs_traj = np.r_[
             self.obs_traj[1:],
             full_press,
@@ -405,7 +471,11 @@ class PneuEnv4:
         self.curr_full_press = obs_traj[-1].copy()
         self.has_episode_state = True
         obs_info["Observation"]["sen_env_displacement"] = float(full_press[0, 4])
-        obs_info["Observation"]["sen_env_velocity"] = float(full_press[0, 5])
+        obs_info["Observation"]["sen_env_velocity"] = (
+            float(full_press[0, self.vel_idx]) if self.vel_idx is not None else 0.0
+        )
+        if self.include_pressure_diff_velocity_obs:
+            obs_info["Observation"]["sen_pressure_diff_velocity"] = float(full_press[0, -1])
         obs_info["ctrl"] = ctrl_traj
         obs_info["pred"] = pred_info
         obs_info["goal_traj"] = goal_traj
@@ -419,12 +489,16 @@ class PneuEnv4:
         ctrl_traj: np.ndarray,
         ref_traj: np.ndarray,
     ) -> Tuple[np.ndarray, Dict[str, np.ndarray]]:
-        init_length, init_velocity = self._env_motion_to_sim_state(init_press[4:6], self.pred)
+        init_base_obs = init_press[:self.base_obs_dim]
+        init_length, init_velocity = self._env_motion_to_sim_state(
+            init_base_obs[self.disp_idx:self.base_obs_dim],
+            self.pred,
+        )
         self.pred.set_init_press(
-            init_press[0],
-            init_press[1],
-            init_press[2],
-            init_press[3],
+            init_base_obs[0],
+            init_base_obs[1],
+            init_base_obs[2],
+            init_base_obs[3],
             init_length,
             init_velocity,
         )
@@ -438,8 +512,9 @@ class PneuEnv4:
 
         preds = np.array([], dtype=np.float64)
         pred_ctrls = []
-        chamber_press = init_press[0:2]
+        chamber_press = init_base_obs[0:2]
         chamber_integral_err = self.chamber_integral_err.copy()
+        prev_base_obs = init_base_obs.copy()
         for ctrl, goal in zip(ctrl_traj, ref_traj):
             pred_ctrl = ctrl.copy()
             if self.steady_chamber_ctrl is not None:
@@ -449,10 +524,13 @@ class PneuEnv4:
                     integrate=True,
                 )
             pred, pred_obs_info = self.pred.observe(pred_ctrl, goal)
-            pred_env_obs = self._sim_obs_to_env_obs(pred, pred_obs_info)
+            pred_base_obs = self._sim_obs_to_base_obs(pred, pred_obs_info)
+            pred_applied_ctrl = self._extract_applied_ctrl(pred_obs_info)
+            pred_env_obs = self._augment_obs(pred_base_obs, prev_base_obs, pred_applied_ctrl)
             preds = np.r_[preds, pred_env_obs]
             pred_ctrls.append(pred_ctrl)
-            chamber_press = pred_env_obs[0:2]
+            chamber_press = pred_base_obs[0:2]
+            prev_base_obs = pred_base_obs
 
         pred_press = preds.reshape(-1, self.dim_obs)
         pred_info = dict(
@@ -487,17 +565,21 @@ class PneuEnv4:
         obs_traj, pred_traj, ref_traj = self._split_state(state)
 
         act_obses = obs_traj[:, 2:4]
-        disp_obses = obs_traj[:, 4]
+        disp_obses = obs_traj[:, self.disp_idx]
         refs = ref_traj[:self.num_obs]
         press_refs = refs[:, 0:2]
         disp_refs = refs[:, 2]
         errs = press_refs - act_obses
         disp_errs = disp_refs - disp_obses
+        diff_refs = press_refs[:, 0] - press_refs[:, 1]
+        diff_obses = act_obses[:, 0] - act_obses[:, 1]
+        diff_errs = diff_refs - diff_obses
 
         prev_errs = errs[0:-1]
         curr_err = errs[-1]
         prev_disp_errs = disp_errs[0:-1]
         curr_disp_err = disp_errs[-1]
+        curr_diff_err = diff_errs[-1]
 
         reward = 0.0
 
@@ -517,20 +599,39 @@ class PneuEnv4:
         disp_prev_reward *= -self.rwd_kwargs["disp_prev_rwd_coeff"]
         disp_curr_reward = np.abs(curr_disp_err)
         disp_curr_reward *= -self.rwd_kwargs["disp_curr_rwd_coeff"]
-        disp_vel_reward = np.abs(obs_traj[-1, 5])
-        disp_vel_reward *= -self.rwd_kwargs["disp_vel_rwd_coeff"]
-        reward += disp_prev_reward + disp_curr_reward + disp_vel_reward
+        if self.vel_idx is not None:
+            disp_vel_reward = np.abs(obs_traj[-1, self.vel_idx])
+            disp_vel_reward *= -self.rwd_kwargs["disp_vel_rwd_coeff"]
+        else:
+            disp_vel_reward = 0.0
+        diff_curr_reward = np.abs(curr_diff_err)
+        diff_curr_reward *= -self.rwd_kwargs["diff_curr_rwd_coeff"]
+        curr_action = self._expand_ctrl_traj(action)[0]
+        action_delta = float(np.mean((curr_action - self.prev_action) ** 2))
+        action_delta_coeff = float(self.rwd_kwargs.get("action_delta_rwd_coeff", 0.0))
+        action_delta_reward = -action_delta_coeff * action_delta
+        reward += (
+            disp_prev_reward
+            + disp_curr_reward
+            + disp_vel_reward
+            + diff_curr_reward
+            + action_delta_reward
+        )
 
         if self.pred is not None and pred_traj is not None:
             pred_act_obses = pred_traj[:, 2:4]
-            pred_disp_obses = pred_traj[:, 4]
+            pred_disp_obses = pred_traj[:, self.disp_idx]
             pred_refs = ref_traj[self.num_obs:self.num_obs + self.num_act]
             pred_press_refs = pred_refs[:, 0:2]
             pred_disp_refs = pred_refs[:, 2]
             pred_errs = pred_press_refs - pred_act_obses
             pred_disp_errs = pred_disp_refs - pred_disp_obses
+            pred_diff_refs = pred_press_refs[:, 0] - pred_press_refs[:, 1]
+            pred_diff_obses = pred_act_obses[:, 0] - pred_act_obses[:, 1]
+            pred_diff_errs = pred_diff_refs - pred_diff_obses
             pred_err = pred_errs[-1]
             pred_disp_err = pred_disp_errs[-1]
+            pred_diff_err = pred_diff_errs[-1]
 
             pos_fut_reward = np.sum(np.abs(pred_errs[:, 0]))
             pos_fut_reward *= -self.rwd_kwargs["pos_fut_rwd_coeff"]
@@ -548,7 +649,11 @@ class PneuEnv4:
             disp_fut_reward *= -self.rwd_kwargs["disp_fut_rwd_coeff"]
             disp_pred_reward = np.abs(pred_disp_err)
             disp_pred_reward *= -self.rwd_kwargs["disp_pred_rwd_coeff"]
-            reward += disp_fut_reward + disp_pred_reward
+            diff_fut_reward = np.sum(np.abs(pred_diff_errs))
+            diff_fut_reward *= -self.rwd_kwargs["diff_fut_rwd_coeff"]
+            diff_pred_reward = np.abs(pred_diff_err)
+            diff_pred_reward *= -self.rwd_kwargs["diff_pred_rwd_coeff"]
+            reward += disp_fut_reward + disp_pred_reward + diff_fut_reward + diff_pred_reward
         else:
             pos_fut_reward = 0.0
             neg_fut_reward = 0.0
@@ -556,36 +661,8 @@ class PneuEnv4:
             neg_pred_reward = 0.0
             disp_fut_reward = 0.0
             disp_pred_reward = 0.0
-
-        curr_ctrl = self._expand_ctrl_traj(action)[0]
-
-        # 2026-05-28:
-        # lib4의 RL+PID 제어가 tracking은 되지만 밸브 동시 개방과 chamber drift로 인해
-        # 거칠게 흔들리는 경향이 있어, 작은 보상 항으로 부드러움/충돌/저장압을 함께 유도한다.
-        action_delta = float(np.mean((curr_ctrl - self.prev_action) ** 2))
-        action_delta_reward = -self.rwd_kwargs["action_delta_rwd_coeff"] * action_delta
-        reward += action_delta_reward
-
-        conflict = float(
-            0.5 * (
-                curr_ctrl[2] * curr_ctrl[3]
-                + curr_ctrl[4] * curr_ctrl[5]
-            )
-        )
-        conflict_reward = -self.rwd_kwargs["conflict_rwd_coeff"] * conflict
-        reward += conflict_reward
-
-        chamber_margin = self.rwd_kwargs["chamber_margin_kpa"]
-        chamber_deadband = self.rwd_kwargs["chamber_deadband_kpa"]
-        ch_pos = obs_traj[-1, 0]
-        ch_neg = obs_traj[-1, 1]
-        pos_reserve_target = refs[-1, 0] + chamber_margin
-        neg_reserve_target = refs[-1, 1] - chamber_margin
-        pos_reserve_shortage = max(pos_reserve_target - ch_pos - chamber_deadband, 0.0)
-        neg_reserve_shortage = max(ch_neg - neg_reserve_target - chamber_deadband, 0.0)
-        chamber_reserve_error = pos_reserve_shortage + neg_reserve_shortage
-        chamber_reserve_reward = -self.rwd_kwargs["chamber_reserve_rwd_coeff"] * chamber_reserve_error
-        reward += chamber_reserve_reward
+            diff_fut_reward = 0.0
+            diff_pred_reward = 0.0
 
         info = {
             "pos_prev_reward": pos_prev_reward,
@@ -596,17 +673,17 @@ class PneuEnv4:
             "neg_fut_reward": neg_fut_reward,
             "pos_pred_reward": pos_pred_reward,
             "neg_pred_reward": neg_pred_reward,
+            "diff_curr_reward": diff_curr_reward,
+            "diff_fut_reward": diff_fut_reward,
+            "diff_pred_reward": diff_pred_reward,
             "disp_prev_reward": disp_prev_reward,
             "disp_curr_reward": disp_curr_reward,
             "disp_fut_reward": disp_fut_reward,
             "disp_pred_reward": disp_pred_reward,
             "disp_vel_reward": disp_vel_reward,
             "action_delta_reward": action_delta_reward,
-            "conflict_reward": conflict_reward,
-            "chamber_reserve_reward": chamber_reserve_reward,
             "action_delta": action_delta,
-            "conflict": conflict,
-            "chamber_reserve_error": chamber_reserve_error,
+            "diff_error": float(curr_diff_err),
             "disp_error": float(curr_disp_err),
         }
 
@@ -701,19 +778,14 @@ class PneuEnv4:
                 f'err={info["reward"]["disp_error"]:.4f}'
             ),
             (
-                f'\t    : Delta\t'
+                f'\t    : Diff \t'
+                f'{info["reward"]["diff_curr_reward"]:.4f}\t'
+                f'err={info["reward"]["diff_error"]:.4f}'
+            ),
+            (
+                f'\t    : ActD \t'
                 f'{info["reward"]["action_delta_reward"]:.4f}\t'
-                f'val={info["reward"]["action_delta"]:.4f}'
-            ),
-            (
-                f'\t    : Conf \t'
-                f'{info["reward"]["conflict_reward"]:.4f}\t'
-                f'val={info["reward"]["conflict"]:.4f}'
-            ),
-            (
-                f'\t    : ChRes\t'
-                f'{info["reward"]["chamber_reserve_reward"]:.4f}\t'
-                f'err={info["reward"]["chamber_reserve_error"]:.4f}'
+                f'delta={info["reward"]["action_delta"]:.4f}'
             ),
             f'\t    : Total\t{sum(value for key, value in info["reward"].items() if key.endswith("_reward")):.4f}',
         ]

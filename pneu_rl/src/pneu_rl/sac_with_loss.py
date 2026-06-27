@@ -388,8 +388,12 @@ class SAC():
             return float(np.mean(np.abs(np.diff(y)))) if len(y) > 1 else 0.0
 
         atm = 101.325
+        support_band = 8.0
         act_pos_near_atm = np.abs(act_pos - atm) < self.train_diag_atm_band
         act_neg_near_atm = np.abs(act_neg - atm) < self.train_diag_atm_band
+        pos_support_margin = ch_pos - act_pos
+        neg_relief_margin = act_neg - ch_neg
+        neg_fill_margin = atm - act_neg
 
         return dict(
             epi=int(epi),
@@ -416,12 +420,18 @@ class SAC():
             pos_wrong_in_when_need_down=mean_when(u_pos_in, pos_need_down),
             pos_wrong_gt_right_when_need_up=ratio_when(u_pos_out > u_pos_in, pos_need_up),
             pos_wrong_gt_right_when_need_down=ratio_when(u_pos_in > u_pos_out, pos_need_down),
+            pos_support_margin_when_need_up=mean_when(pos_support_margin, pos_need_up),
+            pos_support_low_ratio_when_need_up=ratio_when(pos_support_margin < support_band, pos_need_up),
             neg_need_up_ratio=float(np.mean(neg_need_up)),
             neg_need_down_ratio=float(np.mean(neg_need_down)),
             neg_wrong_in_when_need_up=mean_when(u_neg_in, neg_need_up),
             neg_wrong_out_when_need_down=mean_when(u_neg_out, neg_need_down),
             neg_wrong_gt_right_when_need_up=ratio_when(u_neg_in > u_neg_out, neg_need_up),
             neg_wrong_gt_right_when_need_down=ratio_when(u_neg_out > u_neg_in, neg_need_down),
+            neg_fill_margin_when_need_up=mean_when(neg_fill_margin, neg_need_up),
+            neg_fill_low_ratio_when_need_up=ratio_when(neg_fill_margin < support_band, neg_need_up),
+            neg_relief_margin_when_need_down=mean_when(neg_relief_margin, neg_need_down),
+            neg_relief_low_ratio_when_need_down=ratio_when(neg_relief_margin < support_band, neg_need_down),
             act_pos_near_atm_ratio=float(np.mean(act_pos_near_atm)),
             act_neg_near_atm_ratio=float(np.mean(act_neg_near_atm)),
             act_pos_sign_change_per_sec=sign_change_per_sec(act_pos),
@@ -472,7 +482,7 @@ class SAC():
         path: str = 'model.pth',
         evaluate: bool = True
     ) -> None:
-        state_dict = torch.load(path)
+        state_dict = torch.load(path, weights_only=True)
         self.policy.load_state_dict(state_dict['policy_state_dict'])
         self.critic.load_state_dict(state_dict['critic_state_dict'])
         self.critic_target.load_state_dict(state_dict['critic_target_state_dict'])

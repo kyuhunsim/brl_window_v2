@@ -36,8 +36,8 @@
 #define SV_G_ 0.16          //       [mm] Solenoid valve gap (
 #define POS_VALVE_NUM 1      //       [-] Number of positive valves
 #define NEG_VALVE_NUM 1      //       [-] Number of negative valves
-#define CIN_ 3.5414570189218374   //       [-] Inlet discharge coeff, tuned with soft actuator data
-#define COUT_ 17.719671893162565  //       [-] Outlet discharge coeff, tuned with soft actuator data
+#define CIN_ 3.594950818595695    //       [-] Inlet discharge coeff, tuned from coeff_result/260624_11_21_35...
+#define COUT_ 9.425020467026517   //       [-] Outlet discharge coeff, tuned from coeff_result/260624_11_21_35...
 // Paper parameter
 // #define CIN_ 1.464271612858397
 // #define COUT_ 33.47453817004828

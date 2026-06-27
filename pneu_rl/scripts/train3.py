@@ -98,8 +98,6 @@ if train_mode == '1':
                 neg_fut_rwd_coeff = 0.01*1,
                 pos_pred_rwd_coeff = 0.25*1,
                 neg_pred_rwd_coeff = 0.25*1,
-                pos_diff_rwd_coeff = 0.0,
-                neg_diff_rwd_coeff = 0.0,
                 # 2026-05-28:
                 # lib3에서 RL+PID의 tracking은 유지하면서도 제어 진동과 chamber drift를 줄이기 위한 약한 보상 항
                 action_delta_rwd_coeff = 0.08,
@@ -192,8 +190,6 @@ elif train_mode == '2':
 
                 pos_prev_rwd_coeff = 0.0,
                 neg_prev_rwd_coeff = 0.0,
-                pos_diff_rwd_coeff = 0.0,
-                neg_diff_rwd_coeff = 0.0,
                 action_delta_rwd_coeff = 0.0,
                 conflict_rwd_coeff = 0.0,
                 chamber_reserve_rwd_coeff = 0.0,
@@ -274,8 +270,6 @@ elif train_mode == '3':
 
                 pos_prev_rwd_coeff = 0.0,
                 neg_prev_rwd_coeff = 0.0,
-                pos_diff_rwd_coeff = 0.0,
-                neg_diff_rwd_coeff = 0.0,
                 action_delta_rwd_coeff = 0.0,
                 conflict_rwd_coeff = 0.0,
                 chamber_reserve_rwd_coeff = 0.0,
@@ -350,8 +344,6 @@ elif train_mode == '4':
 
                 pos_prev_rwd_coeff = 0.0,
                 neg_prev_rwd_coeff = 0.0,
-                pos_diff_rwd_coeff = 0.0,
-                neg_diff_rwd_coeff = 0.0,
                 action_delta_rwd_coeff = 0.0,
                 conflict_rwd_coeff = 0.0,
                 chamber_reserve_rwd_coeff = 0.0,

@@ -87,15 +87,15 @@ class PressureDiffDisplacementRef(BaseRef):
         pressure_ref: Any,
         dp_to_disp_slope: float = 0.6011927721229401,
         dp_to_disp_intercept: float = -5.325254604545463,
-        min_disp: float = 7.0,
-        max_disp: float = 21.0,
+        min_disp: float | None = None,
+        max_disp: float | None = None,
     ):
         super().__init__()
         self.pressure_ref = pressure_ref
         self.dp_to_disp_slope = float(dp_to_disp_slope)
         self.dp_to_disp_intercept = float(dp_to_disp_intercept)
-        self.min_disp = float(min_disp)
-        self.max_disp = float(max_disp)
+        self.min_disp = None if min_disp is None else float(min_disp)
+        self.max_disp = None if max_disp is None else float(max_disp)
         self.max_time = getattr(pressure_ref, "max_time", float("inf"))
 
     def time_reset(self) -> None:
@@ -106,5 +106,8 @@ class PressureDiffDisplacementRef(BaseRef):
         pos_ref, neg_ref = self.pressure_ref.get_goal(curr_time)
         dp_ref = float(pos_ref) - float(neg_ref)
         disp_ref = self.dp_to_disp_slope * dp_ref + self.dp_to_disp_intercept
-        disp_ref = min(max(disp_ref, self.min_disp), self.max_disp)
+        if self.min_disp is not None:
+            disp_ref = max(disp_ref, self.min_disp)
+        if self.max_disp is not None:
+            disp_ref = min(disp_ref, self.max_disp)
         return float(pos_ref), float(neg_ref), float(disp_ref)

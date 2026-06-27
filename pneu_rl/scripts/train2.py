@@ -66,8 +66,6 @@ if train_mode == '1':
                 neg_fut_rwd_coeff = 0.01*1,
                 pos_pred_rwd_coeff = 0.25*1,
                 neg_pred_rwd_coeff = 0.25*1,
-                pos_diff_rwd_coeff = 0.0,
-                neg_diff_rwd_coeff = 0.0,
             ),
             pos_pred_rnd_offset_range = 0, 
             neg_pred_rnd_offset_range = 0,
@@ -144,8 +142,6 @@ elif train_mode == '2':
                 
                 pos_prev_rwd_coeff = 0.0,
                 neg_prev_rwd_coeff = 0.0,
-                pos_diff_rwd_coeff = 0.0,
-                neg_diff_rwd_coeff = 0.0,
             ),
             pos_pred_rnd_offset_range = 0, 
             neg_pred_rnd_offset_range = 0,
@@ -219,8 +215,6 @@ elif train_mode == '3':
                 
                 pos_prev_rwd_coeff = 0.0,
                 neg_prev_rwd_coeff = 0.0,
-                pos_diff_rwd_coeff = 0.0,
-                neg_diff_rwd_coeff = 0.0,
             ),
             pos_pred_rnd_offset_range = 0, 
             neg_pred_rnd_offset_range = 0,
@@ -288,8 +282,6 @@ elif train_mode == '4':
                 
                 pos_prev_rwd_coeff = 0.0,
                 neg_prev_rwd_coeff = 0.0,
-                pos_diff_rwd_coeff = 0.0,
-                neg_diff_rwd_coeff = 0.0,
             ),
             pos_pred_rnd_offset_range = 0, 
             neg_pred_rnd_offset_range = 0,

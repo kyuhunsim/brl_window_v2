@@ -1,0 +1,153 @@
+disp_ref:
+  max_amp: 3.0
+  max_off: 18.0
+  max_per: 10.0
+  max_ts: 5
+  min_off: 10.0
+  seed: 61099
+env:
+  displacement_obs_key: sen_total_contraction_from_rest
+  displacement_scale: 1000.0
+  episode_carry_state: false
+  fixed_chamber_ctrl: null
+  include_pressure_diff_velocity_obs: true
+  include_prev_action_obs: true
+  neg_pred_rnd_offset_range: 0
+  num_act: 5
+  num_pred: 15
+  num_prev: 10
+  pid_enabled: true
+  pos_pred_rnd_offset_range: 0
+  rwd_kwargs:
+    diff_curr_rwd_coeff: 0.3
+    diff_fut_rwd_coeff: 0.01
+    diff_pred_rwd_coeff: 0.25
+    disp_curr_rwd_coeff: 0.2
+    disp_fut_rwd_coeff: 0.005
+    disp_pred_rwd_coeff: 0.08
+    disp_prev_rwd_coeff: 0.0
+    disp_vel_rwd_coeff: 0.001
+    neg_curr_rwd_coeff: 0.3
+    neg_fut_rwd_coeff: 0.01
+    neg_pred_rwd_coeff: 0.25
+    neg_prev_rwd_coeff: 0.0
+    pos_curr_rwd_coeff: 0.3
+    pos_fut_rwd_coeff: 0.01
+    pos_pred_rwd_coeff: 0.25
+    pos_prev_rwd_coeff: 0.0
+  steady_chamber_ctrl: null
+  velocity_scale: 1000.0
+  verbose: true
+epi: 1000
+metrics:
+  columns:
+    obs_neg: act_neg_press
+    obs_pos: act_pos_press
+    ref_neg: ref_act_neg
+    ref_pos: ref_act_pos
+  displacement:
+    bias: -1.1316586164918454
+    mae: 2.1182407813097988
+    rmse: 2.523781833993236
+    sample_count: 2004
+    unit: mm
+  full:
+    bias_neg: 1.658949954302855
+    bias_pos: 1.5076032679634466
+    mae_neg: 2.518460617997423
+    mae_pos: 2.6574173521244657
+    rmse_neg: 2.8866348926652505
+    rmse_pos: 3.286906860475241
+  sample_count: 2004
+  tracking_pair: Actuator
+  window:
+    bias_neg: 0.4903975486129175
+    bias_pos: 0.8935571801692814
+    end_sec: 90.0
+    mae_neg: 2.8628392965077927
+    mae_pos: 3.541657464624828
+    rmse_neg: 3.29786016097761
+    rmse_pos: 4.0494674131480295
+    sample_count: 500
+    start_sec: 30.0
+model:
+  alpha: 0.5
+  automatic_entropy_tunning: true
+  batch_size: 128
+  buffer_size: 500000.0
+  epoch: 1
+  gamma: 0.9
+  hidden_dim: 256
+  horizon: 2048
+  learning_rate: 0.0003
+  log_std_max: 1
+  log_std_min: -10
+  max_grad_norm: 0.5
+  noise_std: 1.5
+  spatial_weight: 0.4
+  start_epi: 10
+  tau: 0.005
+  temporal_weight: 1
+  train_diag_atm_band: 8.0
+  train_diag_interval: 1
+model_name: 0626_lib4_Ours
+obs:
+  delay: 0.1
+  freq: 50
+  init_act_neg_press: 90.71720123291016
+  init_act_pos_press: 110.23314666748047
+  init_length: 0.017403352886509436
+  init_neg_press: 41.214786529541016
+  init_pos_press: 136.9188690185547
+  noise: false
+  scale: true
+  scale_high: 1.0
+  scale_low: 0.8
+obs_mode: simulation
+pid:
+  Ka: 1
+  Kd_act_neg_in: 0.0
+  Kd_act_neg_out: 0.0
+  Kd_act_pos_in: 0.0
+  Kd_act_pos_out: 0.0
+  Ki_act_neg_in: 0.002
+  Ki_act_neg_out: 0.002
+  Ki_act_pos_in: 0.002
+  Ki_act_pos_out: 0.002
+  Kp_act_neg_in: 0.0
+  Kp_act_neg_out: 0.0
+  Kp_act_pos_in: 0.0
+  Kp_act_pos_out: 0.0
+pred:
+  delay: 0
+  freq: 50
+  init_act_neg_press: 90.71720123291016
+  init_act_pos_press: 110.23314666748047
+  init_length: 0.017403352886509436
+  init_neg_press: 41.214786529541016
+  init_pos_press: 136.9188690185547
+  noise: false
+  noise_std: 0
+  scale: true
+  scale_high: 1.0
+  scale_low: 0.8
+pressure_diff_disp_ref:
+  dp_to_disp_intercept: -1.7580850354058029
+  dp_to_disp_slope: 0.6537588686709214
+  max_disp: 21.0
+  min_disp: 7.0
+ref_mode: random
+rnd_ref:
+  neg_max_amp: 2
+  neg_max_off: 88
+  neg_max_per: 10
+  neg_max_ts: 5
+  neg_min_off: 84
+  pos_max_amp: 4
+  pos_max_off: 126
+  pos_max_per: 10
+  pos_max_ts: 5
+  pos_min_off: 112
+runtime:
+  pid_enabled: true
+  pid_label: 'On'

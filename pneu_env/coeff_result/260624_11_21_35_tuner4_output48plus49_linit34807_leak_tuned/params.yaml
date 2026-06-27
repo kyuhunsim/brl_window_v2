@@ -1,0 +1,15 @@
+act_neg_dead_volume: 0.0
+act_neg_volume_scale: 1.0
+act_pos_dead_volume: 6.19761e-05
+act_pos_volume_scale: 1.0
+belt_backlash: 0.0
+coulomb_friction: 0.0
+force_scale: 1.0
+l_init_total: 0.03480670577301887
+leak_cross: 0.0
+leak_neg_atm: 7.172437082833248e-09
+leak_pos_atm: 1.1717650150589065e-08
+pump_in_coeff: 3.594950818595695e-06
+pump_out_coeff: 9.425020467026517e-06
+stiction_force: 0.0
+viscous_damping: 0.0

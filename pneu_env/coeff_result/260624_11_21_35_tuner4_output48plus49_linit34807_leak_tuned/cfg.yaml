@@ -1,0 +1,32 @@
+data_names:
+- exp/260624_10_48_53_Flowrate_RND6_suite_joint_tuning_soft_act_output12traj.csv
+eval_only: false
+init_params: &id001
+  l_init_total: 0.03480670577301887
+  leak_cross: 0.0
+  leak_neg_atm: 9.938785599250161e-08
+  leak_pos_atm: 7.135320242658609e-09
+  pump_in_coeff: 3.567748249067466e-06
+  pump_out_coeff: 1.1847291021036913e-05
+tune:
+  active_params: &id002 !!python/tuple
+  - pump_in_coeff
+  - pump_out_coeff
+  - leak_pos_atm
+  - leak_neg_atm
+  - leak_cross
+  initial_guess: *id001
+  options:
+    disp: true
+    fatol: 0.001
+    maxiter: 500
+    xatol: 0.0001
+tuner:
+  active_params: *id002
+  clip_end_sec: null
+  clip_start_sec: null
+  clip_tail_sec: null
+  delay: 0.0
+  freq: 50.0
+  progress_every: 25
+  verbose: false
