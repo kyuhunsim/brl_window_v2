@@ -6,6 +6,7 @@ import struct
 import time
 import traceback
 import os
+import json
 
 from tcpip_bridge_common import (
     FIELDS_22,
@@ -55,6 +56,25 @@ OBS_CSV_FN    = os.path.join(BASE_DIR, "obs_history.csv")
 
 def read_ctrl_file():
     return read_ctrl_values(CTRL_JSON_FN, FIELDS)
+
+
+def write_safe_open_ctrl_file():
+    try:
+        with open(CTRL_JSON_FN, "r", encoding="utf-8") as f:
+            ctrl = json.load(f)
+    except Exception:
+        ctrl = {field: 0.0 for field in FIELDS}
+
+    ctrl.update(
+        pos_ctrl=1.0,
+        neg_ctrl=1.0,
+        act_pos_ctrl1=1.0,
+        act_pos_ctrl2=1.0,
+        act_neg_ctrl1=1.0,
+        act_neg_ctrl2=1.0,
+    )
+    write_json_atomic(CTRL_JSON_FN, ctrl)
+    print(f"[INFO] ctrl_act.json safe-open written: controls = [1.0] * 6")
 
 
 
@@ -244,6 +264,7 @@ def main():
         traceback.print_exc()
         print("==========================\n")
     finally:
+        write_safe_open_ctrl_file()
         # 프로그램 종료 시 CSV 저장
         save_csv(CTRL_CSV_FN, CTRL_HEADER, ctrl_rows)
         save_csv(OBS_CSV_FN,  OBS_HEADER,  obs_rows)

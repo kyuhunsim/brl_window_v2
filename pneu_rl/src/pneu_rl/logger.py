@@ -88,7 +88,8 @@ class Logger():
     def set_retrain_model(
         self,
         is_model_loaded: bool = False,
-        retrain_model_name: Optional[str] = None
+        retrain_model_name: Optional[str] = None,
+        copy_buffer: bool = True,
     ) -> str:
         assert is_model_loaded, color('[ERROR] Model is not loaded!','red')
         
@@ -111,9 +112,14 @@ class Logger():
         assert self.model_name != retrain_model_name, color('[ERROR] Model name and retrain model name should be different!', 'red')
         retrain_model_path = f"{get_pkg_path('pneu_rl')}/models/{retrain_model_name}"
 
+        ignore = None
+        if not copy_buffer:
+            ignore = shutil.ignore_patterns("buffer.pkl", "buffer_backup.pkl")
+
         shutil.copytree(
             f"{get_pkg_path('pneu_rl')}/models/{self.model_name}", 
-            retrain_model_path
+            retrain_model_path,
+            ignore=ignore,
         )
 
         return retrain_model_name

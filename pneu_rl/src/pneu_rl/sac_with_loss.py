@@ -41,6 +41,7 @@ class SAC():
         noise_std: float = 0.1,
         train_diag_interval: int = 1,
         train_diag_atm_band: float = 8.0,
+        update_every: int = 1,
     ):
         self.env = env
         state_dim = env.observation_space.shape[0]
@@ -94,6 +95,7 @@ class SAC():
         self.total_steps = 0
         self.train_diag_interval = max(int(train_diag_interval), 0)
         self.train_diag_atm_band = float(train_diag_atm_band)
+        self.update_every = max(int(update_every), 1)
 
         self.log = False
         self.model_name = 'SAC'
@@ -121,15 +123,19 @@ class SAC():
     def set_retrain(
         self,
         retrain_model_name: Optional[str] = None,
+        load_buffer: bool = True,
+        copy_buffer: bool = True,
     ):
         retrain_model_name = self.logger.set_retrain_model(
             is_model_loaded = self.is_model_loaded,
-            retrain_model_name = retrain_model_name
+            retrain_model_name = retrain_model_name,
+            copy_buffer = copy_buffer,
         )
         
         self.load(
             name = retrain_model_name,
-            train = True
+            train = True,
+            load_buffer = load_buffer,
         )
         
         print(f'[ INFO] Retrain Model Name: {retrain_model_name}')
@@ -279,7 +285,7 @@ class SAC():
                 self.buffer.add(state, action, reward, next_state, done)
                 state = next_state
                 
-                if len(self.buffer) > self.batch_size:
+                if len(self.buffer) > self.batch_size and self.total_steps % self.update_every == 0:
                     for _ in range(self.epoch):
                         self.update_parameters()
                         total_critic_loss += self.current_critics_loss
@@ -510,6 +516,7 @@ class SAC():
         self,
         name: str,
         train: bool = False,
+        load_buffer: bool = True,
     ) -> None:
         self.set_logger(name)
         last_epi, last_steps = self.logger.load_infos(name)
@@ -521,9 +528,12 @@ class SAC():
             evaluate = not train
         )
 
-        self.buffer.load_buffer(
-            path = self.logger.buffer_path
-        )
+        if load_buffer:
+            self.buffer.load_buffer(
+                path = self.logger.buffer_path
+            )
+        else:
+            self.buffer.clear_buffer()
 
         self.is_model_loaded = True
 

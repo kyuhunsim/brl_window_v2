@@ -50,17 +50,17 @@ DISP_REWARD_WITH_PRED = dict(
 
 REAL_RETRAIN_PID = dict(
     Kp_act_pos_in=0.0,
-    Ki_act_pos_in=0.0,
+    Ki_act_pos_in=0.002,
     Kd_act_pos_in=0.0,
     Kp_act_pos_out=0.0,
-    Ki_act_pos_out=0.0,
+    Ki_act_pos_out=0.002,
     Kd_act_pos_out=0.0,
-    Kp_act_neg_in=0.001,
-    Ki_act_neg_in=0.001,
-    Kd_act_neg_in=0.001,
-    Kp_act_neg_out=0.001,
-    Ki_act_neg_out=0.001,
-    Kd_act_neg_out=0.001,
+    Kp_act_neg_in=0.0,
+    Ki_act_neg_in=0.002,
+    Kd_act_neg_in=0.0,
+    Kp_act_neg_out=0.0,
+    Ki_act_neg_out=0.002,
+    Kd_act_neg_out=0.0,
     Ka=1,
 )
 
@@ -130,6 +130,8 @@ kwargs["retrain_epi"] = 200
 kwargs["type"] = "simulation" if obs_mode == "1" else "real"
 
 if obs_mode == "2":
+    kwargs["env"]["verbose"] = False
+    kwargs["model"]["update_every"] = 10
     print(color("[INPUT] PID on for this real retrain?", "blue"))
     print(color("\t1. Yes", "yellow"))
     print(color("\t2. No", "yellow"))
@@ -144,6 +146,16 @@ if obs_mode == "2":
         print("[ INFO] PID: disabled for this real retrain")
     else:
         raise ValueError(color(f"[ERROR] Unknown PID mode: {pid_mode}", "red"))
+
+    rest_angle_input = input(
+        color("[INPUT] Max extension encoder angle deg (blank: tuned 8.073mm): ", "blue")
+    ).strip()
+    delete_lines(1)
+    if rest_angle_input:
+        kwargs["obs"]["encoder_rest_angle"] = float(rest_angle_input)
+        print(f"[ INFO] Encoder rest angle: {kwargs['obs']['encoder_rest_angle']:.6f} deg")
+    else:
+        print("[ INFO] Encoder rest angle: not set; using tuned initial displacement")
 
 # Keep the selected model's reference distribution for sim2real.
 # For 0528Ours this matches the no-PID simulation training condition.
@@ -165,6 +177,7 @@ elif obs_mode == "2":
     print("[ INFO] Observation Mode: Real")
     real_kwargs = dict(kwargs["obs"])
     real_kwargs.setdefault("auto_zero_encoder", True)
+    real_kwargs.setdefault("reset_encoder_zero_each_episode", False)
     real_kwargs.setdefault("initial_displacement_mm", TUNED_INITIAL_CONTRACTION_MM)
     real_kwargs.setdefault("clamp_displacement_ref", True)
     obs = PneuReal(**real_kwargs)
@@ -194,9 +207,14 @@ else:
     print("[ INFO] PID: disabled")
 
 model = SAC(env, **kwargs["model"])
-model.load(name=model_name, train=True)
+load_existing_buffer = obs_mode != "2"
+model.load(name=model_name, train=True, load_buffer=load_existing_buffer)
 
-retrain_model_name = model.set_retrain(retrain_model_name)
+retrain_model_name = model.set_retrain(
+    retrain_model_name,
+    load_buffer=load_existing_buffer,
+    copy_buffer=load_existing_buffer,
+)
 if "alpha" in kwargs:
     model.set_alpha(**kwargs["alpha"])
 if "temporal_weight_hardening" in kwargs:

@@ -50,8 +50,10 @@ class PneuReal:
         encoder_angle_unit: Literal["deg", "rad"] = "deg",
         encoder_angular_velocity_scale: float = 1.0,
         encoder_zero_angle: float | None = None,
+        encoder_rest_angle: float | None = None,
         initial_displacement_mm: float = 0.0,
         auto_zero_encoder: bool = True,
+        reset_encoder_zero_each_episode: bool = True,
         clamp_displacement_ref: bool = True,
         unwrap_encoder_delta: bool = True,
         wrap_angle_reference: bool = True,
@@ -95,10 +97,12 @@ class PneuReal:
         self.encoder_angle_unit = str(encoder_angle_unit)
         self.encoder_angular_velocity_scale = float(encoder_angular_velocity_scale)
         self.auto_zero_encoder = bool(auto_zero_encoder)
+        self.reset_encoder_zero_each_episode = bool(reset_encoder_zero_each_episode)
         self.unwrap_encoder_delta = bool(unwrap_encoder_delta)
         self.wrap_angle_reference = bool(wrap_angle_reference)
         self.clamp_displacement_ref = bool(clamp_displacement_ref)
         self._angle_zero = None if encoder_zero_angle is None else float(encoder_zero_angle)
+        self._encoder_rest_angle = None if encoder_rest_angle is None else float(encoder_rest_angle)
         self._encoder_zero_locked = encoder_zero_angle is not None
         self.initial_displacement_m = self._clamp_displacement(float(initial_displacement_mm) * 1e-3)
 
@@ -204,6 +208,18 @@ class PneuReal:
             return float(velocity)
         return velocity
 
+    def _displacement_from_rest_angle(self, angle: float) -> float:
+        if self._encoder_rest_angle is None:
+            return self.initial_displacement_m
+        delta = self._wrap_delta(float(angle) - self._encoder_rest_angle)
+        displacement = (
+            self.encoder_displacement_sign
+            * self.encoder_pitch_radius
+            * self.encoder_gear_ratio
+            * self._angle_delta_to_rad(delta)
+        )
+        return self._clamp_displacement(float(displacement))
+
     def displacement_to_angle(
         self,
         displacement_m: float,
@@ -264,8 +280,16 @@ class PneuReal:
         if not np.isfinite(angle):
             angle = 0.0
         self._angle_zero = angle
+        if self._encoder_rest_angle is not None:
+            self.initial_displacement_m = self._displacement_from_rest_angle(angle)
         self.backend.angle_reference = angle
         print(f"[ INFO] real4 encoder zero: {self._angle_zero:.6f} {self.encoder_angle_unit}")
+        if self._encoder_rest_angle is not None:
+            print(
+                "[ INFO] real4 initial displacement from rest angle: "
+                f"{self.initial_displacement_m * 1e3:.3f} mm "
+                f"(rest={self._encoder_rest_angle:.6f} {self.encoder_angle_unit})"
+            )
         return self._angle_zero
 
     def reset_encoder_zero(self, angle: float | None = None) -> float:
@@ -275,6 +299,8 @@ class PneuReal:
         if not np.isfinite(angle):
             raise ValueError(f"invalid encoder zero angle: {angle}")
         self._angle_zero = float(angle)
+        if self._encoder_rest_angle is not None:
+            self.initial_displacement_m = self._displacement_from_rest_angle(float(angle))
         self.backend.angle_reference = float(angle)
         return self._angle_zero
 
@@ -525,7 +551,11 @@ class PneuReal:
         self._stale_time_count = 0
         self._stale_obs_count = 0
         self._prev_press_vec = None
-        if self.auto_zero_encoder and not self._encoder_zero_locked:
+        if (
+            self.auto_zero_encoder
+            and self.reset_encoder_zero_each_episode
+            and not self._encoder_zero_locked
+        ):
             self._angle_zero = None
 
         self.backend.pos_press = float(init_pos_press)
