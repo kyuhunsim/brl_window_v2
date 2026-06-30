@@ -643,7 +643,27 @@ if __name__ == '__main__':
     if obs_mode == '1':
         obs = PneuSim(**sim_kwargs)
     else:
-        obs = PneuReal(**viz_kwargs["env"]["real"])
+        real_kwargs = copy.deepcopy(viz_kwargs["env"]["real"])
+        real_kwargs.update(kwargs.get("obs", {}))
+        print(
+            color(
+                "[ACTION] For real quick viz, make sure the max extension/rest "
+                "encoder angle in the model cfg is correct.",
+                "blue",
+            )
+        )
+        input(
+            color(
+                "[ACTION] Turn pump on, wait until initial pressures/angle are stable, "
+                "then press Enter to start real quick viz: ",
+                "blue",
+            )
+        )
+        delete_lines(1)
+        real_kwargs.setdefault("auto_zero_encoder", True)
+        real_kwargs.setdefault("initial_displacement_mm", TUNED_INITIAL_CONTRACTION_MM)
+        real_kwargs.setdefault("clamp_displacement_ref", True)
+        obs = PneuReal(**real_kwargs)
     pred = PneuPred(**pred_kwargs)
 
     obs.set_init_press(**init_press_kwargs)

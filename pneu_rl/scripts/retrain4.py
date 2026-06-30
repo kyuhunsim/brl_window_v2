@@ -147,8 +147,15 @@ if obs_mode == "2":
     else:
         raise ValueError(color(f"[ERROR] Unknown PID mode: {pid_mode}", "red"))
 
+    print(
+        color(
+            "[ACTION] Vent/set the actuator to max extension at the low-pressure "
+            "baseline, then enter that encoder angle as displacement 0 mm.",
+            "blue",
+        )
+    )
     rest_angle_input = input(
-        color("[INPUT] Max extension encoder angle deg (blank: tuned 8.073mm): ", "blue")
+        color("[INPUT] Max extension/rest encoder angle deg (blank: tuned 8.073mm): ", "blue")
     ).strip()
     delete_lines(1)
     if rest_angle_input:
@@ -156,6 +163,14 @@ if obs_mode == "2":
         print(f"[ INFO] Encoder rest angle: {kwargs['obs']['encoder_rest_angle']:.6f} deg")
     else:
         print("[ INFO] Encoder rest angle: not set; using tuned initial displacement")
+    input(
+        color(
+            "[ACTION] Turn pump on, wait until initial pressures/angle are stable, "
+            "then press Enter to start real retrain: ",
+            "blue",
+        )
+    )
+    delete_lines(1)
 
 # Keep the selected model's reference distribution for sim2real.
 # For 0528Ours this matches the no-PID simulation training condition.

@@ -70,6 +70,8 @@ class PneuReal:
         self._prev_press_vec: np.ndarray | None = None
         self._stale_obs_count = 0
         self._max_stale_obs_steps = int(os.getenv("PNEU_REAL4_MAX_STALE", "300"))
+        self._invalid_angle_count = 0
+        self._max_invalid_angle_steps = int(os.getenv("PNEU_REAL4_MAX_INVALID_ANGLE", "100"))
         self._debug_every = int(os.getenv("PNEU_REAL4_DEBUG_EVERY", "0"))
 
         self.actuator_series_count = float(actuator_series_count)
@@ -225,6 +227,13 @@ class PneuReal:
         displacement_m: float,
         angle_initial: float | None = None,
     ) -> float:
+        if self._encoder_rest_angle is not None:
+            denom = self.encoder_displacement_sign * self.encoder_pitch_radius * self.encoder_gear_ratio
+            displacement_m = self._clamp_displacement(float(displacement_m))
+            angle_delta_rad = displacement_m / denom
+            return self._wrap_angle(
+                self._encoder_rest_angle + float(self._rad_to_angle_delta(angle_delta_rad))
+            )
         if angle_initial is None:
             angle_initial = self._ensure_encoder_zero()
         denom = self.encoder_displacement_sign * self.encoder_pitch_radius * self.encoder_gear_ratio
@@ -398,8 +407,44 @@ class PneuReal:
 
         angle = float(obs.get("angle", getattr(self.backend, "angle", 0.0)))
         angular_vel = float(obs.get("angular_vel", getattr(self.backend, "angular_vel", 0.0)))
-        relative_displacement_m = self.angle_to_displacement(angle)
-        displacement_m = self._clamp_displacement(self.initial_displacement_m + relative_displacement_m)
+        angle_anchor = (
+            self._encoder_rest_angle
+            if self._encoder_rest_angle is not None
+            else self._ensure_encoder_zero()
+        )
+        if (
+            self._step_count > 5
+            and abs(angle) < 1e-9
+            and abs(float(commanded_angle_ref)) > 1e-6
+            and angle_anchor is not None
+            and abs(float(angle_anchor)) > 1e-6
+            and abs(float(angular_vel)) < 1e-9
+        ):
+            self._invalid_angle_count += 1
+            if self._invalid_angle_count in (10, 50):
+                print(
+                    "[WARN] real4 encoder angle is stuck at zero while the angle "
+                    f"reference is {commanded_angle_ref:.6f}. Check RT/FPGA encoder stream."
+                )
+            if (
+                self._max_invalid_angle_steps > 0
+                and self._invalid_angle_count >= self._max_invalid_angle_steps
+            ):
+                raise RuntimeError(
+                    "real4 encoder angle appears invalid "
+                    f"({self._invalid_angle_count} consecutive zero-angle steps)."
+                )
+        else:
+            self._invalid_angle_count = 0
+
+        if self._encoder_rest_angle is not None:
+            displacement_m = self._displacement_from_rest_angle(angle)
+            relative_displacement_m = displacement_m - self.initial_displacement_m
+        else:
+            relative_displacement_m = self.angle_to_displacement(angle)
+            displacement_m = self._clamp_displacement(
+                self.initial_displacement_m + relative_displacement_m
+            )
         displacement_vel_m_s = self.angular_velocity_to_linear_velocity(angular_vel)
         total_length = self.actuator_total_initial_length - displacement_m
         cell_length = self.clamp_cell_length(self.total_length_to_cell_length(total_length))
@@ -479,6 +524,8 @@ class PneuReal:
             ref_displacement_raw=float(goal[2]) if goal.size >= 3 else self.initial_displacement_m * 1e3,
             angle=angle,
             angle_zero=self._ensure_encoder_zero(),
+            encoder_rest_angle=self._encoder_rest_angle,
+            initial_displacement_mm=self.initial_displacement_m * 1e3,
             angle_reference=commanded_angle_ref,
             angular_vel=angular_vel,
             ctrl_pos=float(obs.get("pos_ctrl", np.nan)),
