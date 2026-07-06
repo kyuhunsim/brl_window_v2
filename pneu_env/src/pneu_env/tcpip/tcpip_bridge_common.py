@@ -3,7 +3,7 @@ import json
 import os
 import socket
 import struct
-from typing import Sequence
+from typing import Optional, Sequence
 
 
 FIELDS_22 = [
@@ -61,7 +61,7 @@ def read_ctrl_values(
         return [0.0] * len(field_names)
 
 
-def recv_all(sock: socket.socket, n_bytes: int) -> bytes | None:
+def recv_all(sock: socket.socket, n_bytes: int) -> Optional[bytes]:
     """Receive exactly n_bytes unless the socket closes or times out."""
     data = bytearray()
     while len(data) < n_bytes:
@@ -84,7 +84,7 @@ def recv_packet(
     payload_bytes: int,
     use_length_prefix: bool,
     length_fmt: str,
-) -> bytes | None:
+) -> Optional[bytes]:
     if not use_length_prefix:
         return recv_all(sock, payload_bytes)
 
