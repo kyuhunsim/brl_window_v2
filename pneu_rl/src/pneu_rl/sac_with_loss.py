@@ -330,6 +330,41 @@ class SAC():
                     )
                     self._append_train_diagnostics(diag)
 
+    def warmup_buffer(
+        self,
+        steps: int,
+        deterministic: bool = False,
+        reset_on_horizon: bool = True,
+    ) -> None:
+        steps = int(steps)
+        if steps <= 0:
+            return
+
+        state = self.env.reset()[0]
+        epi_steps = 0
+        reward_sum = 0.0
+        for step in range(steps):
+            if deterministic:
+                action = self.evaluate_action(state)
+            else:
+                action = self.select_action(state)
+
+            next_state, reward, done, _, _ = self.env.step(action)
+            self.buffer.add(state, action, reward, next_state, done)
+            state = next_state
+            reward_sum += float(reward)
+            epi_steps += 1
+            self.total_steps += 1
+
+            if done or (reset_on_horizon and epi_steps >= self.horizon):
+                state = self.env.reset()[0]
+                epi_steps = 0
+
+        print(
+            f"[ INFO] Warmup buffer collected: steps={steps}, "
+            f"buffer={len(self.buffer)}, reward_sum={reward_sum:.4f}"
+        )
+
     def _episode_diagnostics(
         self,
         epi: int,

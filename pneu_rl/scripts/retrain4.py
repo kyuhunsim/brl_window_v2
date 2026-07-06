@@ -131,7 +131,15 @@ kwargs["type"] = "simulation" if obs_mode == "1" else "real"
 
 if obs_mode == "2":
     kwargs["env"]["verbose"] = False
-    kwargs["model"]["update_every"] = 10
+    kwargs["model"]["update_every"] = 5
+    warmup_input = input(
+        color("[INPUT] Real warmup steps before update (blank: 5120, 0: off): ", "blue")
+    ).strip()
+    delete_lines(1)
+    kwargs["real_warmup_steps"] = 5120 if warmup_input == "" else int(warmup_input)
+    kwargs["real_warmup_deterministic"] = False
+    print(f"[ INFO] Real warmup steps: {kwargs['real_warmup_steps']}")
+
     print(color("[INPUT] PID on for this real retrain?", "blue"))
     print(color("\t1. Yes", "yellow"))
     print(color("\t2. No", "yellow"))
@@ -235,6 +243,14 @@ if "alpha" in kwargs:
 if "temporal_weight_hardening" in kwargs:
     model.set_temporal_weight_hardening(**kwargs["temporal_weight_hardening"])
 model.clear_buffer()
+
+if kwargs.get("real_warmup_steps", 0) > 0:
+    model.warmup_buffer(
+        steps=kwargs["real_warmup_steps"],
+        deterministic=kwargs.get("real_warmup_deterministic", False),
+        reset_on_horizon=True,
+    )
+    model.buffer.save_buffer(model.logger.buffer_path)
 
 save_yaml(retrain_model_name, kwargs, "retrain_cfg.yaml")
 

@@ -166,3 +166,5 @@ pneu_env/ref
 pneu_env/data
 pneu_env/test
 /pneu_rl/models/**
+pneu_env/src/pneu_env/tcpip/ctrl_history.csv
+pneu_env/src/pneu_env/tcpip/obs_history.csv
