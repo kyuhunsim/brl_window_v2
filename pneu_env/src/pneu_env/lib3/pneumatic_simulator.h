@@ -42,6 +42,9 @@
 
 #define M_DOT_DIM 10
 #define VALVE_DEBUG_DIM 54
+#define VALVE_RUNTIME_DIM 5
+#define VALVE_COUNT 6
+#define AUGMENTED_STATE_DIM 37
 // mass_flowrate (lib5) index map:
 // 0 m_po1, 1 m_pi1, 2 m_po2, 3 m_pi2,
 // 4 m_sv_cp, 5 m_sv_cn,
@@ -90,6 +93,11 @@ public:
     PneumaticCT();
     ~PneumaticCT();
     void reset_valve_states();
+    // Analysis-only snapshot hooks.  The runtime ordering for each valve is
+    // [z, x1, x2, I_prev, state_prev].  They do not alter the dynamics used
+    // by normal simulator calls.
+    void get_valve_runtime_states(double* out) const;
+    void set_valve_runtime_states(const double* in);
     void set_volume(double volume1, double volume2);
     void set_discharge_coeff(
         double Cd1IN,
@@ -132,6 +140,10 @@ public:
     );
     void time_reset();
     void set_logging(bool enable);
+    // Snapshot ordering excludes the clock and is
+    // [Pch+, Pch-, theta, Ppump1, Ppump2, Pact+, Pact-, 6 x valve_runtime].
+    void get_augmented_state(double* out) const;
+    void set_augmented_state(const double* in);
 
 private:
     PneumaticCT *pneumaticCT;

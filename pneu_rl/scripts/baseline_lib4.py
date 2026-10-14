@@ -20,6 +20,7 @@ from pneu_ref.random_ref import RandomRef
 from pneu_ref.sine_ref import SineRef
 from pneu_ref.step_ref import StepCasesRef
 from pneu_utils.utils import get_pkg_path, load_yaml
+from pneu_rl.exp_paths import ensure_model_exp_dir
 
 
 LIB4_TUNED_PARAMS_PATH = (
@@ -492,8 +493,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     save_name = args.save_name or datetime.now().strftime("%y%m%d_%H_%M_%S_lib4_baseline")
-    out_dir = Path(get_pkg_path("pneu_rl")) / "exp" / save_name
-    out_dir.mkdir(parents=True, exist_ok=False)
+    out_dir = ensure_model_exp_dir("lib4_baseline", save_name)
 
     reports = {}
     for mode in args.controllers:

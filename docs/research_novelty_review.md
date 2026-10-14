@@ -1,23 +1,23 @@
 # 연구 방향 및 Novelty 점검
 
-작성 기준일: 2026-05-31
+작성 기준일: 2026-08-23
+
+최신 reward × observation 결과와 다음 실험 우선순위는
+[lib4 논문 연구 방향과 다음 실험](novelty_research_plan.md)에 별도로 정리했다.
+
+수식이 LaTeX 명령 그대로 보이는 viewer에서는
+[plain 수식 요약](formula_reference_plain.md)을 사용한다.
 
 ## 1. 결론
 
 이 연구는 충분히 진행할 가치가 있다. 다만 현재 상태 그대로 논문을 구성하면
 `기존 시스템을 복잡하게 확장하고 RL을 적용한 연구`로 보일 위험이 있다.
 
-이 연구의 핵심 novelty는 RL, SAC, Runge-Kutta integrator 자체가 아니다.
-가장 강한 중심축 후보는 다음과 같다.
+이 연구의 핵심 novelty는 RL, SAC, 6개 control input, soft-actuator displacement tracking 또는 Runge-Kutta integrator 자체가 아니다. soft actuator position/RL control은 이미 존재하므로 `제어에 성공했다`는 결과만으로는 중심 contribution이 되기 어렵다. 가장 강한 중심축 후보는 다음과 같다.
 
-> Static pressure matching만으로는 soft pneumatic actuator의 closed-loop 성능을
-> 보장할 수 없다. 주파수 의존 밸브 동특성, chamber reserve, actuator geometry가
-> 결합되면 작은 mismatch가 drift와 valve conflict로 증폭된다. 본 연구는 이 실패를
-> 측정하고, 모델링하며, 구조적으로 줄이는 방법을 제시한다.
+> Shared dual-pressure source가 soft actuator와 결합되면 control authority는 고정된 input limit가 아니라 chamber–actuator reserve, motion state와 valve/action history에 따라 변한다. 본 연구는 이 state-dependent control authority를 short-horizon reachable output-rate로 정의하고, 기존 controller의 실패 및 sim-to-real gap을 설명·완화하는지 검증한다.
 
-좋은 논문으로 만들기 위해서는 `더 복잡한 simulator를 만들었다`가 아니라
-`기존 평가 방식이 놓치던 control-relevant mismatch를 정의하고 검증했다`를
-주장해야 한다.
+좋은 논문으로 만들기 위해서는 `더 복잡한 simulator를 만들었다`가 아니라 `기존 평가 방식이 놓치던 state-dependent authority와 control-relevant mismatch를 정의하고 검증했다`를 주장해야 한다. 단, 이는 아직 novelty 확정 문장이 아니라 raw reserve/history보다 추가 설명력이 있는지 sim/real에서 반증 가능하게 확인해야 하는 가설이다.
 
 ## 2. 선행 연구와 현재 연구의 차이
 
@@ -161,6 +161,98 @@ raw 6D SAC는 pressure control과 valve allocation을 동시에 학습해야 한
 - policy가 직접 6개 밸브를 제어하는 대신 pressure-rate 또는 reserve command를 내리면
   sim-to-real robustness가 좋아지는가?
 
+### 5.4 State-dependent control authority
+
+#### 쉬운 정의
+
+`Control authority`는 현재 상태에서 controller가 제한된 시간 안에 실제로 만들 수 있는 압력·변위 변화량이다. `State-dependent`는 그 능력이 고정 상수가 아니라 현재 pressure reserve, displacement/velocity와 recent valve action에 따라 달라진다는 뜻이다.
+
+```text
+같은 displacement error + 같은 valve command
+
+POS chamber가 충분히 충전되고 valve가 opening 중
+→ actuator pressure와 contraction을 빠르게 올릴 수 있음
+
+POS reserve가 부족하고 valve가 closing 중이며 actuator가 반대 방향으로 운동 중
+→ 같은 command가 늦거나 거의 듣지 않고 먼저 supply를 복원해야 함
+```
+
+또한 현재 action이 chamber를 충전하거나 소모하므로 controller는 현재 출력뿐 아니라 **미래에 사용할 authority도 스스로 만든다**. 이 점에서 authority는 단순 actuator saturation보다 `endogenous`하다.
+
+#### 수학적 정의
+
+제어 출력과 안전한 상태/action 집합을
+
+\[
+y_t=[P_{act,+},P_{act,-},D],
+\qquad
+u_t\in\mathcal U,
+\qquad
+x_t\in\mathcal X_{safe}
+\]
+
+로 둘 때 $K$-step control-authority set을 다음처럼 정의한다.
+
+\[
+\mathcal A_K(x_t)
+=
+\left\{
+\frac{y_{t+K}-y_t}{K\Delta t}
+\;\middle|\;
+u_{t:t+K-1}\in\mathcal U,
+x_{t:t+K}\in\mathcal X_{safe}
+\right\}.
+\]
+
+이 집합은 현재 state에서 만들 수 있는 signed actuator-pressure rate와 displacement rate의 범위를 나타낸다. 실제 배포에서는 hidden valve state를 직접 쓰지 않고 다음 measurable proxy를 사용한다.
+
+\[
+\phi_t=[P_t,D_t,\dot D_t,\dot P_t,\rho_t,u_{t-H:t-1}],
+\]
+
+\[
+\rho_+=P_{ch,+}-P_{act,+},
+\qquad
+\rho_-=P_{act,-}-P_{ch,-}.
+\]
+
+중요한 구분은 다음과 같다.
+
+| 항목 | 의미 |
+|---|---|
+| action range | valve command가 가질 수 있는 숫자 범위 |
+| chamber reserve | 현재 flow를 만들 pressure gradient를 나타내는 핵심 feature |
+| control authority | reserve, motion, pressure level, valve history와 horizon을 모두 반영한 reachable output-rate set |
+| capacity utilization | 원하는 reference rate가 현재 authority를 얼마나 사용하는지 나타내는 난이도 |
+
+따라서 `reserve 두 개를 observation에 추가했다`는 것만으로 state-dependent-control-authority method가 되지는 않는다. 최소한 short-rollout/action sweep으로
+
+\[
+\widehat{\mathcal A}_K(\phi_t)
+\]
+
+를 추정하거나, 그 signed bound를 예측해 reference certification, policy conditioning 또는 safety management에 명시적으로 사용해야 한다.
+
+원하는 rate $\dot r_t$의 utilization은 예를 들어 다음처럼 정의한다. 이때 $\widehat{\mathcal A}_K$는 원점을 포함하는 conservative convex/star-convex under-approximation 또는 방향별 signed bound로 사용한다.
+
+\[
+\eta_t
+=
+\inf\{\eta\ge0:\dot r_t\in\eta\widehat{\mathcal A}_K(\phi_t)\}
+\]
+
+로 정의할 수 있다. $\eta<1$은 현재 추정 capacity 안, $\eta\approx1$은 edge, $\eta>1$은 unsupported demand를 뜻한다. 경계 숫자는 sim/real sweep으로 결정하며 임의로 논문 결론에 맞추지 않는다.
+
+#### 이것이 contribution이 되기 위한 조건
+
+1. 유사한 tracking error에서도 state에 따라 signed output capacity가 실제로 달라져야 한다.
+2. $\widehat{\mathcal A}_K$ 또는 $\eta$가 global rate limit과 raw reserve보다 baseline failure를 더 잘 예측해야 한다.
+3. authority-aware reference/policy가 단순히 target을 느리게 만들어 RMSE를 낮춘 것이 아님을 공통 원본 dynamic reference에서 보여야 한다.
+4. simulator의 절대 수치가 틀리더라도 state별 capacity ordering과 failure trend가 real에서 유지되어야 한다.
+5. raw-reserve observation, history-only, global-rate curriculum과 분리된 ablation이 있어야 한다.
+
+이 조건이 충족되지 않으면 이 표현을 메인 novelty로 사용하지 않고 `reserve-aware controller engineering`으로 축소한다. 또한 reachable-set projection 자체는 이미 DDAT 같은 일반 연구가 있으므로([RSS 2025](https://www.roboticsproceedings.org/rss21/p078.html)), 차별점은 shared pneumatic supply의 measurable signed authority와 real tracking/transfer에 대한 설명력이어야 한다.
+
 ## 6. 현재 구현 상태와 부족한 부분
 
 ### 6.1 구현된 부분
@@ -177,7 +269,9 @@ raw 6D SAC는 pressure control과 valve allocation을 동시에 학습해야 한
 - PID baseline
 - RL reward의 action delta, valve conflict, chamber reserve 항
 
-### 6.2 아직 구현되지 않은 핵심
+현재 `lib4`에는 여기에 variable-volume soft-actuator pressure/force/displacement dynamics, displacement/velocity observation, 3D pressure–displacement reference와 current-tuned replay pipeline이 추가되어 있다. 16-member core train bank, 별도 unseen-ID bank와 nominal edge probe도 생성했지만, 이것은 nominal simulator feasibility 결과이지 real authority 검증 결과는 아니다.
+
+### 6.2 현재 남은 핵심
 
 `docs/5538b4a2-5c1f-441f-b8da-f2f264f83734_Modeling.pdf`에는 다음 모델이 정리되어 있다.
 
@@ -187,14 +281,17 @@ raw 6D SAC는 pressure control과 valve allocation을 동시에 학습해야 한
 - pressure에 따른 force
 - rod displacement dynamics
 
-그러나 현재 `lib3` 구현에서 actuator volume은 고정값이며 displacement state는 없다.
-따라서 최종 목표인 displacement control은 아직 닫히지 않았다.
+`lib3`는 여전히 고정-volume pressure-control plant이고 displacement state가 없다. 위 soft-actuator 항은 `lib4`에 구현되었으므로 구현 자체는 더 이상 핵심 blocker가 아니다. 현재 부족한 것은 다음 증거다.
+
+- held-out real trajectory에서 pressure/force/displacement 동시 predictive validation
+- initial state, payload와 parameter perturbation에서 authority-map robustness
+- dynamic displacement oscillator의 sim/real 동일 reference 평가
+- raw reserve/history 대비 authority estimate의 추가 설명력
+- 장기 RL controller 및 zero-shot/fixed-budget adaptation 결과
 
 ### 6.3 simulator 계보가 정리되어야 한다
 
-`docs/goal.md`에는 `lib9` 기반 메인 트랙이 적혀 있지만 현재 repository에는
-`sim9.py`, `env9.py`, `pred9.py`, `lib9`가 없다. 반면 `gen_sim9_from_real_csv.py`,
-`real9.py`는 존재한다.
+과거 `docs/goal.md`의 `lib9` 표기와 현재 `lib3` pressure-control, `lib4` soft-actuator 트랙이 혼재한다. 논문 실험의 메인 plant는 현재 `lib4`로 고정하되 `lib3`를 source-level failure/ablation evidence로 사용하는 계보를 명시해야 한다.
 
 논문 실험 전에는 simulator 버전, 튜닝 결과, 빌드 결과, RL 모델의 대응관계를
 명시적으로 고정해야 한다.
@@ -269,6 +366,8 @@ raw 6D SAC는 pressure control과 valve allocation을 동시에 학습해야 한
 - SAC + CAPS
 - raw 6D RL + reserve penalty
 - structured RL + conflict-free allocator
+- history/rate/reserve temporal RL
+- raw reserve 대비 estimated-authority-conditioned RL
 
 ## 8. 추천 controller 구조
 
@@ -277,12 +376,14 @@ raw 6D RL을 최종 구조로 고집하지 않는 편이 좋다.
 권장 구조:
 
 ```text
-observation
--> policy
+measurable pressure/motion/action history
+-> short-horizon signed authority estimator
+-> policy conditioned on desired-rate / available-authority utilization
 -> low-dimensional pressure-rate / reserve command
--> conflict-free allocator
--> 6 valve commands
+-> conflict-free allocator or bounded 6-valve action
 ```
+
+authority estimator를 최종 구조로 채택할지는 먼저 short-rollout prediction과 real trend 검증으로 결정한다. 검증 전에 단순히 network block을 추가하지 않는다.
 
 이 구조는 단순한 engineering trick이 아니다. 다음 실패 원인에서 직접 도출된다.
 
@@ -309,16 +410,22 @@ raw 6D action
    - 6-valve pressure source와 soft actuator를 대상으로 hysteretic dynamic valve model,
      variable-volume actuator geometry, displacement dynamics를 결합한 simulator를 구축한다.
 
-3. **Reserve-aware structured control**
-   - chamber reserve 붕괴와 redundant valve action 문제를 줄이기 위해 reserve-aware
-     objective와 conflict-free allocation 구조를 사용하고, pressure 및 displacement
-     tracking에서 검증한다.
+3. **State-dependent-control-authority-aware control**
+   - chamber reserve, motion과 recent action으로 short-horizon signed output-rate set을 추정하고, 그 utilization을 reference certification과 temporal policy에 사용한다. raw reserve/history/global-rate baseline과 분리해 pressure 및 displacement tracking, safety와 sim-to-real failure prediction을 검증한다.
 
 ## 10. 우선순위
 
 ### Priority 0: 논문 질문 고정
 
-논문의 중심을 `RL 적용`이 아니라 `control-relevant fidelity와 구조적 제어`로 고정한다.
+논문의 중심을 `RL 적용`이 아니라 `state-dependent control authority가 기존 controller 실패와 real transfer를 설명하는가`로 우선 검증한다. 이 가설이 반증되면 control-relevant fidelity와 구조적 제어를 supporting system contribution으로 되돌린다.
+
+### Priority 0.5: authority 가설을 학습 전에 반증 시도
+
+- displacement, velocity direction, chamber reserve와 recent action을 분리한 short-pulse grid를 만든다.
+- 각 상태에서 signed $\dot P_{act}$, $\dot D$ bound를 sim과 real에서 측정한다.
+- global bound, raw reserve와 history model 대비 held-out prediction력을 비교한다.
+- 기존 controller의 saturation/overcharge/tracking failure가 utilization에 따라 정렬되는지 본다.
+- 추가 설명력이 없으면 full RL matrix 전에 authority claim을 폐기한다.
 
 ### Priority 1: simulator 버전 고정
 
@@ -338,19 +445,16 @@ raw 6D action
 - conflict-free allocator 버전을 추가한다.
 - tracking, conflict, reserve violation을 동시에 비교한다.
 
-### Priority 4: soft actuator displacement 모델 구현
+### Priority 4: soft actuator displacement 모델 검증과 제어
 
-- `V(L)`, `dV/dL`, force, rod dynamics를 simulator state에 추가한다.
-- 실제 displacement sensor 데이터로 검증한다.
-- 최종적으로 position tracking 실험을 수행한다.
+- 구현된 `V(L)`, force, rod dynamics를 held-out real displacement/velocity 데이터로 검증한다.
+- dynamic oscillator를 동일 파일로 simulation과 real에 적용한다.
+- displacement-primary reward와 pressure/reserve safety objective를 분리한다.
+- 최종적으로 authority-aware 여부를 포함한 position tracking ablation을 수행한다.
 
 ## 11. 30초 설명
 
-> 기존 연구는 양압과 음압 source의 pressure tracking을 다뤘지만, soft actuator를 연결하면
-> 6개 밸브, 저장압, 밸브 히스테리시스, actuator volume 변화가 결합됩니다.
-> 이때 static sim-real matching이 좋아도 closed-loop policy는 drift와 valve conflict로
-> 실패할 수 있습니다. 저희는 이 control-relevant mismatch를 정량화하고,
-> dynamic simulator와 reserve-aware structured controller로 줄입니다.
+> 기존 soft-actuator 변위 제어는 존재하지만, 저희 shared dual-pressure system에서는 같은 valve command의 효과가 chamber reserve, 운동 방향과 valve history에 따라 달라지고 현재 action이 미래의 제어 능력까지 바꿉니다. 저희는 이를 state-dependent control authority라는 short-horizon reachable output-rate로 정량화하고, 기존 controller 실패를 설명하는지 검증한 뒤 authority-aware reference와 temporal controller로 sim-to-real tracking을 개선합니다.
 
 ## 12. 마지막 판단
 
@@ -360,4 +464,3 @@ raw 6D action
 
 > 더 많은 요소를 넣었다고 주장하지 말고, 기존 연구가 측정하지 못한 실패를 정의하고,
 > 그 실패가 왜 발생하는지 보이며, 각 설계가 그 원인에서 필연적으로 도출되도록 만든다.
-

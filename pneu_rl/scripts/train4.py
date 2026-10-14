@@ -263,21 +263,22 @@ if train_mode == '1':
             train_diag_atm_band = 8.0
         ),
         epi = 1000,
-        pid = dict(
-            Kp_act_pos_in = 0.0,
-            Ki_act_pos_in = 0.002,
-            Kd_act_pos_in = 0.0,
-            Kp_act_pos_out = 0.0,
-            Ki_act_pos_out = 0.002,
-            Kd_act_pos_out = 0.0,
-            Kp_act_neg_in = 0.0,
-            Ki_act_neg_in = 0.002,
-            Kd_act_neg_in = 0.0,
-            Kp_act_neg_out = 0.0,
-            Ki_act_neg_out = 0.002,
-            Kd_act_neg_out = 0.0,
-            Ka = 1
-        )
+        pid = None
+        # pid = dict(
+        #     Kp_act_pos_in = 0.0,
+        #     Ki_act_pos_in = 0.002,
+        #     Kd_act_pos_in = 0.0,
+        #     Kp_act_pos_out = 0.0,
+        #     Ki_act_pos_out = 0.002,
+        #     Kd_act_pos_out = 0.0,
+        #     Kp_act_neg_in = 0.0,
+        #     Ki_act_neg_in = 0.002,
+        #     Kd_act_neg_in = 0.0,
+        #     Kp_act_neg_out = 0.0,
+        #     Ki_act_neg_out = 0.002,
+        #     Kd_act_neg_out = 0.0,
+        #     Ka = 1
+        # )
     )
     print(f'[ INFO] Train mode: Ours')
 

@@ -161,6 +161,46 @@ void PneumaticCT::reset_valve_states()
     reset_valve_state(&valve_state_act_neg_out);
 }
 
+void PneumaticCT::get_valve_runtime_states(double* out) const
+{
+    const ValveRuntimeState* states[VALVE_COUNT] = {
+        &valve_state_ch_pos,
+        &valve_state_ch_neg,
+        &valve_state_act_pos_in,
+        &valve_state_act_pos_out,
+        &valve_state_act_neg_in,
+        &valve_state_act_neg_out,
+    };
+    for (int valve = 0; valve < VALVE_COUNT; ++valve) {
+        const int offset = valve * VALVE_RUNTIME_DIM;
+        out[offset + 0] = states[valve]->z;
+        out[offset + 1] = states[valve]->x1;
+        out[offset + 2] = states[valve]->x2;
+        out[offset + 3] = states[valve]->I_prev;
+        out[offset + 4] = states[valve]->state_prev;
+    }
+}
+
+void PneumaticCT::set_valve_runtime_states(const double* in)
+{
+    ValveRuntimeState* states[VALVE_COUNT] = {
+        &valve_state_ch_pos,
+        &valve_state_ch_neg,
+        &valve_state_act_pos_in,
+        &valve_state_act_pos_out,
+        &valve_state_act_neg_in,
+        &valve_state_act_neg_out,
+    };
+    for (int valve = 0; valve < VALVE_COUNT; ++valve) {
+        const int offset = valve * VALVE_RUNTIME_DIM;
+        states[valve]->z = in[offset + 0];
+        states[valve]->x1 = in[offset + 1];
+        states[valve]->x2 = in[offset + 2];
+        states[valve]->I_prev = in[offset + 3];
+        states[valve]->state_prev = in[offset + 4];
+    }
+}
+
 void PneumaticCT::set_volume(double volume1, double volume2)
 {
     V1 = volume1;

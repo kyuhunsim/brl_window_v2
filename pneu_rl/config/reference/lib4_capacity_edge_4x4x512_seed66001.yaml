@@ -1,0 +1,380 @@
+kind: trajectory_bank_nd
+kwargs:
+  trajectory_npz: pneu_rl/config/reference/lib4_capacity_edge_4x4x512_seed66001.npz
+  reference_key: reference
+  seed: 66001
+  sample_mode: coverage
+  repeat_after_end: false
+design:
+  library: 4
+  method: displacement-targeted sampled projection onto full-replay admissible outputs
+  tier: edge
+  training_eligible: false
+  edge_requires_robust_and_real_gate: true
+  reference_channels:
+  - act_pos_kpa
+  - act_neg_kpa
+  - contraction_mm
+  oracle_action_is_policy_input: false
+  oracle_action_storage_dtype: float64
+  continuous_carry: true
+  bank_size: 4
+  block_steps: 512
+  blocks_per_hard_reset: 4
+  frequency_hz: 50.0
+  duration_sec: 40.96
+  model_cfg: pneu_rl/models/0625_lib4_Ours/cfg.yaml
+  simulator:
+    state_source: current_tuned
+    sim_cfg:
+      delay: 0.1
+      freq: 50
+      init_act_neg_press: 90.71720123291016
+      init_act_pos_press: 110.23314666748047
+      init_length: 0.017403352886509436
+      init_neg_press: 41.214786529541016
+      init_pos_press: 136.9188690185547
+      noise: false
+      scale: true
+      scale_high: 1.0
+      scale_low: 0.8
+      noise_std: 0.0
+    tuned:
+      params_path: /home/rise/test/brl_window_v2/pneu_env/coeff_result/260624_11_21_35_tuner4_output48plus49_linit34807_leak_tuned/params.yaml
+      state_csv: /home/rise/test/brl_window_v2/pneu_env/exp/260624_10_48_53_Flowrate_RND6_suite_joint_tuning_soft_act_output12traj.csv
+      init_length: 0.017403352886509436
+      init_pos_press: 136.9188690185547
+      init_neg_press: 41.214786529541016
+      init_act_pos_press: 110.23314666748047
+      init_act_neg_press: 90.71720123291016
+      pump_in_coeff: 3.594950818595695e-06
+      pump_out_coeff: 9.425020467026517e-06
+      leak_pos_atm: 1.1717650150589065e-08
+      leak_neg_atm: 7.172437082833248e-09
+      leak_cross: 0.0
+  support:
+    intended_stroke_mm:
+    - 0.0
+    - 32.0
+    tuning_data_contraction_max_mm: 21.467442133834744
+    desired_peak_range_mm:
+    - 22.217442133834744
+    - 30.5
+    meaning: core is data-supported nominal feasibility; edge is nominal extrapolation
+      only
+  filters:
+    state_bands:
+      ch_pos:
+      - 100.0
+      - 215.0
+      ch_neg:
+      - 1.0
+      - 105.0
+      act_pos:
+      - 90.0
+      - 165.0
+      act_neg:
+      - 15.0
+      - 115.0
+      displacement_mm:
+      - 0.0
+      - 32.0
+    terminal_bands:
+      ch_pos:
+      - 100.0
+      - 215.0
+      ch_neg:
+      - 1.0
+      - 105.0
+      act_pos:
+      - 90.0
+      - 165.0
+      act_neg:
+      - 15.0
+      - 115.0
+      displacement_mm:
+      - 0.0
+      - 32.0
+    rate_abs_max:
+    - 80.0
+    - 80.0
+    - 55.0
+    - 45.0
+    - 20.0
+    minimum_reserve_kpa:
+    - 3.0
+    - 3.0
+    minimum_reference_span:
+    - 1.0
+    - 1.0
+    - 2.0
+    maximum_target_projection_error_mm: 6.0
+    ignore_initial_sec: 1.0
+  coverage_feature: (act_pos/8kPa, act_neg/8kPa, contraction/4mm, velocity_sign)
+  global_feature_bin_count: 30
+  schedule:
+  - trajectory: 0
+    tier: edge
+    candidate_seed: 442062068
+    rejections:
+      state_band:ch_pos: 1
+    desired_peak_mm: 22.217442133834744
+    achieved_peak_mm: 22.32394291087345
+    target_error_mm: 0.10650077703870409
+    state_min:
+    - 145.835838332525
+    - 4.689798244275128
+    - 101.29489710434525
+    - 81.86798093360656
+    - 0.0
+    state_max:
+    - 214.44293728331434
+    - 28.24520979082121
+    - 117.91032832917031
+    - 101.27925200308631
+    - 22.32394291087345
+    reference_span:
+    - 16.61543122482506
+    - 19.411271069479753
+    - 22.32394291087345
+    rate_abs_max:
+    - 45.11560696474248
+    - 4.1836360257017535
+    - 7.662400629247301
+    - 7.225253297237089
+    - 13.141304408759824
+    reserve_min:
+    - 41.93165553703216
+    - 65.83907152530165
+    terminal_state:
+    - 174.5125374077455
+    - 5.336832710915922
+    - 101.36080498904084
+    - 101.25836162571717
+    - 2.2817657485685316e-07
+    feature_bin_count: 20
+    score: 31.99526248481461
+    coverage_gain: 20
+    selection_score: 61.99526248481461
+    events:
+    - phase: 0
+      direction: contract
+      start_sec: 0.5234008910866016
+      transition_sec: 12.883591762737622
+      end_sec: 40.96
+      target_raw:
+      - 0.0
+      - 0.5
+      - 0.8642429786204602
+      - 0.0
+      - 0.0
+      - 0.8642429786204602
+    - kind: offline_state_gate
+      gate_is_policy_input: false
+      ch_pos_hysteresis_kpa:
+      - 176.00554910820568
+      - 193.53330492634262
+      chamber_raw_rate_per_sec: 0.7866058667117827
+      chamber_switch_count: 7
+      displacement_gate_mm: 21.780481726835262
+      displacement_gate_sec: 11.58
+      actuator_raw_taper_rate_per_sec: 0.145781196895239
+  - trajectory: 1
+    tier: edge
+    candidate_seed: 903853942
+    rejections:
+      state_band:ch_pos: 1
+    desired_peak_mm: 24.97829475588983
+    achieved_peak_mm: 25.04909820993216
+    target_error_mm: 0.07080345404233057
+    state_min:
+    - 140.39642091992502
+    - 4.561332305171156
+    - 101.30113111004762
+    - 79.75793594735457
+    - 0.0
+    state_max:
+    - 211.51467732663207
+    - 28.209436176251153
+    - 120.8139050891788
+    - 101.2764330343029
+    - 25.04909820993216
+    reference_span:
+    - 19.512773979131183
+    - 21.51849708694833
+    - 25.04909820993216
+    rate_abs_max:
+    - 46.86868281273604
+    - 6.597104785735919
+    - 12.192426046697946
+    - 10.132862473129833
+    - 18.740798628730413
+    reserve_min:
+    - 37.92375183093239
+    - 62.393965967619565
+    terminal_state:
+    - 166.92791739049918
+    - 5.153218429387258
+    - 101.36080498922814
+    - 101.25836162590431
+    - 2.2817657485685316e-07
+    feature_bin_count: 20
+    score: 35.68459268238952
+    coverage_gain: 3
+    selection_score: 40.18459268238952
+    events:
+    - phase: 0
+      direction: contract
+      start_sec: 0.5816573856898767
+      transition_sec: 13.61266796994529
+      end_sec: 40.96
+      target_raw:
+      - 0.0
+      - 0.5
+      - 0.9313041026291706
+      - 0.0
+      - 0.0
+      - 0.9313041026291706
+    - kind: offline_state_gate
+      gate_is_policy_input: false
+      ch_pos_hysteresis_kpa:
+      - 169.3211997050843
+      - 193.22175167173828
+      chamber_raw_rate_per_sec: 0.9770648056011204
+      chamber_switch_count: 7
+      displacement_gate_mm: 24.775201245975342
+      displacement_gate_sec: 11.92
+      actuator_raw_taper_rate_per_sec: 0.23285491512932457
+  - trajectory: 2
+    tier: edge
+    candidate_seed: 837831748
+    rejections:
+      state_band:ch_pos: 3
+      state_rate:displacement_mm: 1
+    desired_peak_mm: 27.739147377944914
+    achieved_peak_mm: 26.343390790839237
+    target_error_mm: 1.3957565871056765
+    state_min:
+    - 140.8575911253419
+    - 16.427002782675604
+    - 101.31245204842064
+    - 78.54822396691236
+    - 0.0
+    state_max:
+    - 213.45776435900999
+    - 28.273168396836404
+    - 123.26458898909175
+    - 101.2733838483098
+    - 26.343390790839237
+    reference_span:
+    - 21.95213694067111
+    - 22.725159881397445
+    - 26.343390790839237
+    rate_abs_max:
+    - 36.36957176639868
+    - 1.8264786044114523
+    - 8.162841409946253
+    - 6.09605287741104
+    - 13.505157386730415
+    reserve_min:
+    - 24.015171913955143
+    - 61.80313655827871
+    terminal_state:
+    - 140.8575911253419
+    - 16.427002782675604
+    - 116.84241921138677
+    - 78.61211432230712
+    - 23.734175299308784
+    feature_bin_count: 18
+    score: 9.662123889829132
+    coverage_gain: 7
+    selection_score: 20.162123889829132
+    events:
+    - phase: 0
+      direction: contract
+      start_sec: 0.6496695826589585
+      transition_sec: 15.692192435487161
+      end_sec: 40.96
+      target_raw:
+      - 0.0
+      - 0.5
+      - 0.9235060948268838
+      - 0.0
+      - 0.0
+      - 0.9235060948268838
+    - kind: offline_state_gate
+      gate_is_policy_input: false
+      ch_pos_hysteresis_kpa:
+      - 173.1719668276265
+      - 192.02673360922364
+      chamber_raw_rate_per_sec: 0.7559686682727267
+      chamber_switch_count: 5
+      displacement_gate_mm: 27.688906030880197
+      displacement_gate_sec: null
+      actuator_raw_taper_rate_per_sec: 0.16570085324667033
+  - trajectory: 3
+    tier: edge
+    candidate_seed: 973989343
+    rejections:
+      state_band:ch_pos: 3
+    desired_peak_mm: 30.5
+    achieved_peak_mm: 27.032020912826276
+    target_error_mm: 3.467979087173724
+    state_min:
+    - 139.59019655556102
+    - 16.77578319733999
+    - 101.31419721055723
+    - 77.83614869860453
+    - 0.0
+    state_max:
+    - 212.84840307325607
+    - 28.233787884277756
+    - 124.32427473438446
+    - 101.27338384403643
+    - 27.032020912826276
+    reference_span:
+    - 23.010077523827235
+    - 23.4372351454319
+    - 27.032020912826276
+    rate_abs_max:
+    - 36.34730389038836
+    - 1.7724689902672175
+    - 9.645748394979137
+    - 7.351297181856609
+    - 15.442428036459654
+    reserve_min:
+    - 22.313287920327227
+    - 60.71251568093142
+    terminal_state:
+    - 139.59019655556102
+    - 16.77578319733999
+    - 117.2769086352338
+    - 77.90162912624952
+    - 24.346726177441603
+    feature_bin_count: 16
+    score: -32.00519519718525
+    coverage_gain: 0
+    selection_score: -32.00519519718525
+    events:
+    - phase: 0
+      direction: contract
+      start_sec: 0.4896279990886583
+      transition_sec: 14.27971436177754
+      end_sec: 40.96
+      target_raw:
+      - 0.0
+      - 0.5
+      - 0.9465133473835285
+      - 0.0
+      - 0.0
+      - 0.9465133473835285
+    - kind: offline_state_gate
+      gate_is_policy_input: false
+      ch_pos_hysteresis_kpa:
+      - 176.85973735744648
+      - 193.2814819158655
+      chamber_raw_rate_per_sec: 0.8883916952137061
+      chamber_switch_count: 5
+      displacement_gate_mm: 30.52833804739479
+      displacement_gate_sec: null
+      actuator_raw_taper_rate_per_sec: 0.15239304192208522

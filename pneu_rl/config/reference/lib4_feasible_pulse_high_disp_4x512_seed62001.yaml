@@ -1,0 +1,263 @@
+kind: trajectory_bank_nd
+kwargs:
+  trajectory_npz: pneu_rl/config/reference/lib4_feasible_pulse_high_disp_4x512_seed62001.npz
+  reference_key: reference
+  seed: 62001
+  sample_mode: coverage
+  repeat_after_end: false
+design:
+  library: 4
+  reference_channels:
+  - act_pos_kpa
+  - act_neg_kpa
+  - contraction_mm
+  continuous_carry: true
+  bank_size: 1
+  block_steps: 512
+  blocks_per_hard_reset: 4
+  frequency_hz: 50.0
+  duration_sec: 40.96
+  oracle_feasible: true
+  oracle_action_is_policy_input: false
+  proposal_mode: topology_pulse
+  pulse_patterns_raw:
+    drive:
+    - 0.0
+    - 1.0
+    - 1.0
+    - 0.0
+    - 1.0
+    - 0.0
+    release:
+    - 1.0
+    - 0.0
+    - 0.0
+    - 1.0
+    - 0.0
+    - 1.0
+  model_cfg: pneu_rl/models/0625_lib4_Ours/cfg.yaml
+  simulator:
+    state_source: current_tuned
+    sim_cfg:
+      delay: 0.1
+      freq: 50
+      init_act_neg_press: 90.71720123291016
+      init_act_pos_press: 110.23314666748047
+      init_length: 0.017403352886509436
+      init_neg_press: 41.214786529541016
+      init_pos_press: 136.9188690185547
+      noise: false
+      scale: true
+      scale_high: 1.0
+      scale_low: 0.8
+      noise_std: 0.0
+    tuned:
+      params_path: /home/rise/test/brl_window_v2/pneu_env/coeff_result/260624_11_21_35_tuner4_output48plus49_linit34807_leak_tuned/params.yaml
+      state_csv: /home/rise/test/brl_window_v2/pneu_env/exp/260624_10_48_53_Flowrate_RND6_suite_joint_tuning_soft_act_output12traj.csv
+      init_length: 0.017403352886509436
+      init_pos_press: 136.9188690185547
+      init_neg_press: 41.214786529541016
+      init_act_pos_press: 110.23314666748047
+      init_act_neg_press: 90.71720123291016
+      pump_in_coeff: 3.594950818595695e-06
+      pump_out_coeff: 9.425020467026517e-06
+      leak_pos_atm: 1.1717650150589065e-08
+      leak_neg_atm: 7.172437082833248e-09
+      leak_cross: 0.0
+  filters:
+    state_bands:
+      ch_pos:
+      - 100.0
+      - 200.0
+      ch_neg:
+      - 1.0
+      - 105.0
+      act_pos:
+      - 90.0
+      - 160.0
+      act_neg:
+      - 20.0
+      - 110.0
+      displacement_mm:
+      - 0.0
+      - 32.0
+    terminal_bands:
+      ch_pos:
+      - 100.0
+      - 195.0
+      ch_neg:
+      - 1.0
+      - 100.0
+      act_pos:
+      - 90.0
+      - 155.0
+      act_neg:
+      - 20.0
+      - 108.0
+      displacement_mm:
+      - 0.0
+      - 31.0
+    rate_abs_max:
+    - 80.0
+    - 80.0
+    - 55.0
+    - 45.0
+    - 20.0
+    minimum_reserve_kpa:
+    - 3.0
+    - 3.0
+    minimum_reference_span:
+    - 1.0
+    - 1.0
+    - 0.5
+    minimum_displacement_peak_mm: 8.0
+    ignore_initial_sec: 1.0
+  schedule:
+  - trajectory: 0
+    block: 0
+    rejections:
+      state_rate: 6
+    state_min:
+    - 118.21500822375384
+    - 11.28568660351523
+    - 98.34668333265232
+    - 76.43560806219277
+    - 3.45433685752794e-05
+    state_max:
+    - 180.95669331728007
+    - 27.65267975402117
+    - 130.36071230623523
+    - 109.01434370104245
+    - 16.20795309759987
+    reference_span:
+    - 32.01402897358291
+    - 32.57873563884968
+    - 16.207918554231295
+    displacement_peak_mm: 16.20795309759987
+    rate_abs_max:
+    - 32.14270463242528
+    - 30.53290408581386
+    - 44.54435781159489
+    - 18.260079681648023
+    - 18.876803059734293
+    reserve_min:
+    - 16.89559366094882
+    - 60.46042892351622
+    terminal_state:
+    - 118.21500822375384
+    - 15.753474342794634
+    - 101.31941456280502
+    - 76.43560806219277
+    - 13.072209372477095
+    score: 97.00860172089517
+  - trajectory: 0
+    block: 1
+    rejections:
+      state_rate: 5
+    state_min:
+    - 112.99436766494797
+    - 7.074724841791103
+    - 97.41178562307296
+    - 76.43440026313716
+    - 0.06656712329204673
+    state_max:
+    - 160.61202703081025
+    - 26.95069106398734
+    - 121.12421706961412
+    - 103.37470272574811
+    - 13.076218172803564
+    reference_span:
+    - 23.71243144654116
+    - 26.940302462610944
+    - 13.009651049511518
+    displacement_peak_mm: 13.076218172803564
+    rate_abs_max:
+    - 26.971610556470438
+    - 38.33412806144878
+    - 40.20729286552225
+    - 29.325932645720343
+    - 16.07369438879658
+    reserve_min:
+    - 7.956879542738591
+    - 60.68213371939814
+    terminal_state:
+    - 130.8322875906999
+    - 25.17869341252254
+    - 113.14814256379381
+    - 103.23542354736252
+    - 1.2981380588271487
+    score: 76.67203600817514
+  - trajectory: 0
+    block: 2
+    rejections:
+      state_rate: 1
+    state_min:
+    - 112.92320357831706
+    - 7.017410681172906
+    - 97.93819719878702
+    - 76.84194378301451
+    - 0.05615376344529632
+    state_max:
+    - 162.9620944713558
+    - 27.232716682925293
+    - 123.64837826056483
+    - 103.26672880666791
+    - 12.586709513327381
+    reference_span:
+    - 25.710181061777803
+    - 26.4247850236534
+    - 12.530555749882085
+    displacement_peak_mm: 12.586709513327381
+    rate_abs_max:
+    - 25.03039944088883
+    - 29.969797283838773
+    - 24.175670630294377
+    - 24.826619183114573
+    - 14.26538572310756
+    reserve_min:
+    - 8.26513620327394
+    - 61.23028435100416
+    terminal_state:
+    - 162.9620944713558
+    - 27.232716682925293
+    - 123.64837826056483
+    - 102.12473956694267
+    - 8.814409844099293
+    score: 77.19607758519537
+  - trajectory: 0
+    block: 3
+    rejections:
+      state_rate: 1
+    state_min:
+    - 115.55693331824558
+    - 7.121467576508419
+    - 97.71314849278207
+    - 76.95872979607086
+    - 0.0767477925379817
+    state_max:
+    - 172.75032447276183
+    - 27.36355351415765
+    - 124.99640959497636
+    - 103.39052034975377
+    - 12.465030103765494
+    reference_span:
+    - 27.283261102194288
+    - 26.431790553682916
+    - 12.388282311227513
+    displacement_peak_mm: 12.465030103765494
+    rate_abs_max:
+    - 31.150586675319403
+    - 37.8365630133854
+    - 43.0579073419846
+    - 27.07948335684449
+    - 17.240764672909847
+    reserve_min:
+    - 10.79400841188749
+    - 61.144374017496155
+    terminal_state:
+    - 167.9728564355108
+    - 27.36355351415765
+    - 124.99640959497636
+    - 101.90467126159436
+    - 10.274314135772222
+    score: 78.49161627833223

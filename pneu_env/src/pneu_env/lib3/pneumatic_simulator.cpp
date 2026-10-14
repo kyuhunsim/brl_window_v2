@@ -162,6 +162,19 @@ void PneumaticSimulator::set_logging(bool enable) {
     this->pneumaticCT->set_logging(enable);
 }
 
+void PneumaticSimulator::get_augmented_state(double* out) const
+{
+    for (int i = 1; i < X_DIM; ++i) out[i - 1] = xk0[i];
+    pneumaticCT->get_valve_runtime_states(out + (X_DIM - 1));
+}
+
+void PneumaticSimulator::set_augmented_state(const double* in)
+{
+    xk0[0] = 0.0;
+    for (int i = 1; i < X_DIM; ++i) xk0[i] = in[i - 1];
+    pneumaticCT->set_valve_runtime_states(in + (X_DIM - 1));
+}
+
 extern "C" {
     double get_time_c() {return PneumaticSimulator::get_instance().get_time();}
     double* step_c(double* control, double time_step) { return PneumaticSimulator::get_instance().step(control, time_step); }
@@ -191,4 +204,11 @@ extern "C" {
     double* get_valve_debug_c() { return PneumaticSimulator::get_instance().get_valve_debug(); }
     void time_reset_c() {return PneumaticSimulator::get_instance().time_reset();}
     void set_logging_c(bool enable) { return PneumaticSimulator::get_instance().set_logging(enable); }
+    int get_augmented_state_dim_c() { return AUGMENTED_STATE_DIM; }
+    void get_augmented_state_c(double* out) {
+        PneumaticSimulator::get_instance().get_augmented_state(out);
+    }
+    void set_augmented_state_c(const double* in) {
+        PneumaticSimulator::get_instance().set_augmented_state(in);
+    }
 }

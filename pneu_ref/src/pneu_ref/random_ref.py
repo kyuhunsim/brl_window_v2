@@ -26,7 +26,10 @@ class RandomRef(BaseRef):
     ):
         super(RandomRef, self).__init__()
         
-        random.seed(seed)
+        # Keep reference generation independent from SAC's global Python RNG.
+        # The replay buffer also uses ``random``; sharing the global stream
+        # makes the reference trajectory change when the training seed changes.
+        self.rng = random.Random(seed)
 
         self.pos_start_time = 0
         self.pos_time_step = 0
@@ -100,10 +103,10 @@ class RandomRef(BaseRef):
         dt = T - self.pos_start_time
         if dt > self.pos_time_step:
             self.pos_start_time = T 
-            self.pos_time_step = random.randrange(1, max_time_step + 1)
-            self.pos_amplitude = random.randrange(-max_amplitude, max_amplitude + 1)
-            self.pos_period = 0.1*random.randrange(20, 10*max_period + 1)
-            self.pos_offset = random.randrange(min_offset, max_offset + 1)
+            self.pos_time_step = self.rng.randrange(1, max_time_step + 1)
+            self.pos_amplitude = self.rng.randrange(-max_amplitude, max_amplitude + 1)
+            self.pos_period = 0.1*self.rng.randrange(20, 10*max_period + 1)
+            self.pos_offset = self.rng.randrange(min_offset, max_offset + 1)
             
         goal = self.pos_amplitude*math.sin(2*math.pi*dt/self.pos_period) + self.pos_offset
         return goal
@@ -123,12 +126,11 @@ class RandomRef(BaseRef):
         dt = T - self.neg_start_time
         if dt > self.neg_time_step:
             self.neg_start_time = T 
-            self.neg_time_step = random.randrange(1, max_time_step + 1)
-            self.neg_amplitude = random.randrange(-max_amplitude, max_amplitude + 1)
-            self.neg_period = 0.1*random.randrange(20, 10*max_period + 1)
-            self.neg_offset = random.randrange(min_offset, max_offset + 1)
+            self.neg_time_step = self.rng.randrange(1, max_time_step + 1)
+            self.neg_amplitude = self.rng.randrange(-max_amplitude, max_amplitude + 1)
+            self.neg_period = 0.1*self.rng.randrange(20, 10*max_period + 1)
+            self.neg_offset = self.rng.randrange(min_offset, max_offset + 1)
             
         goal = self.neg_amplitude*math.sin(2*math.pi*dt/self.neg_period) + self.neg_offset
         return goal
     
- 

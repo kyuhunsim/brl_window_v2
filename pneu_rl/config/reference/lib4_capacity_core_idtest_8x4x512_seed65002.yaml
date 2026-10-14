@@ -1,0 +1,768 @@
+kind: trajectory_bank_nd
+kwargs:
+  trajectory_npz: pneu_rl/config/reference/lib4_capacity_core_idtest_8x4x512_seed65002.npz
+  reference_key: reference
+  seed: 65002
+  sample_mode: coverage
+  repeat_after_end: false
+design:
+  library: 4
+  method: displacement-targeted sampled projection onto full-replay admissible outputs
+  tier: core
+  training_eligible: true
+  edge_requires_robust_and_real_gate: false
+  reference_channels:
+  - act_pos_kpa
+  - act_neg_kpa
+  - contraction_mm
+  oracle_action_is_policy_input: false
+  oracle_action_storage_dtype: float64
+  continuous_carry: true
+  bank_size: 8
+  block_steps: 512
+  blocks_per_hard_reset: 4
+  frequency_hz: 50.0
+  duration_sec: 40.96
+  model_cfg: pneu_rl/models/0625_lib4_Ours/cfg.yaml
+  simulator:
+    state_source: current_tuned
+    sim_cfg:
+      delay: 0.1
+      freq: 50
+      init_act_neg_press: 90.71720123291016
+      init_act_pos_press: 110.23314666748047
+      init_length: 0.017403352886509436
+      init_neg_press: 41.214786529541016
+      init_pos_press: 136.9188690185547
+      noise: false
+      scale: true
+      scale_high: 1.0
+      scale_low: 0.8
+      noise_std: 0.0
+    tuned:
+      params_path: /home/rise/test/brl_window_v2/pneu_env/coeff_result/260624_11_21_35_tuner4_output48plus49_linit34807_leak_tuned/params.yaml
+      state_csv: /home/rise/test/brl_window_v2/pneu_env/exp/260624_10_48_53_Flowrate_RND6_suite_joint_tuning_soft_act_output12traj.csv
+      init_length: 0.017403352886509436
+      init_pos_press: 136.9188690185547
+      init_neg_press: 41.214786529541016
+      init_act_pos_press: 110.23314666748047
+      init_act_neg_press: 90.71720123291016
+      pump_in_coeff: 3.594950818595695e-06
+      pump_out_coeff: 9.425020467026517e-06
+      leak_pos_atm: 1.1717650150589065e-08
+      leak_neg_atm: 7.172437082833248e-09
+      leak_cross: 0.0
+  support:
+    intended_stroke_mm:
+    - 0.0
+    - 32.0
+    tuning_data_contraction_max_mm: 21.467442133834744
+    desired_peak_range_mm:
+    - 8.0
+    - 20.5
+    meaning: core is data-supported nominal feasibility; edge is nominal extrapolation
+      only
+  filters:
+    state_bands:
+      ch_pos:
+      - 100.0
+      - 210.0
+      ch_neg:
+      - 1.0
+      - 105.0
+      act_pos:
+      - 90.0
+      - 165.0
+      act_neg:
+      - 15.0
+      - 115.0
+      displacement_mm:
+      - 0.0
+      - 32.0
+    terminal_bands:
+      ch_pos:
+      - 100.0
+      - 210.0
+      ch_neg:
+      - 1.0
+      - 105.0
+      act_pos:
+      - 90.0
+      - 165.0
+      act_neg:
+      - 15.0
+      - 115.0
+      displacement_mm:
+      - 0.0
+      - 32.0
+    rate_abs_max:
+    - 80.0
+    - 80.0
+    - 55.0
+    - 45.0
+    - 20.0
+    minimum_reserve_kpa:
+    - 3.0
+    - 3.0
+    minimum_reference_span:
+    - 1.0
+    - 1.0
+    - 2.0
+    maximum_target_projection_error_mm: 4.5
+    ignore_initial_sec: 1.0
+  coverage_feature: (act_pos/8kPa, act_neg/8kPa, contraction/4mm, velocity_sign)
+  global_feature_bin_count: 33
+  schedule:
+  - trajectory: 0
+    tier: core
+    candidate_seed: 1441413315
+    rejections:
+      reserve: 6
+      state_band:ch_pos: 4
+      reference_span: 1
+    desired_peak_mm: 8.0
+    achieved_peak_mm: 5.231571083537729
+    target_error_mm: 2.7684289164622706
+    state_min:
+    - 152.9742510849583
+    - 4.461469033086236
+    - 101.19829236195126
+    - 91.83632429508518
+    - 0.0
+    state_max:
+    - 202.32704418595313
+    - 27.508171105593295
+    - 108.72652174212008
+    - 101.27671370278766
+    - 5.231571083537729
+    reference_span:
+    - 7.528229380168824
+    - 9.440389407702483
+    - 5.231571083537729
+    rate_abs_max:
+    - 13.697475588802632
+    - 28.24524302256157
+    - 6.09097402545018
+    - 6.882714588954997
+    - 4.111170048443424
+    reserve_min:
+    - 50.899285775441044
+    - 72.37132163495022
+    terminal_state:
+    - 202.32704418595313
+    - 10.605691073865426
+    - 108.72652174212008
+    - 91.83632429508518
+    - 5.231571083537729
+    feature_bin_count: 9
+    score: -44.78857630631411
+    coverage_gain: 9
+    selection_score: -31.288576306314113
+    events:
+    - phase: 0
+      direction: contract
+      start_sec: 0.4621608599971938
+      transition_sec: 3.4460836653854754
+      end_sec: 7.042177229180464
+      target_raw:
+      - 0.0
+      - 0.0
+      - 0.5967594015442562
+      - 0.0
+      - 0.0
+      - 0.5967594015442562
+    - phase: 1
+      direction: recover
+      start_sec: 7.042177229180464
+      transition_sec: 4.106269696056219
+      end_sec: 17.429738381085144
+      target_raw:
+      - 0.0
+      - 0.5
+      - 0.0
+      - 0.0
+      - 0.442560126918011
+      - 0.0
+    - phase: 2
+      direction: contract
+      start_sec: 17.429738381085144
+      transition_sec: 3.9221419574206493
+      end_sec: 40.96
+      target_raw:
+      - 0.0
+      - 0.5
+      - 0.627098007185122
+      - 0.0
+      - 0.0
+      - 0.627098007185122
+  - trajectory: 1
+    tier: core
+    candidate_seed: 1559028363
+    rejections:
+      reserve: 6
+      target_projection_error: 2
+    desired_peak_mm: 9.785714285714286
+    achieved_peak_mm: 9.893257995022692
+    target_error_mm: 0.10754370930840551
+    state_min:
+    - 152.95470047536753
+    - 4.222609715436214
+    - 101.14608363790192
+    - 88.15622206730777
+    - 0.0
+    state_max:
+    - 185.7509540275183
+    - 27.51777048537218
+    - 110.40631021201946
+    - 101.27632341341169
+    - 9.893257995022692
+    reference_span:
+    - 9.260226574117539
+    - 13.120101346103922
+    - 9.893257995022692
+    rate_abs_max:
+    - 12.284851445091505
+    - 23.806693073659922
+    - 7.034418963533895
+    - 10.03069466286668
+    - 9.5123749066641
+    reserve_min:
+    - 50.87973516503442
+    - 72.36172225665304
+    terminal_state:
+    - 185.7509540275183
+    - 11.738856745371633
+    - 110.39985797695057
+    - 89.0706832635423
+    - 9.037244693051157
+    feature_bin_count: 12
+    score: 14.861400204865653
+    coverage_gain: 4
+    selection_score: 20.861400204865653
+    events:
+    - phase: 0
+      direction: contract
+      start_sec: 0.5368616399662862
+      transition_sec: 4.469903564872405
+      end_sec: 6.958964269184472
+      target_raw:
+      - 0.0
+      - 0.0
+      - 0.6948096079913556
+      - 0.0
+      - 0.0
+      - 0.6948096079913556
+    - phase: 1
+      direction: recover
+      start_sec: 6.958964269184472
+      transition_sec: 4.011644577328276
+      end_sec: 15.861326330766815
+      target_raw:
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.6487769104909326
+      - 0.6487769104909326
+      - 0.0
+    - phase: 2
+      direction: contract
+      start_sec: 15.861326330766815
+      transition_sec: 3.3159728388686087
+      end_sec: 40.96
+      target_raw:
+      - 0.0
+      - 0.5
+      - 0.6831801508321348
+      - 0.0
+      - 0.0
+      - 0.6831801508321348
+  - trajectory: 2
+    tier: core
+    candidate_seed: 1403584585
+    rejections:
+      reference_span: 1
+      target_projection_error: 2
+      reserve: 4
+    desired_peak_mm: 11.571428571428571
+    achieved_peak_mm: 12.336613754094675
+    target_error_mm: 0.7651851826661034
+    state_min:
+    - 145.90876347171533
+    - 4.548952946321402
+    - 101.12182400906003
+    - 87.34914056700846
+    - 0.0
+    state_max:
+    - 189.74489356357648
+    - 34.97364166646249
+    - 111.97246920967102
+    - 101.2764972982711
+    - 12.336613754094675
+    reference_span:
+    - 10.850645200610984
+    - 13.927356731262634
+    - 12.336613754094675
+    rate_abs_max:
+    - 34.7837679995159
+    - 32.07308349822693
+    - 8.225470762568676
+    - 10.683047169139215
+    - 12.71643158721556
+    reserve_min:
+    - 39.915999761636655
+    - 52.48468800423527
+    terminal_state:
+    - 148.08079772542342
+    - 34.08515675117933
+    - 107.08053514286968
+    - 87.68680626988707
+    - 7.343305983357064
+    feature_bin_count: 17
+    score: 6.771810197366285
+    coverage_gain: 7
+    selection_score: 17.271810197366285
+    events:
+    - phase: 0
+      direction: contract
+      start_sec: 0.4341549529478358
+      transition_sec: 4.110457459887973
+      end_sec: 8.40021707186477
+      target_raw:
+      - 0.5
+      - 1.0
+      - 0.7118890673951371
+      - 0.0
+      - 0.0
+      - 0.7118890673951371
+    - phase: 1
+      direction: recover
+      start_sec: 8.40021707186477
+      transition_sec: 3.5783606434991593
+      end_sec: 18.37059799651511
+      target_raw:
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.5614414381710645
+      - 0.5614414381710645
+      - 0.0
+    - phase: 2
+      direction: contract
+      start_sec: 18.37059799651511
+      transition_sec: 4.243181272348541
+      end_sec: 40.96
+      target_raw:
+      - 1.0
+      - 1.0
+      - 0.7112191038258169
+      - 0.0
+      - 0.0
+      - 0.7112191038258169
+  - trajectory: 3
+    tier: core
+    candidate_seed: 787124898
+    rejections:
+      reserve: 7
+      target_projection_error: 2
+    desired_peak_mm: 13.357142857142858
+    achieved_peak_mm: 15.901112422587602
+    target_error_mm: 2.543969565444744
+    state_min:
+    - 138.92259850667648
+    - 3.4034162555603826
+    - 100.8658525579454
+    - 85.89712028623411
+    - 0.0
+    state_max:
+    - 177.18867312990878
+    - 35.692602609118495
+    - 113.8029220216484
+    - 101.48706445017805
+    - 15.901112422587602
+    reference_span:
+    - 12.937069463702997
+    - 15.58994416394394
+    - 15.901112422587602
+    rate_abs_max:
+    - 11.698892987777754
+    - 29.428409070042072
+    - 6.916070170045074
+    - 11.148885956654553
+    - 9.116788936935727
+    reserve_min:
+    - 35.91490162522609
+    - 50.20451767711562
+    terminal_state:
+    - 177.18867312990878
+    - 35.692602609118495
+    - 113.8029220216484
+    - 85.89712028623411
+    - 15.901112422587602
+    feature_bin_count: 15
+    score: -26.051928204924934
+    coverage_gain: 3
+    selection_score: -21.551928204924934
+    events:
+    - phase: 0
+      direction: contract
+      start_sec: 0.4398578383785079
+      transition_sec: 4.8645602159555885
+      end_sec: 10.595076685661084
+      target_raw:
+      - 1.0
+      - 1.0
+      - 0.7408374408147297
+      - 0.0
+      - 0.0
+      - 0.7408374408147297
+    - phase: 1
+      direction: recover
+      start_sec: 10.595076685661084
+      transition_sec: 4.72085081056975
+      end_sec: 18.548598667082818
+      target_raw:
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.7710091629582946
+      - 0.7710091629582946
+      - 0.0
+    - phase: 2
+      direction: contract
+      start_sec: 18.548598667082818
+      transition_sec: 3.956425704295503
+      end_sec: 40.96
+      target_raw:
+      - 0.5
+      - 1.0
+      - 0.748331408466707
+      - 0.0
+      - 0.0
+      - 0.748331408466707
+  - trajectory: 4
+    tier: core
+    candidate_seed: 523532955
+    rejections:
+      reserve: 4
+      target_projection_error: 3
+      state_band:ch_pos: 1
+    desired_peak_mm: 15.142857142857142
+    achieved_peak_mm: 15.025074266573204
+    target_error_mm: 0.11778287628393791
+    state_min:
+    - 147.34500253071914
+    - 4.017095536046692
+    - 101.11208798728819
+    - 85.72755818016705
+    - 0.0
+    state_max:
+    - 174.1405144090912
+    - 34.70434495861517
+    - 112.89211623039749
+    - 101.27819185358317
+    - 15.025074266573204
+    reference_span:
+    - 11.7800282431093
+    - 15.550633673416115
+    - 15.025074266573204
+    rate_abs_max:
+    - 14.533272204781866
+    - 27.567388008333893
+    - 10.314384678511601
+    - 10.691963077205457
+    - 13.486821958727345
+    reserve_min:
+    - 39.50371114299878
+    - 52.225464024774
+    terminal_state:
+    - 147.34500253071914
+    - 34.52257261482272
+    - 107.84129138772036
+    - 86.82583991703135
+    - 8.816676633824807
+    feature_bin_count: 19
+    score: 23.535949836720718
+    coverage_gain: 0
+    selection_score: 23.535949836720718
+    events:
+    - phase: 0
+      direction: contract
+      start_sec: 0.5774004467311996
+      transition_sec: 3.528399325204825
+      end_sec: 10.989535004648113
+      target_raw:
+      - 0.0
+      - 0.0
+      - 0.7438660633194537
+      - 0.0
+      - 0.0
+      - 0.7438660633194537
+    - phase: 1
+      direction: recover
+      start_sec: 10.989535004648113
+      transition_sec: 4.3889777677659945
+      end_sec: 18.593203792096162
+      target_raw:
+      - 0.0
+      - 0.5
+      - 0.0
+      - 0.0
+      - 0.46812299053233253
+      - 0.0
+    - phase: 2
+      direction: contract
+      start_sec: 18.593203792096162
+      transition_sec: 3.779733812224049
+      end_sec: 40.96
+      target_raw:
+      - 1.0
+      - 1.0
+      - 0.7290235340200857
+      - 0.0
+      - 0.0
+      - 0.7290235340200857
+  - trajectory: 5
+    tier: core
+    candidate_seed: 57051407
+    rejections:
+      reserve: 7
+      state_band:ch_pos: 1
+    desired_peak_mm: 16.92857142857143
+    achieved_peak_mm: 16.68093919581162
+    target_error_mm: 0.24763223275980906
+    state_min:
+    - 144.75712574760246
+    - 5.233869938569339
+    - 101.12557463618813
+    - 85.70320025750726
+    - 0.0
+    state_max:
+    - 196.72320183692787
+    - 36.009193568426426
+    - 114.88764020295451
+    - 101.274213995841
+    - 16.68093919581162
+    reference_span:
+    - 13.762065566766381
+    - 15.571013738333733
+    - 16.68093919581162
+    rate_abs_max:
+    - 18.47668228312287
+    - 18.551479387688197
+    - 11.62461313697527
+    - 12.829719440398435
+    - 15.057515119925279
+    reserve_min:
+    - 35.42071968625878
+    - 50.307228399028425
+    terminal_state:
+    - 177.8960139090051
+    - 35.580809348296576
+    - 113.5255529075469
+    - 86.1385288109012
+    - 15.357377198759872
+    feature_bin_count: 19
+    score: 22.694948505870446
+    coverage_gain: 4
+    selection_score: 28.694948505870446
+    events:
+    - phase: 0
+      direction: contract
+      start_sec: 0.6395691642893084
+      transition_sec: 4.562255885124263
+      end_sec: 14.252963954924011
+      target_raw:
+      - 1.0
+      - 1.0
+      - 0.7454452424100052
+      - 0.0
+      - 0.0
+      - 0.7454452424100052
+    - phase: 1
+      direction: recover
+      start_sec: 14.252963954924011
+      transition_sec: 3.0659806604291546
+      end_sec: 23.843277844258886
+      target_raw:
+      - 0.0
+      - 0.5
+      - 0.0
+      - 0.0
+      - 0.489201030812803
+      - 0.0
+    - phase: 2
+      direction: contract
+      start_sec: 23.843277844258886
+      transition_sec: 3.7939883699428183
+      end_sec: 40.96
+      target_raw:
+      - 0.5
+      - 1.0
+      - 0.7433994314643139
+      - 0.0
+      - 0.0
+      - 0.7433994314643139
+  - trajectory: 6
+    tier: core
+    candidate_seed: 1515560965
+    rejections:
+      reserve: 6
+      state_rate:displacement_mm: 1
+      target_projection_error: 2
+    desired_peak_mm: 18.714285714285715
+    achieved_peak_mm: 20.47876342705884
+    target_error_mm: 1.7644777127731253
+    state_min:
+    - 147.15611084698799
+    - 3.737513146573888
+    - 101.00166264745876
+    - 83.18022363204499
+    - 0.0
+    state_max:
+    - 175.31025955617727
+    - 27.512939779842725
+    - 116.49497448617758
+    - 101.37499243246855
+    - 20.47876342705884
+    reference_span:
+    - 15.493311838718824
+    - 18.19476880042356
+    - 20.47876342705884
+    rate_abs_max:
+    - 11.877115396937654
+    - 21.73483832632046
+    - 10.169543990721408
+    - 12.173957468776209
+    - 17.004554846744966
+    reserve_min:
+    - 34.481241033031466
+    - 70.15287843051671
+    terminal_state:
+    - 155.19315086396054
+    - 12.012136172874877
+    - 111.4468414435607
+    - 84.78094285534308
+    - 14.645788327640508
+    feature_bin_count: 23
+    score: -1.6263867964465462
+    coverage_gain: 5
+    selection_score: 5.873613203553454
+    events:
+    - phase: 0
+      direction: contract
+      start_sec: 0.41890182313127533
+      transition_sec: 4.9990927620383045
+      end_sec: 14.633327354739517
+      target_raw:
+      - 0.0
+      - 0.0
+      - 0.799522497459444
+      - 0.0
+      - 0.0
+      - 0.799522497459444
+    - phase: 1
+      direction: recover
+      start_sec: 14.633327354739517
+      transition_sec: 4.107785940416226
+      end_sec: 21.836176968971877
+      target_raw:
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.7050508528180339
+      - 0.7050508528180339
+      - 0.0
+    - phase: 2
+      direction: contract
+      start_sec: 21.836176968971877
+      transition_sec: 4.123895023071871
+      end_sec: 40.96
+      target_raw:
+      - 0.0
+      - 0.0
+      - 0.7728581990958311
+      - 0.0
+      - 0.0
+      - 0.7728581990958311
+  - trajectory: 7
+    tier: core
+    candidate_seed: 1936483359
+    rejections:
+      state_rate:displacement_mm: 4
+      reserve: 5
+      state_band:ch_pos: 1
+    desired_peak_mm: 20.5
+    achieved_peak_mm: 20.6072275502338
+    target_error_mm: 0.1072275502338016
+    state_min:
+    - 140.2752418012051
+    - 5.263284123249651
+    - 101.09439035088818
+    - 81.16891293524264
+    - 0.0
+    state_max:
+    - 181.06190298344023
+    - 37.57394446091858
+    - 114.49348321152974
+    - 101.40130385193035
+    - 20.6072275502338
+    reference_span:
+    - 13.39909286064156
+    - 20.232390916687706
+    - 20.6072275502338
+    rate_abs_max:
+    - 17.508549656180605
+    - 18.05203778315665
+    - 10.962461570829163
+    - 13.093830043496268
+    - 19.06216927720692
+    reserve_min:
+    - 26.677136744167044
+    - 43.76559363063997
+    terminal_state:
+    - 143.82134831509543
+    - 36.30740045813291
+    - 111.23339011270681
+    - 83.23202110438976
+    - 16.1160655559229
+    feature_bin_count: 18
+    score: 29.144250734424233
+    coverage_gain: 1
+    selection_score: 30.644250734424233
+    events:
+    - phase: 0
+      direction: contract
+      start_sec: 0.48124929088722557
+      transition_sec: 4.250455426498836
+      end_sec: 16.731270477618448
+      target_raw:
+      - 1.0
+      - 1.0
+      - 0.8498736147931689
+      - 0.0
+      - 0.0
+      - 0.8498736147931689
+    - phase: 1
+      direction: recover
+      start_sec: 16.731270477618448
+      transition_sec: 4.192226626623443
+      end_sec: 25.08752112707848
+      target_raw:
+      - 0.0
+      - 0.5
+      - 0.0
+      - 0.0
+      - 0.7099863933534021
+      - 0.0
+    - phase: 2
+      direction: contract
+      start_sec: 25.08752112707848
+      transition_sec: 3.32216244139929
+      end_sec: 40.96
+      target_raw:
+      - 1.0
+      - 1.0
+      - 0.8080554114248798
+      - 0.0
+      - 0.0
+      - 0.8080554114248798

@@ -11,6 +11,8 @@ from pneu_ref.random_ref import RandomRef
 from pneu_ref.sine_ref import SineRef
 from pneu_ref.step_ref import StepRef
 from pneu_utils.utils import get_pkg_path
+from pneu_rl.exp_paths import ensure_model_exp_dir
+from pneu_rl.plotting import plot_lib3_pressure_and_controls
 
 try:
     from analyze_lib3_redundancy import analyze_csv, print_report
@@ -414,66 +416,7 @@ def run_controller(args: argparse.Namespace, mode: str) -> pd.DataFrame:
 
 
 def plot_controller(df: pd.DataFrame, mode: str, out_dir: Path, show: bool) -> None:
-    import matplotlib.pyplot as plt
-
-    time = df["curr_time"].to_numpy(dtype=np.float64)
-
-    fig, axes = plt.subplots(3, 1, figsize=(9, 8), sharex=True)
-    axes[0].plot(time, df["press_pos"], label="Chamber Pos", color="#d62728")
-    axes[0].plot(time, df["press_neg"], label="Chamber Neg", color="#1f77b4")
-    if "ref_ch_pos" in df.columns and not np.all(np.isnan(df["ref_ch_pos"])):
-        axes[0].plot(time, df["ref_ch_pos"], label="Chamber Pos Ref", color="#d62728", linestyle="--")
-        axes[0].plot(time, df["ref_ch_neg"], label="Chamber Neg Ref", color="#1f77b4", linestyle="--")
-    axes[0].set_ylabel("Chamber [kPa]")
-    axes[0].legend(loc="best")
-
-    axes[1].plot(time, df["ref_act_pos"], label="Ref Pos", color="black", linestyle="--")
-    axes[1].plot(time, df["act_pos_press"], label="Act Pos", color="#d62728")
-    axes[1].plot(time, df["ref_act_neg"], label="Ref Neg", color="gray", linestyle="--")
-    axes[1].plot(time, df["act_neg_press"], label="Act Neg", color="#1f77b4")
-    axes[1].set_ylabel("Actuator [kPa]")
-    axes[1].legend(loc="best", ncol=2)
-
-    pos_common = 0.5 * (df["ctrl3"] + df["ctrl4"])
-    pos_diff = df["ctrl3"] - df["ctrl4"]
-    neg_common = 0.5 * (df["ctrl5"] + df["ctrl6"])
-    neg_diff = df["ctrl6"] - df["ctrl5"]
-    axes[2].plot(time, pos_common, label="Pos Common", color="#d62728")
-    axes[2].plot(time, pos_diff, label="Pos Diff", color="#ff7f0e")
-    axes[2].plot(time, neg_common, label="Neg Common", color="#1f77b4")
-    axes[2].plot(time, neg_diff, label="Neg Diff", color="#9467bd")
-    axes[2].axhline(0.0, color="black", linewidth=0.8)
-    axes[2].set_ylabel("Common / Diff")
-    axes[2].set_xlabel("Time [s]")
-    axes[2].legend(loc="best", ncol=2)
-
-    for ax in axes:
-        ax.grid(True, color="0.85")
-    fig.tight_layout()
-    fig.savefig(out_dir / f"{mode}_main.png", dpi=150)
-
-    ctrl_fig, ctrl_axes = plt.subplots(6, 1, figsize=(9, 10), sharex=True)
-    ctrl_series = [
-        ("ctrl1", "Positive Chamber", "#d62728"),
-        ("ctrl2", "Negative Chamber", "#1f77b4"),
-        ("ctrl3", "Actuator Positive In", "#2ca02c"),
-        ("ctrl4", "Actuator Positive Out", "#ff7f0e"),
-        ("ctrl5", "Actuator Negative In", "#9467bd"),
-        ("ctrl6", "Actuator Negative Out", "#8c564b"),
-    ]
-    for ax, (key, title, color) in zip(ctrl_axes, ctrl_series):
-        ax.plot(time, df[key], color=color, linewidth=1.8)
-        ax.set_ylabel(title, fontsize=11)
-        ax.grid(True, color="0.85")
-    ctrl_axes[-1].set_xlabel("Time [s]")
-    ctrl_fig.tight_layout()
-    ctrl_fig.savefig(out_dir / f"{mode}_ctrl.png", dpi=150)
-
-    if show:
-        plt.show()
-    else:
-        plt.close(fig)
-        plt.close(ctrl_fig)
+    plot_lib3_pressure_and_controls(df, out_dir / mode, show=show)
 
 
 def save_and_analyze(args: argparse.Namespace, mode: str, out_dir: Path) -> dict:
@@ -562,8 +505,7 @@ def main() -> None:
     args = parse_args()
     timestamp = datetime.now().strftime("%y%m%d_%H_%M_%S")
     save_name = args.save_name or f"{timestamp}_lib3_baseline_diag_{args.ref}"
-    out_dir = Path(get_pkg_path("pneu_rl")) / "exp" / save_name
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = ensure_model_exp_dir("lib3_baseline", save_name)
 
     reports = []
     for mode in args.controllers:

@@ -1,0 +1,19 @@
+kind: legacy_random
+kwargs:
+  seed: 61098
+  pos_min_off: 140
+  pos_max_off: 210
+  neg_min_off: 10
+  neg_max_off: 32
+  pos_max_ts: 10
+  neg_max_ts: 10
+  pos_max_amp: 10
+  neg_max_amp: 10
+  pos_max_per: 10
+  neg_max_per: 10
+design:
+  library: 2
+  action_scale:
+  - 0.8
+  - 1.0
+  source: historical 051lib2_Ours saved reference configuration

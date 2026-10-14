@@ -19,6 +19,8 @@ from pneu_env.sim4 import PneuSim
 from pneu_env.pred4 import PneuPred
 from pneu_env.real.real4 import PneuReal
 from pneu_rl.sac_with_loss import SAC
+from pneu_rl.exp_paths import ensure_model_exp_dir
+from pneu_rl.exp_paths import find_experiment_file
 from pneu_utils.utils import (
     delete_lines, 
     color, 
@@ -338,10 +340,10 @@ def save_datas(
     obs_mode = "real" if obs_mode.lower() == "real" else "simulation"
 
     if save_name is not None:
-        os.makedirs(f'{get_pkg_path("pneu_rl")}/exp/{save_name}')
+        output_dir = ensure_model_exp_dir(model_name, save_name)
         df = datas_to_df(datas)
         # df.to_csv(f'/Users/greenlandshark/MATLAB/main/datas/{save_name}.csv', index=False)
-        df.to_csv(f'{get_pkg_path("pneu_rl")}/exp/{save_name}/{save_name}.csv', index=False)
+        df.to_csv(output_dir / f'{save_name}.csv', index=False)
 
     metrics = calc_metrics(datas)
     print_metrics(metrics)
@@ -360,13 +362,13 @@ def save_datas(
     save_cfg["env"]["pid_enabled"] = bool(pid_enabled)
 
     if save_name is not None:
-        with open(f'{get_pkg_path("pneu_rl")}/exp/{save_name}/cfg.yaml', 'w') as f:
+        with open(output_dir / 'cfg.yaml', 'w') as f:
             yaml.dump(save_cfg, f)
     
     if save_name is not None:
         print('[ INFO] Saving data Done!')
 
-def plot_datas(datas, save_name=None):
+def plot_datas(datas, model_name, save_name=None):
     fontname = Times_New_Roman
     label_font_size = 18
     
@@ -458,7 +460,8 @@ def plot_datas(datas, save_name=None):
 
     plt.tight_layout()
     if save_name is not None:
-        plt.savefig(f'{get_pkg_path("pneu_rl")}/exp/{save_name}/{save_name}_main.png')
+        output_dir = ensure_model_exp_dir(model_name, save_name)
+        plt.savefig(output_dir / f'{save_name}_main.png')
 
     ctrl_fig, ctrl_axes = plt.subplots(6, 1, figsize=(9, 10), sharex=True)
     ctrl_series = [
@@ -480,7 +483,7 @@ def plot_datas(datas, save_name=None):
     ctrl_axes[-1].set_xlabel('Time [sec]', fontproperties=fontname, fontsize=label_font_size)
     ctrl_fig.tight_layout()
     if save_name is not None:
-        ctrl_fig.savefig(f'{get_pkg_path("pneu_rl")}/exp/{save_name}/{save_name}_ctrl.png')
+        ctrl_fig.savefig(output_dir / f'{save_name}_ctrl.png')
     plt.show()
 
 if __name__ == '__main__':
@@ -524,8 +527,7 @@ if __name__ == '__main__':
     elif ref_mode =='3':
         print(f'[ INFO] Reference Mode: Trajectory')
         csv_file_name = viz_kwargs["ref"]["traj"]["file"]
-        csv_file_name = f"{get_pkg_path('pneu_rl')}/exp/{csv_file_name}/{csv_file_name}"
-        csv_file_name = f"{csv_file_name}.csv"
+        csv_file_name = find_experiment_file(csv_file_name, f"{csv_file_name}.csv")
         csv_data = pd.read_csv(csv_file_name).to_dict(orient="list")
         keys = [
             "curr_time",
@@ -713,7 +715,7 @@ if __name__ == '__main__':
             kwargs,
             pid_enabled=pid_enabled,
         )
-        plot_datas(datas, save_name)
+        plot_datas(datas, model_name, save_name)
 
     except KeyboardInterrupt:
         print()
@@ -728,7 +730,7 @@ if __name__ == '__main__':
             kwargs,
             pid_enabled=pid_enabled,
         )
-        plot_datas(datas, save_name)
+        plot_datas(datas, model_name, save_name)
     
     finally:
         env.close()

@@ -1,0 +1,617 @@
+kind: optimized_trajectory_bank
+kwargs:
+  trajectory_npz: pneu_rl/config/reference/_smoke2_lib3_capacity_random.npz
+  seed: 61098
+  sample_mode: coverage
+  repeat_after_end: false
+design:
+  library: 3
+  generator: pressure-space independent POS/NEG minimum-jerk waypoints
+  training_npz_keys:
+  - time
+  - pressure
+  teacher_or_oracle_action_stored_in_training_reference: false
+  simulator_output_used_as_training_target: false
+  simulator_and_pid_role: offline capacity characterization and pass/fail certification
+    only
+  pid_certifier_gains:
+    act_pos_in:
+      kp: 0.09
+      ki: 0.005
+      kd: 0.001
+    act_pos_out:
+      kp: 0.052
+      ki: 0.00045
+      kd: 0.001
+    act_neg_in:
+      kp: 0.058
+      ki: 0.00135
+      kd: 0.001
+    act_neg_out:
+      kp: 0.075
+      ki: 0.0006
+      kd: 0.001
+    deadband: 0.5
+    integral_limit: 100.0
+    max_open: 1.0
+  action_scale:
+  - 0.8
+  - 1.0
+  continuous_carry: true
+  blocks_per_hard_reset: 4
+  block_steps: 512
+  duration_sec: 40.96
+  bank_size: 1
+  seed: 61098
+  actuator_pressure_bounds_kpa:
+    pos:
+    - 110.0
+    - 145.0
+    neg:
+    - 58.0
+    - 82.0
+  derived_chamber_reserve_margin_kpa: 35.0
+  events_per_512_block_per_axis:
+  - 3
+  - 4
+  minimum_jerk_peak_slope: 1.875
+  maximum_reference_frequency_hz: 0.35
+  signed_reference_rate_limits_kpa_s: &id001
+    act_pos:
+      up: 10.0
+      down: 12.0
+    act_neg:
+      up: 4.5
+      down: 5.0
+  capacity_characterization:
+    capacity_quantile_within_state: 0.9
+    per_state:
+      '0':
+        initial_pressure_kpa:
+        - 101.325
+        - 101.325
+        - 101.325
+        - 101.325
+        ch_pos:
+          up: 79.60818014704735
+          down: 0.0
+        ch_neg:
+          up: 0.0
+          down: 124.72139337966507
+        act_pos:
+          up: 104.18365883010641
+          down: 0.0
+        act_neg:
+          up: 8.488776071402526e-05
+          down: 111.48478795737398
+      '1':
+        initial_pressure_kpa:
+        - 147.0
+        - 25.0
+        - 112.0
+        - 60.0
+        ch_pos:
+          up: 33.48071393381048
+          down: 32.969734514769016
+        ch_neg:
+          up: 26.89486136084795
+          down: 28.090146786400897
+        act_pos:
+          up: 136.4015022162599
+          down: 54.559970059445284
+        act_neg:
+          up: 112.21811118931832
+          down: 70.91031428006292
+      '2':
+        initial_pressure_kpa:
+        - 147.0
+        - 35.0
+        - 112.0
+        - 70.0
+        ch_pos:
+          up: 39.27938509547658
+          down: 27.495055050949553
+        ch_neg:
+          up: 16.028711806145875
+          down: 40.50175467194715
+        act_pos:
+          up: 143.21378436533965
+          down: 54.559970059445284
+        act_neg:
+          up: 95.7354919130886
+          down: 82.5213030603319
+      '3':
+        initial_pressure_kpa:
+        - 147.0
+        - 45.0
+        - 112.0
+        - 80.0
+        ch_pos:
+          up: 40.917878068157734
+          down: 22.407851679290545
+        ch_neg:
+          up: 4.898431749591303
+          down: 53.03631528651749
+        act_pos:
+          up: 150.19115784806175
+          down: 54.559970059445284
+        act_neg:
+          up: 73.9344877521183
+          down: 94.02367472280913
+      '4':
+        initial_pressure_kpa:
+        - 162.5
+        - 25.0
+        - 127.5
+        - 60.0
+        ch_pos:
+          up: 33.2332104812113
+          down: 38.63180584915084
+        ch_neg:
+          up: 27.31490104620025
+          down: 27.74565234930518
+        act_pos:
+          up: 137.92652522814018
+          down: 105.11728463040437
+        act_neg:
+          up: 112.21811118931832
+          down: 70.91031326781446
+      '5':
+        initial_pressure_kpa:
+        - 162.5
+        - 35.0
+        - 127.5
+        - 70.0
+        ch_pos:
+          up: 39.03232363036436
+          down: 32.77138393291906
+        ch_neg:
+          up: 16.459983657281594
+          down: 40.15631922639933
+        act_pos:
+          up: 144.74089643130878
+          down: 105.11728463040437
+        act_neg:
+          up: 95.7354919130886
+          down: 82.5187694634711
+      '6':
+        initial_pressure_kpa:
+        - 162.5
+        - 45.0
+        - 127.5
+        - 80.0
+        ch_pos:
+          up: 45.06913751937059
+          down: 26.953177368433536
+        ch_neg:
+          up: 5.331737149782256
+          down: 52.689146079801176
+        act_pos:
+          up: 151.65920144667368
+          down: 105.11728463040437
+        act_neg:
+          up: 73.93448775189934
+          down: 94.006451039923
+      '7':
+        initial_pressure_kpa:
+        - 178.0
+        - 25.0
+        - 143.0
+        - 60.0
+        ch_pos:
+          up: 32.99106148150834
+          down: 43.65954417836146
+        ch_neg:
+          up: 27.73356560233587
+          down: 27.392107735520803
+        act_pos:
+          up: 139.80520437541122
+          down: 147.41270659929856
+        act_neg:
+          up: 112.21811118931832
+          down: 70.91028269669853
+      '8':
+        initial_pressure_kpa:
+        - 178.0
+        - 35.0
+        - 143.0
+        - 70.0
+        ch_pos:
+          up: 41.0959747867706
+          down: 37.750561823158435
+        ch_neg:
+          up: 16.887404708131125
+          down: 39.80689359582746
+        act_pos:
+          up: 146.69090052594657
+          down: 147.41270659929856
+        act_neg:
+          up: 95.7354919130886
+          down: 82.51461283789683
+      '9':
+        initial_pressure_kpa:
+        - 178.0
+        - 45.0
+        - 143.0
+        - 80.0
+        ch_pos:
+          up: 44.81240471965542
+          down: 31.588112824061817
+        ch_neg:
+          up: 5.765799592468959
+          down: 52.33632390909543
+        act_pos:
+          up: 153.25720025440273
+          down: 147.41270659929856
+        act_neg:
+          up: 73.9344877516893
+          down: 93.98608593861653
+    robust_across_steady_states:
+      ch_pos:
+        up:
+          min: 32.99106148150834
+          q20: 33.38171255277081
+          median: 39.27938509547658
+          max: 45.06913751937059
+        down:
+          min: 22.407851679290545
+          q20: 27.278303977943146
+          median: 32.77138393291906
+          max: 43.65954417836146
+      ch_neg:
+        up:
+          min: 4.898431749591303
+          q20: 5.592174615394278
+          median: 16.459983657281594
+          max: 27.73356560233587
+        down:
+          min: 27.392107735520803
+          q20: 27.95234901156261
+          median: 40.15631922639933
+          max: 53.03631528651749
+      act_pos:
+        up:
+          min: 136.4015022162599
+          q20: 139.0537327165028
+          median: 144.74089643130878
+          max: 153.25720025440273
+        down:
+          min: 54.559970059445284
+          q20: 54.559970059445284
+          median: 105.11728463040437
+          max: 147.41270659929856
+      act_neg:
+        up:
+          min: 73.9344877516893
+          q20: 73.93448775203072
+          median: 95.7354919130886
+          max: 112.21811118931832
+        down:
+          min: 70.91028269669853
+          q20: 70.91031387516354
+          median: 82.5187694634711
+          max: 94.02367472280913
+    reference_rate_derivation:
+      utilization_of_q20_capacity: 0.45
+      manual_upper_caps_kpa_s:
+        act_pos:
+          up: 10.0
+          down: 12.0
+        act_neg:
+          up: 4.5
+          down: 5.0
+      resolved_reference_rates_kpa_s: *id001
+  candidate_metrics:
+  - reference:
+      actuator_pressure_min_kpa:
+      - 101.325
+      - 68.3416284091185
+      actuator_pressure_max_kpa:
+      - 129.99671127199838
+      - 101.325
+      actuator_pressure_min_after_startup_kpa:
+      - 110.0
+      - 68.3416284091185
+      actuator_pressure_max_after_startup_kpa:
+      - 129.99671127199838
+      - 81.12194601709173
+      actuator_rate_min_kpa_s:
+      - -11.423666472876093
+      - -21.5421609926441
+      actuator_rate_max_kpa_s:
+      - 11.332136764460898
+      - 4.459584365635649
+      chamber_reference_min_kpa:
+      - 136.325
+      - 33.3416284091185
+      chamber_reference_max_kpa:
+      - 164.99671127199838
+      - 66.325
+      chamber_reference_rate_min_kpa_s:
+      - -11.423666472876448
+      - -21.5421609926441
+      chamber_reference_rate_max_kpa_s:
+      - 11.332136764460898
+      - 4.459584365635649
+      pos_peaks: 5
+      pos_valleys: 5
+      neg_peaks: 6
+      neg_valleys: 7
+      checked_samples: 740.0
+      supported_samples: 740.0
+      support_fraction: 1.0
+    pid_certifier:
+      pos_rmse_kpa: 4.143320526179482
+      neg_rmse_kpa: 3.123672880098143
+      pos_mae_kpa: 3.6925606977013414
+      neg_mae_kpa: 2.50501444831861
+      pos_tolerance_5kpa_fraction: 0.7706198145436799
+      neg_tolerance_5kpa_fraction: 0.8882381649585164
+      pos_direction_fraction: 0.8
+      neg_direction_fraction: 0.9463141025641025
+      pos_signed_rate_gain_median: 0.028517530278001905
+      neg_signed_rate_gain_median: 0.012904201703718714
+      pos_best_response_lag_sec: 1.3
+      neg_best_response_lag_sec: 1.52
+      chamber_pos_min_kpa: 153.6716296854272
+      chamber_pos_max_kpa: 179.76177010788172
+      chamber_neg_min_kpa: 15.731977019765262
+      chamber_neg_max_kpa: 26.920985164764858
+      pos_reserve_ge_5kpa_fraction: 1.0
+      neg_reserve_ge_5kpa_fraction: 1.0
+      inlet_outlet_conflict_fraction:
+      - 0.0
+      - 0.0
+      physical_action_min:
+      - 0.8
+      - 0.8
+      - 0.8
+      - 0.8
+      - 0.8
+      - 0.8
+      physical_action_max:
+      - 0.9649906304371887
+      - 0.9700000000000001
+      - 0.9483318250448375
+      - 0.9034919947802078
+      - 0.8887380439268664
+      - 0.9130835322847957
+    passed: true
+    score: 6.163105571048146
+  schedules:
+  - pos:
+    - block: 1
+      event: 1
+      start_sec: 0.0
+      transition_sec: 4.74364486077108
+      hold_sec: 0.3540314921827508
+      pressure_start_kpa: 101.325
+      pressure_target_kpa: 129.99671127199838
+      direction: 1
+      end_sec: 5.0976763529538305
+    - block: 1
+      event: 2
+      start_sec: 5.0976763529538305
+      transition_sec: 2.466859620085368
+      hold_sec: 0.6273770505360197
+      pressure_start_kpa: 129.99671127199838
+      pressure_target_kpa: 115.07139179598894
+      direction: -1
+      end_sec: 8.191913023575218
+    - block: 1
+      event: 3
+      start_sec: 8.191913023575218
+      transition_sec: 1.6594008115569696
+      hold_sec: 0.3886861648678126
+      pressure_start_kpa: 115.07139179598894
+      pressure_target_kpa: 123.55554403566653
+      direction: 1
+      end_sec: 10.239999999999998
+    - block: 2
+      event: 1
+      start_sec: 10.24
+      transition_sec: 1.8490036200480031
+      hold_sec: 1.65
+      pressure_start_kpa: 123.55554403566653
+      pressure_target_kpa: 112.28621398754181
+      direction: -1
+      end_sec: 13.739003620048004
+    - block: 2
+      event: 2
+      start_sec: 13.739003620048003
+      transition_sec: 1.7188322490409187
+      hold_sec: 1.65
+      pressure_start_kpa: 112.28621398754181
+      pressure_target_kpa: 120.26065955456366
+      direction: 1
+      end_sec: 17.10783586908892
+    - block: 2
+      event: 3
+      start_sec: 17.107835869088923
+      transition_sec: 1.7221641309110791
+      hold_sec: 1.65
+      pressure_start_kpa: 120.26065955456366
+      pressure_target_kpa: 110.0
+      direction: -1
+      end_sec: 20.48
+    - block: 3
+      event: 1
+      start_sec: 20.48
+      transition_sec: 2.6739858652701622
+      hold_sec: 1.4803371439809987
+      pressure_start_kpa: 110.0
+      pressure_target_kpa: 123.27869758060669
+      direction: 1
+      end_sec: 24.634323009251162
+    - block: 3
+      event: 2
+      start_sec: 24.634323009251162
+      transition_sec: 1.572217622336376
+      hold_sec: 1.6407133267800034
+      pressure_start_kpa: 123.27869758060669
+      pressure_target_kpa: 117.15998587728865
+      direction: -1
+      end_sec: 27.84725395836754
+    - block: 3
+      event: 3
+      start_sec: 27.847253958367542
+      transition_sec: 1.503916234599941
+      hold_sec: 1.3688298070325189
+      pressure_start_kpa: 117.15998587728865
+      pressure_target_kpa: 110.0
+      direction: -1
+      end_sec: 30.720000000000002
+    - block: 4
+      event: 1
+      start_sec: 30.72
+      transition_sec: 1.4346631145620967
+      hold_sec: 1.5351977027480492
+      pressure_start_kpa: 110.0
+      pressure_target_kpa: 116.84112490398356
+      direction: 1
+      end_sec: 33.68986081731015
+    - block: 4
+      event: 2
+      start_sec: 33.68986081731015
+      transition_sec: 1.5373317371368
+      hold_sec: 1.5110750505670878
+      pressure_start_kpa: 116.84112490398356
+      pressure_target_kpa: 110.0
+      direction: -1
+      end_sec: 36.73826760501404
+    - block: 4
+      event: 3
+      start_sec: 36.73826760501404
+      transition_sec: 2.6175891886102023
+      hold_sec: 1.6041432063757646
+      pressure_start_kpa: 110.0
+      pressure_target_kpa: 123.11345437923359
+      direction: 1
+      end_sec: 40.96000000000001
+    neg:
+    - block: 1
+      event: 1
+      start_sec: 0.0
+      transition_sec: 2.6971860089137136
+      hold_sec: 0.5117790041943754
+      pressure_start_kpa: 101.325
+      pressure_target_kpa: 70.32955790984238
+      direction: -1
+      end_sec: 3.208965013108089
+    - block: 1
+      event: 2
+      start_sec: 3.208965013108089
+      transition_sec: 1.6935617036812782
+      hold_sec: 0.3537061082393409
+      pressure_start_kpa: 70.32955790984238
+      pressure_target_kpa: 73.9640928433218
+      direction: 1
+      end_sec: 5.256232825028708
+    - block: 1
+      event: 3
+      start_sec: 5.256232825028708
+      transition_sec: 2.1909146702294016
+      hold_sec: 0.4489864411648481
+      pressure_start_kpa: 73.9640928433218
+      pressure_target_kpa: 68.3416284091185
+      direction: -1
+      end_sec: 7.896133936422958
+    - block: 1
+      event: 4
+      start_sec: 7.896133936422958
+      transition_sec: 1.9853163170083976
+      hold_sec: 0.35854974656864436
+      pressure_start_kpa: 68.3416284091185
+      pressure_target_kpa: 72.6797356153143
+      direction: 1
+      end_sec: 10.24
+    - block: 2
+      event: 1
+      start_sec: 10.24
+      transition_sec: 1.5247344739052107
+      hold_sec: 1.6168897951456644
+      pressure_start_kpa: 72.6797356153143
+      pressure_target_kpa: 69.66385589063168
+      direction: -1
+      end_sec: 13.381624269050874
+    - block: 2
+      event: 2
+      start_sec: 13.381624269050874
+      transition_sec: 2.924912367116427
+      hold_sec: 1.0846529110814713
+      pressure_start_kpa: 69.66385589063168
+      pressure_target_kpa: 76.48527697307134
+      direction: 1
+      end_sec: 17.39118954724877
+    - block: 2
+      event: 3
+      start_sec: 17.39118954724877
+      transition_sec: 1.5834427019967459
+      hold_sec: 1.505367750754481
+      pressure_start_kpa: 76.48527697307134
+      pressure_target_kpa: 72.97857420301264
+      direction: -1
+      end_sec: 20.479999999999997
+    - block: 3
+      event: 1
+      start_sec: 20.48
+      transition_sec: 2.8633614433308536
+      hold_sec: 0.36071049845401004
+      pressure_start_kpa: 72.97857420301264
+      pressure_target_kpa: 79.79026795346161
+      direction: 1
+      end_sec: 23.704071941784864
+    - block: 3
+      event: 2
+      start_sec: 23.704071941784864
+      transition_sec: 2.6644080142536577
+      hold_sec: 0.7540422824966667
+      pressure_start_kpa: 79.79026795346161
+      pressure_target_kpa: 73.27364599480583
+      direction: -1
+      end_sec: 27.122522238535186
+    - block: 3
+      event: 3
+      start_sec: 27.12252223853519
+      transition_sec: 3.029655806383282
+      hold_sec: 0.5678219550815299
+      pressure_start_kpa: 73.27364599480583
+      pressure_target_kpa: 80.20479331128149
+      direction: 1
+      end_sec: 30.720000000000002
+    - block: 4
+      event: 1
+      start_sec: 30.72
+      transition_sec: 1.8243403904813271
+      hold_sec: 0.45947822787568404
+      pressure_start_kpa: 80.20479331128149
+      pressure_target_kpa: 75.72096170959453
+      direction: -1
+      end_sec: 33.00381861835701
+    - block: 4
+      event: 2
+      start_sec: 33.00381861835701
+      transition_sec: 2.3454705917640015
+      hold_sec: 0.5910074613893336
+      pressure_start_kpa: 75.72096170959453
+      pressure_target_kpa: 81.12194601709173
+      direction: 1
+      end_sec: 35.94029667151034
+    - block: 4
+      event: 3
+      start_sec: 35.940296671510346
+      transition_sec: 1.882961559021712
+      hold_sec: 0.49984299986202474
+      pressure_start_kpa: 81.12194601709173
+      pressure_target_kpa: 76.35635037070766
+      direction: -1
+      end_sec: 38.32310123039408
+    - block: 4
+      event: 4
+      start_sec: 38.32310123039408
+      transition_sec: 1.825859395002673
+      hold_sec: 0.811039374603244
+      pressure_start_kpa: 76.35635037070766
+      pressure_target_kpa: 80.60771160973226
+      direction: 1
+      end_sec: 40.96

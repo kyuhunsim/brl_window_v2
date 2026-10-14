@@ -32,6 +32,8 @@ class PneuSim():
         offset_pos: float = 0,
         offset_neg: float = 0,
         scale: bool = True,
+        scale_low: float = 0.8,
+        scale_high: float = 1.0,
     ):
         env_pkg_path = Path(get_pkg_path('pneu_env'))
         # preferred_lib = "lib"
@@ -86,6 +88,10 @@ class PneuSim():
         self.noise_std = noise_std
         self.offset_pos = offset_pos
         self.offset_neg = offset_neg
+        self.scale_low = float(scale_low)
+        self.scale_high = float(scale_high)
+        if self.scale_high < self.scale_low:
+            raise ValueError("scale_high must be greater than or equal to scale_low")
 
         obs_buf_len = int(freq*delay + 1)
         self.obs_buf = deque(maxlen=obs_buf_len)
@@ -111,7 +117,7 @@ class PneuSim():
         # RL action is normalized to [0, 1]; lib2 valves open around 0.85.
         ctrl = np.clip(np.asarray(ctrl, dtype=np.float64), 0.0, 1.0)
         if self.scale:
-            ctrl = 0.85 + 0.15*ctrl
+            ctrl = self.scale_low + (self.scale_high - self.scale_low) * ctrl
 
         if self.is_anti_windup:
             sat_ctrl = ctrl
@@ -173,6 +179,7 @@ class PneuSim():
         self.obs = np.array([
             init_pos_press, init_neg_press
         ], dtype=np.float32)
+        self.obs_buf.clear()
 
     def set_init_press_with_pump_state(
         self,

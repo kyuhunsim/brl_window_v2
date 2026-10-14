@@ -114,7 +114,8 @@ class SACPolicy(nn.Module):
         hidden_dim: int = 256,
         action_space: Optional[spaces.Box] = None,
         log_std_min: float = -1.6,
-        log_std_max: float = -1.6
+        log_std_max: float = -1.6,
+        initial_action: Optional[np.ndarray] = None,
     ):
         super(SACPolicy, self).__init__()
         
@@ -140,6 +141,28 @@ class SACPolicy(nn.Module):
         log_std_bias = (log_std_max + log_std_min)/2.
         self.log_std_scale = log_std_scale*torch.ones(action_dim)
         self.log_std_bias = log_std_bias*torch.ones(action_dim)
+
+        if initial_action is not None:
+            initial = np.asarray(initial_action, dtype=np.float32).reshape(-1)
+            if initial.size == 1:
+                initial = np.full(action_dim, float(initial[0]), dtype=np.float32)
+            if initial.size != action_dim:
+                raise ValueError(
+                    "initial_action must be scalar or match action dimension: "
+                    f"got {initial.size} for {action_dim}"
+                )
+            low = np.asarray(action_space.low if action_space is not None else np.zeros(action_dim), dtype=np.float32)
+            high = np.asarray(action_space.high if action_space is not None else np.ones(action_dim), dtype=np.float32)
+            initial = np.clip(initial, low, high)
+            normalized = 2.0 * (initial - low) / np.maximum(high - low, 1e-6) - 1.0
+            normalized = np.clip(normalized, -0.999, 0.999)
+            bias = np.arctanh(normalized)
+            with torch.no_grad():
+                # Start from the requested operating point for every state;
+                # otherwise random hidden-to-mean weights can overwhelm the
+                # bias before the first policy update.
+                self.linear_mean.weight.zero_()
+                self.linear_mean.bias.copy_(torch.as_tensor(bias, dtype=torch.float32))
     
     def forward(
         self,
