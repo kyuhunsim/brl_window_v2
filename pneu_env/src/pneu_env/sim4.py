@@ -114,7 +114,12 @@ class PneuSim:
             self.actuator_min_total_length / self.actuator_series_count
         )
         if actuator_hard_min_cell_length is None:
-            actuator_hard_min_cell_length = 0.0
+            # Keep the C++ integration hard stop consistent with the public
+            # 32 mm total-stroke contract (40 mm extended length, 8 mm
+            # minimum total length).  Previously the wrapper advertised a
+            # 32 mm stroke while silently giving C++ a zero cell-length stop,
+            # which allowed nominal rollouts to enter the 32--40 mm region.
+            actuator_hard_min_cell_length = self.actuator_stroke_min_cell_length
         self.actuator_hard_min_cell_length = float(actuator_hard_min_cell_length)
         self.encoder_pitch_radius = float(encoder_pitch_radius)
         self.encoder_gear_ratio = float(encoder_gear_ratio)

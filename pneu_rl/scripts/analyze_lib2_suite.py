@@ -16,6 +16,7 @@ from analyze_lib2_baseline import (
     run_rl,
 )
 from pneu_utils.utils import get_pkg_path
+from pneu_rl.exp_paths import ensure_model_exp_dir
 
 
 REF_MODES = ["random", "cos", "sin", "step"]
@@ -260,8 +261,7 @@ def main() -> None:
         stamp = datetime.now().strftime("%y%m%d_%H_%M_%S")
         save_name = f"{stamp}_lib2_{args.plot_mode}_diagnosis_suite"
 
-    out_dir = f'{get_pkg_path("pneu_rl")}/exp/{save_name}'
-    os.makedirs(out_dir, exist_ok=True)
+    out_dir = ensure_model_exp_dir(args.model_name, save_name)
 
     rows = []
     reports = {}
@@ -271,13 +271,13 @@ def main() -> None:
         reports[ref_mode] = result["report"]
 
     df = pd.DataFrame(rows)
-    df.to_csv(f"{out_dir}/summary.csv", index=False)
+    df.to_csv(out_dir / "summary.csv", index=False)
 
     suite = dict(
         args=vars(args),
         reports=reports,
     )
-    with open(f"{out_dir}/summary.yaml", "w") as f:
+    with open(out_dir / "summary.yaml", "w") as f:
         yaml.dump(suite, f)
 
     print(f"\n[INFO] Saved suite diagnosis: {out_dir}")

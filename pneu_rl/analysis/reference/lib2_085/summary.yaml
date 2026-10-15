@@ -1,0 +1,36 @@
+sweep:
+  pressure_states: 15
+  action_pairs_per_state: 49
+  valid_samples: 735
+  total_samples: 735
+  warmup_sec: 0.35
+  measure_sec: 0.25
+robust_directional_capacity_kpa_s:
+  pos_up: 15.726284267238125
+  pos_down: 32.00518987472883
+  neg_up: 4.306738664051083
+  neg_down: 8.941121921075146
+safe_reference_rate_kpa_s:
+  pos_up: 7.863142133619062
+  pos_down: 16.002594937364414
+  neg_up: 2.1533693320255414
+  neg_down: 4.470560960537573
+maximum_observed:
+  net_pos_mdot_abs_kg_s: 0.004329897477454893
+  net_neg_mdot_abs_kg_s: 0.00013162876288796388
+  pos_valve_flow_lpm: 26.41851207639696
+  neg_valve_flow_lpm: 16.662215658212517
+  pos_valve_flow_slew_lpm_s: 132.50431812778817
+  neg_valve_flow_slew_lpm_s: 187.32508629286016
+frequency_design:
+  valve_wn_min_rad_s: 11.0
+  valve_natural_frequency_min_hz: 1.7507043740108488
+  reference_frequency_hz: 0.17507043740108488
+preview:
+  legacy_pos_slew_max_kpa_s: 3529.1364595477235
+  legacy_neg_slew_max_kpa_s: 981.537444399142
+  feasible_pos_slew_max_kpa_s: 2.0976878514787245
+  feasible_neg_slew_max_kpa_s: 4.47055992089922
+  representative_state_pos_kpa: 180.0
+  representative_state_neg_kpa: 20.0
+profile: pneu_rl/config/reference/lib2_feasible_085.yaml

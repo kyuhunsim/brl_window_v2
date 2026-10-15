@@ -30,7 +30,12 @@ class PneuRefND:
             raise ValueError(f"reference dimension changed from {self.dim_ref} to {goal.size}")
         return goal
 
-    def reset(self) -> None:
+    def reset(self, initial_state: np.ndarray | None = None) -> None:
+        if initial_state is not None and hasattr(self.ref, "set_initial_state"):
+            state = np.asarray(initial_state, dtype=np.float64).reshape(-1)
+            if state.size < 2:
+                raise ValueError("pressure reference initial_state needs two values")
+            self.ref.set_initial_state(float(state[0]), float(state[1]))
         if hasattr(self.ref, "time_reset"):
             self.ref.time_reset()
         init_ref = self._goal_array(1 / self.ctrl_freq)

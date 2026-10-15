@@ -1,0 +1,596 @@
+kind: optimized_trajectory_bank
+kwargs:
+  trajectory_npz: pneu_rl/config/reference/lib3_full_domain_oracle_hard_4x512_seed61098.npz
+  seed: 61098
+  sample_mode: coverage
+  repeat_after_end: false
+design:
+  library: 3
+  continuous_carry: true
+  bank_size: 1
+  duration_sec: 40.96
+  block_steps: 512
+  blocks_per_hard_reset: 4
+  action_scale:
+  - 0.8
+  - 1.0
+  common_physical_command_domain_all_six_valves:
+  - 0.8
+  - 1.0
+  valve_specific_command_bounds_used: false
+  policy_action_projection_used: false
+  reference_pressure_channels:
+  - act_pos
+  - act_neg
+  stored_diagnostic_pressure_channels:
+  - ch_pos
+  - ch_neg
+  - act_pos
+  - act_neg
+  generator: smooth random six-valve command programmes selected by complete lib3
+    simulator replay
+  initial_pressure_kpa:
+  - 101.325
+  - 101.325
+  - 101.325
+  - 101.325
+  initial_physical_command:
+  - 0.95
+  - 0.95
+  - 0.95
+  - 0.95
+  - 0.95
+  - 0.95
+  candidate_filters:
+    pressure_kpa:
+      ch_pos:
+      - 95.0
+      - 220.0
+      ch_neg:
+      - 5.0
+      - 105.0
+      act_pos:
+      - 95.0
+      - 180.0
+      act_neg:
+      - 25.0
+      - 105.0
+    rate_abs_max_kpa_s:
+    - 80.0
+    - 50.0
+    - 45.0
+    - 20.0
+    high_frequency_cutoff_hz: 2.0
+    actuator_hf_power_fraction_max:
+    - 0.12
+    - 0.18
+    global_startup_excluded_sec: 1.0
+  randomness:
+    seeded: true
+    families:
+    - coupled
+    - pos_branch
+    - neg_branch
+    - mixed
+    independent_timing_per_valve: true
+    full_domain_uniform_proposal_probability: 0.2
+    each_endpoint_proposal_probability: 0.04
+    local_proposal_sigma: 0.025
+  optimisation:
+    method: per-block complete-prefix simulator replay candidate search
+    candidates_per_block: 16
+    feedback_controller_used: false
+    PID_used: false
+    teacher_action_given_to_RL: false
+  validation:
+    trajectory_metrics:
+    - pressure_min_after_startup_kpa:
+      - 122.50790440798433
+      - 15.334745054263886
+      - 99.32257298239128
+      - 53.50311598905632
+      pressure_max_after_startup_kpa:
+      - 178.40072191949147
+      - 34.74536819806335
+      - 129.5232649947007
+      - 89.25110264794968
+      pressure_span_after_startup_kpa:
+      - 55.89281751150715
+      - 19.41062314379947
+      - 30.200692012309418
+      - 35.74798665889336
+      rate_abs_max_after_startup_kpa_s:
+      - 12.615663609534522
+      - 10.075755018181454
+      - 34.50607514738948
+      - 19.791355218403872
+      actuator_hf_power_fraction_after_startup:
+      - 0.005670407758020542
+      - 7.128666198408611e-07
+      physical_action_min:
+      - 0.9018298251713082
+      - 0.856318849931546
+      - 0.9100656043615531
+      - 0.8413235380550192
+      - 0.9332241766954356
+      - 0.9235998861461813
+      physical_action_max:
+      - 0.9899343956384468
+      - 0.9764001138538186
+      - 0.9776209063216961
+      - 1.0
+      - 0.9764001138538186
+      - 0.9622708392396564
+    generator_float64_replay_rmse_kpa_full_pressure:
+    - - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+    generator_float64_replay_max_abs_kpa_full_pressure:
+    - - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+    saved_float32_replay_rmse_kpa_full_pressure:
+    - - 1.689860419640884e-05
+      - 3.0839748589545063e-06
+      - 6.3949039799853065e-06
+      - 6.441040798811953e-06
+    saved_float32_replay_max_abs_kpa_full_pressure:
+    - - 4.394107114080725e-05
+      - 6.899001149918149e-06
+      - 2.5829109816299933e-05
+      - 2.5909715404281997e-05
+  schedule:
+  - trajectory: 0
+    block: 0
+    start_sec: 0.0
+    candidate_count: 16
+    rejections:
+      act_pos_band: 3
+      act_neg_rate: 3
+      nonfinite_or_emergency: 2
+      act_pos_rate: 2
+      ch_neg_band: 2
+      act_neg_band: 3
+    family: coupled
+    proposal_kind: open_loop_neutral_recovery
+    active_valves:
+    - ch_pos
+    - ch_neg
+    - act_pos_in
+    - act_pos_out
+    - act_neg_in
+    - act_neg_out
+    segments:
+      ch_pos:
+      - start_sec: 0.0
+        transition_sec: 2.0
+        hold_sec: 8.24
+        physical_start: 0.95
+        physical_target: 0.95
+        end_sec: 10.24
+      ch_neg:
+      - start_sec: 0.0
+        transition_sec: 2.0
+        hold_sec: 8.24
+        physical_start: 0.95
+        physical_target: 0.95
+        end_sec: 10.24
+      act_pos_in:
+      - start_sec: 0.0
+        transition_sec: 2.0
+        hold_sec: 8.24
+        physical_start: 0.95
+        physical_target: 0.95
+        end_sec: 10.24
+      act_pos_out:
+      - start_sec: 0.0
+        transition_sec: 2.0
+        hold_sec: 8.24
+        physical_start: 0.95
+        physical_target: 0.95
+        end_sec: 10.24
+      act_neg_in:
+      - start_sec: 0.0
+        transition_sec: 2.0
+        hold_sec: 8.24
+        physical_start: 0.95
+        physical_target: 0.95
+        end_sec: 10.24
+      act_neg_out:
+      - start_sec: 0.0
+        transition_sec: 2.0
+        hold_sec: 8.24
+        physical_start: 0.95
+        physical_target: 0.95
+        end_sec: 10.24
+    score: 14.815217995746009
+    coverage_gain: 5
+    pressure_min_kpa:
+    - 146.87007329847003
+    - 31.042242424265215
+    - 108.22482315051465
+    - 71.64678347909161
+    pressure_max_kpa:
+    - 160.39748302922058
+    - 34.74536819806335
+    - 108.7102016553762
+    - 73.88178259984792
+    pressure_span_kpa:
+    - 13.527409730750549
+    - 3.7031257737981385
+    - 0.48537850486154355
+    - 2.2349991207563136
+    rate_abs_max_kpa_s:
+    - 10.581455817148822
+    - 10.075755018181454
+    - 5.342880072659639
+    - 5.675077509304316
+    rate_mean_abs_actuator_kpa_s:
+    - 0.14716266340567277
+    - 0.2476712770033187
+    actuator_hf_power_fraction:
+    - 0.0
+    - 0.1299522878025568
+    physical_action_min:
+    - 0.95
+    - 0.95
+    - 0.95
+    - 0.95
+    - 0.95
+    - 0.95
+    physical_action_max:
+    - 0.95
+    - 0.95
+    - 0.95
+    - 0.95
+    - 0.95
+    - 0.95
+  - trajectory: 0
+    block: 1
+    start_sec: 10.24
+    candidate_count: 16
+    rejections:
+      act_neg_rate: 1
+      ch_pos_band: 1
+      nonfinite_or_emergency: 6
+      ch_neg_band: 2
+      act_neg_band: 3
+      act_pos_rate: 1
+    family: pos_branch
+    proposal_kind: physics_topology_open_loop
+    active_valves:
+    - ch_pos
+    - ch_neg
+    - act_pos_in
+    - act_pos_out
+    - act_neg_in
+    - act_neg_out
+    positive_branch_segments:
+    - start_sec: 0.0
+      transition_sec: 2.629115105158829
+      hold_sec: 5.290706323166104
+      direction: lower
+      magnitude: 0.03993439563844681
+      physical_start:
+      - 0.95
+      - 0.95
+      - 0.95
+      physical_target:
+      - 0.9899343956384468
+      - 0.9100656043615531
+      - 0.9899343956384468
+      end_sec: 7.919821428324933
+    - start_sec: 7.919821428324933
+      transition_sec: 1.374720063058123
+      hold_sec: 0.9454585086169445
+      direction: raise
+      magnitude: 0.04585271538482048
+      physical_start:
+      - 0.9899343956384468
+      - 0.9100656043615531
+      - 0.9899343956384468
+      physical_target:
+      - 0.9440816802536263
+      - 0.9559183197463736
+      - 0.9440816802536263
+      end_sec: 10.24
+    negative_branch_segments:
+    - start_sec: 0.0
+      transition_sec: 3.3845710560346873
+      hold_sec: 6.855428943965313
+      direction: raise
+      magnitude: 0.026400113853818734
+      physical_start:
+      - 0.95
+      - 0.95
+      - 0.95
+      physical_target:
+      - 0.9764001138538186
+      - 0.9764001138538186
+      - 0.9235998861461813
+      end_sec: 10.24
+    positive_negative_timing_independent: true
+    score: 52.05366357340515
+    coverage_gain: 17
+    pressure_min_kpa:
+    - 160.39748302922058
+    - 31.16750913997927
+    - 99.32257298239128
+    - 71.64678347909161
+    pressure_max_kpa:
+    - 178.40072191949147
+    - 34.46009861667216
+    - 119.88518959365308
+    - 89.25110264794968
+    pressure_span_kpa:
+    - 18.003238890270893
+    - 3.2925894766928927
+    - 20.562616611261802
+    - 17.60431916885807
+    rate_abs_max_kpa_s:
+    - 3.3963541228111183
+    - 1.7418184815108262
+    - 34.50607514738948
+    - 10.239082897731322
+    rate_mean_abs_actuator_kpa_s:
+    - 3.696433331314055
+    - 1.7158251483179086
+    actuator_hf_power_fraction:
+    - 0.01088216868515025
+    - 0.020426347838556166
+    physical_action_min:
+    - 0.9440816802536263
+    - 0.95
+    - 0.9100656043615531
+    - 0.9440816802536263
+    - 0.95
+    - 0.9235998861461813
+    physical_action_max:
+    - 0.9899343956384468
+    - 0.9764001138538186
+    - 0.9559183197463736
+    - 0.9899343956384468
+    - 0.9764001138538186
+    - 0.95
+  - trajectory: 0
+    block: 2
+    start_sec: 20.48
+    candidate_count: 16
+    rejections:
+      nonfinite_or_emergency: 6
+      act_neg_rate: 3
+      act_pos_band: 2
+      ch_neg_band: 3
+      act_neg_band: 1
+    family: neg_branch
+    proposal_kind: open_loop_neutral_recovery
+    active_valves:
+    - ch_pos
+    - ch_neg
+    - act_pos_in
+    - act_pos_out
+    - act_neg_in
+    - act_neg_out
+    segments:
+      ch_pos:
+      - start_sec: 0.0
+        transition_sec: 2.0
+        hold_sec: 8.24
+        physical_start: 0.9440816802536263
+        physical_target: 0.95
+        end_sec: 10.24
+      ch_neg:
+      - start_sec: 0.0
+        transition_sec: 2.0
+        hold_sec: 8.24
+        physical_start: 0.9764001138538186
+        physical_target: 0.95
+        end_sec: 10.24
+      act_pos_in:
+      - start_sec: 0.0
+        transition_sec: 2.0
+        hold_sec: 8.24
+        physical_start: 0.9559183197463736
+        physical_target: 0.95
+        end_sec: 10.24
+      act_pos_out:
+      - start_sec: 0.0
+        transition_sec: 2.0
+        hold_sec: 8.24
+        physical_start: 0.9440816802536263
+        physical_target: 0.95
+        end_sec: 10.24
+      act_neg_in:
+      - start_sec: 0.0
+        transition_sec: 2.0
+        hold_sec: 8.24
+        physical_start: 0.9764001138538186
+        physical_target: 0.95
+        end_sec: 10.24
+      act_neg_out:
+      - start_sec: 0.0
+        transition_sec: 2.0
+        hold_sec: 8.24
+        physical_start: 0.9235998861461813
+        physical_target: 0.95
+        end_sec: 10.24
+    score: 12.664471232020643
+    coverage_gain: 4
+    pressure_min_kpa:
+    - 159.72531080383848
+    - 30.999189644674264
+    - 110.24976818673329
+    - 71.58353050056327
+    pressure_max_kpa:
+    - 176.97149880367522
+    - 34.523223381262724
+    - 119.9545034436973
+    - 89.25109707550074
+    pressure_span_kpa:
+    - 17.246187999836735
+    - 3.5240337365884606
+    - 9.704735256964014
+    - 17.667566574937467
+    rate_abs_max_kpa_s:
+    - 3.3194009909543354
+    - 2.6871068687171373
+    - 9.985032720728881
+    - 12.875468604697105
+    rate_mean_abs_actuator_kpa_s:
+    - 1.0060340614212386
+    - 1.7219850463585982
+    actuator_hf_power_fraction:
+    - 0.027836425730649518
+    - 0.02629861280866259
+    physical_action_min:
+    - 0.9440816802536263
+    - 0.95
+    - 0.95
+    - 0.9440816802536263
+    - 0.95
+    - 0.9235998861461813
+    physical_action_max:
+    - 0.95
+    - 0.9764001138538186
+    - 0.9559183197463736
+    - 0.95
+    - 0.9764001138538186
+    - 0.95
+  - trajectory: 0
+    block: 3
+    start_sec: 30.72
+    candidate_count: 16
+    rejections:
+      nonfinite_or_emergency: 5
+      ch_neg_band: 2
+      act_pos_rate: 1
+      act_neg_rate: 3
+      act_neg_band: 1
+      act_pos_band: 2
+    family: mixed
+    active_valves:
+    - ch_pos
+    - ch_neg
+    - act_pos_in
+    - act_pos_out
+    - act_neg_in
+    - act_neg_out
+    segments:
+      ch_pos:
+      - start_sec: 0.0
+        transition_sec: 3.1995014354997124
+        hold_sec: 0.8139047122003319
+        physical_start: 0.95
+        physical_target: 0.9018298251713082
+        end_sec: 4.013406147700044
+      - start_sec: 4.013406147700044
+        transition_sec: 0.8761637726687558
+        hold_sec: 5.3504300796312
+        physical_start: 0.9018298251713082
+        physical_target: 0.9296699206500646
+        end_sec: 10.239999999999998
+      ch_neg:
+      - start_sec: 0.0
+        transition_sec: 2.431925629522417
+        hold_sec: 2.0801466176575634
+        physical_start: 0.95
+        physical_target: 0.928221480311869
+        end_sec: 4.51207224717998
+      - start_sec: 4.51207224717998
+        transition_sec: 1.4689916848248665
+        hold_sec: 1.634420934389063
+        physical_start: 0.928221480311869
+        physical_target: 0.8861038111427935
+        end_sec: 7.61548486639391
+      - start_sec: 7.61548486639391
+        transition_sec: 1.187901713392662
+        hold_sec: 1.4366134202134286
+        physical_start: 0.8861038111427935
+        physical_target: 0.856318849931546
+        end_sec: 10.24
+      act_pos_in:
+      - start_sec: 0.0
+        transition_sec: 3.453116300125891
+        hold_sec: 6.786883699874109
+        physical_start: 0.95
+        physical_target: 0.9776209063216961
+        end_sec: 10.24
+      act_pos_out:
+      - start_sec: 0.0
+        transition_sec: 2.1542617903100023
+        hold_sec: 3.5234651297307016
+        physical_start: 0.95
+        physical_target: 1.0
+        end_sec: 5.677726920040704
+      - start_sec: 5.677726920040704
+        transition_sec: 2.8596725927147046
+        hold_sec: 1.7026004872445908
+        physical_start: 1.0
+        physical_target: 0.8413235380550192
+        end_sec: 10.239999999999998
+      act_neg_in:
+      - start_sec: 0.0
+        transition_sec: 1.9521211132227367
+        hold_sec: 1.2640712798179692
+        physical_start: 0.95
+        physical_target: 0.9332241766954356
+        end_sec: 3.216192393040706
+      - start_sec: 3.216192393040706
+        transition_sec: 1.4993767419493782
+        hold_sec: 5.524430865009916
+        physical_start: 0.9332241766954356
+        physical_target: 0.9627613002091974
+        end_sec: 10.24
+      act_neg_out:
+      - start_sec: 0.0
+        transition_sec: 3.380901864635611
+        hold_sec: 6.85909813536439
+        physical_start: 0.95
+        physical_target: 0.9622708392396564
+        end_sec: 10.240000000000002
+    score: 58.242116772292
+    coverage_gain: 19
+    pressure_min_kpa:
+    - 122.50790440798433
+    - 15.334745054263886
+    - 110.0974050535914
+    - 53.50311598905632
+    pressure_max_kpa:
+    - 159.72531080383848
+    - 30.999189644674264
+    - 129.5232649947007
+    - 74.02892030799272
+    pressure_span_kpa:
+    - 37.217406395854155
+    - 15.664444590410378
+    - 19.425859941109294
+    - 20.5258043189364
+    rate_abs_max_kpa_s:
+    - 12.615663609534522
+    - 9.338673248533258
+    - 23.567714046022203
+    - 19.791355218403872
+    rate_mean_abs_actuator_kpa_s:
+    - 3.459950512654627
+    - 3.7625778412397213
+    actuator_hf_power_fraction:
+    - 0.022534862120384327
+    - 0.0002621687265825645
+    physical_action_min:
+    - 0.9018298251713082
+    - 0.856318849931546
+    - 0.95
+    - 0.8413235380550192
+    - 0.9332241766954356
+    - 0.95
+    physical_action_max:
+    - 0.95
+    - 0.95
+    - 0.9776209063216961
+    - 1.0
+    - 0.9627613002091974
+    - 0.9622708392396564
+  note: pressure is a deterministic lib3 simulator output. physical_action/raw_action
+    are oracle replay diagnostics and are not loaded into the policy observation.

@@ -1,0 +1,38 @@
+schema: lib4_structured_history_v1
+python: /home/rise/miniconda3/envs/env_1/bin/python
+train_script: pneu_rl/scripts/train_lib4_screening.py
+evaluate_script: pneu_rl/scripts/evaluate_lib4_screening.py
+lambda_diagnostic: pneu_rl/scripts/analyze_lambda_discrepancy.py
+
+# Matched defaults.  Keep reference, reward, horizon, and seed fixed while
+# changing only the structured history feature.
+train_reference: pneu_rl/config/reference/lib4_capacity_core_16x4x512_seed64001.yaml
+evaluation_reference: pneu_rl/config/reference/lib4_capacity_core_idtest_8x4x512_seed65002.yaml
+evaluation_protocol: pneu_rl/config/evaluation/lib4_p0_protocol.yaml
+seed: 0
+episodes: 1000
+physical_horizon: 512
+carry_blocks: 4
+history_len: 10
+reference_lookahead: 15
+
+jobs:
+  - name: 260902_lib4_hrr_seed0
+    variant: hrr
+    purpose: history + pressure rate + chamber/actuator reserve
+  - name: 260902_lib4_pide_seed0
+    variant: pide
+    purpose: fixed tracking-error P/I/D summary
+  - name: 260902_lib4_gpide_seed0
+    variant: gpide
+    purpose: generalized observation/action difference summary
+
+lambda_discrepancy:
+  lambda_low: 0.0
+  lambda_high: 0.95
+  gamma: 0.99
+  value_column: value
+  note: >-
+    Run on validation traces after evaluation.  This is a value-relevant
+    Markovness diagnostic; it is not a direct controller ranking.  Prefer
+    common frozen-policy traces when comparing representations.

@@ -16,7 +16,9 @@ from pneu_env.sim2 import PneuSim as PneuSim2
 from pneu_ref.random_ref import RandomRef
 from pneu_ref.sine_ref import SineRef
 from pneu_ref.step_ref import StepRef
+from pneu_ref.factory import make_pressure_reference
 from pneu_rl.sac import SAC
+from pneu_rl.exp_paths import ensure_model_exp_dir
 from pneu_utils.utils import get_pkg_path
 
 
@@ -82,9 +84,9 @@ PID_GAINS = dict(
         integral_limit = 200.0,
     ),
     neg = dict(
-        p = 0.05,
+        p = 0.06,
         i = 0.0015,
-        d = 0.0000,
+        d = 0.00006,
         integral_limit = 200.0,
     ),
 )
@@ -101,7 +103,10 @@ class CosRef(SineRef):
         return amp * np.cos(2 * np.pi * x / per) + off
 
 
-def make_ref(ref_mode: str):
+def make_ref(ref_mode: str, reference_profile: Optional[str] = None):
+    if reference_profile is not None:
+        with open(reference_profile, "r", encoding="utf-8") as handle:
+            return make_pressure_reference(yaml.safe_load(handle))
     if ref_mode == "random":
         return RandomRef(**RANDOM_REF_KWARGS)
     if ref_mode == "sin":
@@ -193,20 +198,26 @@ def make_simulator(args: argparse.Namespace, sim_kind: str):
     else:
         raise ValueError(f"Unknown sim kind: {sim_kind}")
 
-    sim = sim_cls(
+    sim_kwargs = dict(
         freq=args.freq,
         delay=args.delay,
         noise=False,
         scale=args.scale,
     )
-    sim.set_init_press(ATM, ATM)
+    if sim_kind == "sim2":
+        sim_kwargs.update(
+            scale_low=args.scale_low,
+            scale_high=args.scale_high,
+        )
+    sim = sim_cls(**sim_kwargs)
+    sim.set_init_press(args.init_pos, args.init_neg)
     return sim
 
 
 def run_pid(args: argparse.Namespace, sim_kind: str = "sim2") -> pd.DataFrame:
     sim = make_simulator(args, sim_kind)
 
-    ref = make_ref(args.ref)
+    ref = make_ref(args.ref, args.reference_profile)
 
     rows = []
     obs = np.array([ATM, ATM], dtype=np.float64)
@@ -260,11 +271,11 @@ def run_rl(args: argparse.Namespace) -> pd.DataFrame:
 
     obs = PneuSim2(**cfg["obs"])
     pred = PneuPred(**cfg["pred"]) if cfg.get("pred") is not None else None
-    obs.set_init_press(ATM, ATM)
+    obs.set_init_press(args.init_pos, args.init_neg)
 
     env = PneuEnv(
         obs=obs,
-        ref=make_ref(args.ref),
+        ref=make_ref(args.ref, args.reference_profile),
         pred=pred,
         **cfg["env"],
     )
@@ -346,22 +357,32 @@ def save_outputs(run_dfs: dict[str, pd.DataFrame], args: argparse.Namespace) -> 
         run_tag = "_".join(run_dfs.keys())
         save_name = f"{stamp}_lib2_{args.ref}_{run_tag}_baseline"
 
-    out_dir = f'{get_pkg_path("pneu_rl")}/exp/{save_name}'
-    os.makedirs(out_dir, exist_ok=True)
+    owner_model = args.model_name if "rl_sim2" in run_dfs else "lib2_baseline"
+    out_dir = ensure_model_exp_dir(owner_model, save_name)
     for run_name, df in run_dfs.items():
-        df.to_csv(f"{out_dir}/{save_name}_{run_name}.csv", index=False)
+        df.to_csv(out_dir / f"{save_name}_{run_name}.csv", index=False)
 
     cfg = dict(
         plot_mode=args.plot_mode,
         runs=list(run_dfs.keys()),
         model_name=args.model_name if "rl_sim2" in run_dfs else None,
-        sim=dict(freq=args.freq, delay=args.delay, scale=args.scale),
-        ref=dict(mode=args.ref, kwargs=REF_KWARGS[args.ref]),
+        sim=dict(
+            freq=args.freq,
+            delay=args.delay,
+            scale=args.scale,
+            init_pos=args.init_pos,
+            init_neg=args.init_neg,
+        ),
+        ref=dict(
+            mode=args.ref,
+            profile=args.reference_profile,
+            kwargs=REF_KWARGS.get(args.ref),
+        ),
         pid_gains=PID_GAINS,
         controller=vars(args),
         metrics=metrics,
     )
-    with open(f"{out_dir}/cfg.yaml", "w") as f:
+    with open(out_dir / "cfg.yaml", "w") as f:
         yaml.dump(cfg, f)
 
     num_plots = 3 * len(run_dfs)
@@ -409,7 +430,7 @@ def save_outputs(run_dfs: dict[str, pd.DataFrame], args: argparse.Namespace) -> 
     )
     fig.suptitle(f"{save_name} | {title_metrics}")
     fig.tight_layout()
-    fig.savefig(f"{out_dir}/{save_name}.png", dpi=150)
+    fig.savefig(out_dir / f"{save_name}.png", dpi=150)
 
     print(f"[INFO] Saved baseline: {out_dir}")
     for run_name, run_metrics in metrics.items():
@@ -427,11 +448,20 @@ def main() -> None:
     )
     ap.add_argument("--model-name", default="0427_lib2_Ours_2")
     ap.add_argument("--ref", choices=["random", "sin", "cos", "step"], default="random")
+    ap.add_argument(
+        "--reference-profile",
+        default=None,
+        help="YAML reference profile; overrides --ref while preserving the baseline PID",
+    )
+    ap.add_argument("--init-pos", type=float, default=ATM)
+    ap.add_argument("--init-neg", type=float, default=ATM)
     ap.add_argument("--max-time", type=float, default=100.0)
     ap.add_argument("--freq", type=float, default=50.0)
     ap.add_argument("--delay", type=float, default=0.1)
     ap.add_argument("--scale", action="store_true", default=True)
     ap.add_argument("--no-scale", dest="scale", action="store_false")
+    ap.add_argument("--scale-low", type=float, default=0.8)
+    ap.add_argument("--scale-high", type=float, default=1.0)
     ap.add_argument("--save-name", default=None)
     args = ap.parse_args()
 

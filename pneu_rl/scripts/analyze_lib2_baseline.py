@@ -14,6 +14,7 @@ from baseline_lib2 import (
     run_rl,
 )
 from pneu_utils.utils import get_pkg_path
+from pneu_rl.exp_paths import ensure_model_exp_dir
 
 
 def robust_amplitude(x: np.ndarray) -> float:
@@ -386,12 +387,11 @@ def main() -> None:
         stamp = datetime.now().strftime("%y%m%d_%H_%M_%S")
         save_name = f"{stamp}_lib2_{args.ref}_{args.plot_mode}_diagnosis"
 
-    out_dir = f'{get_pkg_path("pneu_rl")}/exp/{save_name}'
-    os.makedirs(out_dir, exist_ok=True)
-    pid_df.to_csv(f"{out_dir}/{save_name}_pid.csv", index=False)
+    out_dir = ensure_model_exp_dir(args.model_name, save_name)
+    pid_df.to_csv(out_dir / f"{save_name}_pid.csv", index=False)
     if rl_df is not None:
-        rl_df.to_csv(f"{out_dir}/{save_name}_rl.csv", index=False)
-    with open(f"{out_dir}/diagnosis.yaml", "w") as f:
+        rl_df.to_csv(out_dir / f"{save_name}_rl.csv", index=False)
+    with open(out_dir / "diagnosis.yaml", "w") as f:
         yaml.dump(report, f)
 
     print_summary(report)

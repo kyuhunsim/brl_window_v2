@@ -1,0 +1,609 @@
+kind: optimized_trajectory_bank
+kwargs:
+  trajectory_npz: pneu_rl/config/reference/lib2_stabilized_carry_target_hold_v2_10x512.npz
+  seed: 742
+  sample_mode: coverage
+  repeat_after_end: false
+design:
+  library: 2
+  continuous_carry: true
+  duration_sec: 102.4
+  horizon_512_sec: 10.24
+  episode_boundaries_inside_rollout: 10
+  generator: one continuous lib2 simulator rollout with bounded reference-generation
+    feedback
+  target_mode: segmented
+  reference_initial_pressure_kpa:
+  - 150.0
+  - 24.0
+  expected_training_initial_pressure_kpa:
+  - 101.325
+  - 101.325
+  rate_filter_ignore_initial_sec: 1.0
+  pressure_filter_kpa:
+    pos:
+    - 115.0
+    - 220.0
+    neg:
+    - 10.0
+    - 30.0
+  rate_filter_kpa_s:
+  - 32.0
+  - 9.5
+  parameters:
+    target_pos: 145.0
+    target_neg: 20.0
+    target_amp_pos: 12.0
+    target_amp_neg: 3.0
+    freq_pos: 0.018
+    freq_neg: 0.047
+    freq_pos2: 0.061
+    freq_neg2: 0.083
+    kp_pos: 0.008
+    kp_neg: 0.013
+    dither_amp_pos: 0.04
+    dither_amp_neg: 0.03
+    target_pos_range:
+    - 120.0
+    - 205.0
+    target_neg_range:
+    - 14.0
+    - 28.0
+    pos_transitions_per_horizon:
+    - 1.0
+    - 3.0
+    neg_transitions_per_horizon:
+    - 2.0
+    - 4.0
+    transition_sec:
+    - 0.45
+    - 2.2
+    hold_sec:
+    - 1.0
+    - 9.0
+  pos_schedule:
+    transition_count: 18
+    transition_duration_sec:
+    - 0.6695736171437173
+    - 0.5731868374333966
+    - 0.6869413495706982
+    - 0.4683090941947546
+    - 0.7460658154290716
+    - 1.0448339244344111
+    - 1.1673392900253474
+    - 0.8991111736330599
+    - 1.0718049070006153
+    - 0.7107071122439751
+    - 0.8386070201972976
+    - 0.9002617841928502
+    - 1.32386999831818
+    - 1.4702743191979373
+    - 1.3620341065552624
+    - 1.1197297533283928
+    - 1.7453477749744983
+    - 1.1974113527852734
+    hold_duration_sec:
+    - 3.365744274379563
+    - 3.79536590204163
+    - 5.507822945108212
+    - 7.359491947523353
+    - 6.0754273706140065
+    - 7.325346851855687
+    - 7.3087820402219466
+    - 4.250989327626646
+    - 3.8247798618849753
+    - 1.219195886555318
+    - 3.418333860569475
+    - 2.9370233930659255
+    - 4.150930928626569
+    - 5.989860528863314
+    - 2.183756599118583
+    - 7.353855681163893
+    - 5.254111279049141
+    - 3.0837720910730217
+    segments:
+    - start_sec: 0.0
+      transition_sec: 0.6695736171437173
+      hold_sec: 3.365744274379563
+      transition_end_sec: 0.6695736171437173
+      hold_end_sec: 4.03531789152328
+      target_start_kpa: 193.1374456557798
+      target_end_kpa: 141.20505077299558
+    - start_sec: 4.03531789152328
+      transition_sec: 0.5731868374333966
+      hold_sec: 3.79536590204163
+      transition_end_sec: 4.608504728956676
+      hold_end_sec: 8.403870630998306
+      target_start_kpa: 141.20505077299558
+      target_end_kpa: 193.7763268962958
+    - start_sec: 8.403870630998306
+      transition_sec: 0.6869413495706982
+      hold_sec: 5.507822945108212
+      transition_end_sec: 9.090811980569004
+      hold_end_sec: 14.598634925677217
+      target_start_kpa: 193.7763268962958
+      target_end_kpa: 156.4731031626721
+    - start_sec: 14.598634925677217
+      transition_sec: 0.4683090941947546
+      hold_sec: 7.359491947523353
+      transition_end_sec: 15.066944019871972
+      hold_end_sec: 22.426435967395324
+      target_start_kpa: 156.4731031626721
+      target_end_kpa: 168.872327826757
+    - start_sec: 22.426435967395324
+      transition_sec: 0.7460658154290716
+      hold_sec: 6.0754273706140065
+      transition_end_sec: 23.172501782824398
+      hold_end_sec: 29.247929153438406
+      target_start_kpa: 168.872327826757
+      target_end_kpa: 194.18493856874667
+    - start_sec: 29.247929153438406
+      transition_sec: 1.0448339244344111
+      hold_sec: 7.325346851855687
+      transition_end_sec: 30.292763077872817
+      hold_end_sec: 37.618109929728504
+      target_start_kpa: 194.18493856874667
+      target_end_kpa: 148.17564435494523
+    - start_sec: 37.618109929728504
+      transition_sec: 1.1673392900253474
+      hold_sec: 7.3087820402219466
+      transition_end_sec: 38.78544921975385
+      hold_end_sec: 46.0942312599758
+      target_start_kpa: 148.17564435494523
+      target_end_kpa: 130.2727751440928
+    - start_sec: 46.0942312599758
+      transition_sec: 0.8991111736330599
+      hold_sec: 4.250989327626646
+      transition_end_sec: 46.99334243360886
+      hold_end_sec: 51.24433176123551
+      target_start_kpa: 130.2727751440928
+      target_end_kpa: 157.3240116303336
+    - start_sec: 51.24433176123551
+      transition_sec: 1.0718049070006153
+      hold_sec: 3.8247798618849753
+      transition_end_sec: 52.316136668236126
+      hold_end_sec: 56.1409165301211
+      target_start_kpa: 157.3240116303336
+      target_end_kpa: 172.6714728686346
+    - start_sec: 56.1409165301211
+      transition_sec: 0.7107071122439751
+      hold_sec: 1.219195886555318
+      transition_end_sec: 56.85162364236508
+      hold_end_sec: 58.070819528920396
+      target_start_kpa: 172.6714728686346
+      target_end_kpa: 171.11553109218193
+    - start_sec: 58.070819528920396
+      transition_sec: 0.8386070201972976
+      hold_sec: 3.418333860569475
+      transition_end_sec: 58.90942654911769
+      hold_end_sec: 62.327760409687166
+      target_start_kpa: 171.11553109218193
+      target_end_kpa: 146.77555167273206
+    - start_sec: 62.327760409687166
+      transition_sec: 0.9002617841928502
+      hold_sec: 2.9370233930659255
+      transition_end_sec: 63.228022193880015
+      hold_end_sec: 66.16504558694594
+      target_start_kpa: 146.77555167273206
+      target_end_kpa: 198.54796005725484
+    - start_sec: 66.16504558694594
+      transition_sec: 1.32386999831818
+      hold_sec: 4.150930928626569
+      transition_end_sec: 67.48891558526411
+      hold_end_sec: 71.63984651389067
+      target_start_kpa: 198.54796005725484
+      target_end_kpa: 195.39000016285428
+    - start_sec: 71.63984651389067
+      transition_sec: 1.4702743191979373
+      hold_sec: 5.989860528863314
+      transition_end_sec: 73.11012083308862
+      hold_end_sec: 79.09998136195193
+      target_start_kpa: 195.39000016285428
+      target_end_kpa: 131.20993465139873
+    - start_sec: 79.09998136195193
+      transition_sec: 1.3620341065552624
+      hold_sec: 2.183756599118583
+      transition_end_sec: 80.46201546850719
+      hold_end_sec: 82.64577206762577
+      target_start_kpa: 131.20993465139873
+      target_end_kpa: 170.54778533410476
+    - start_sec: 82.64577206762577
+      transition_sec: 1.1197297533283928
+      hold_sec: 7.353855681163893
+      transition_end_sec: 83.76550182095416
+      hold_end_sec: 91.11935750211805
+      target_start_kpa: 170.54778533410476
+      target_end_kpa: 192.25990271157883
+    - start_sec: 91.11935750211805
+      transition_sec: 1.7453477749744983
+      hold_sec: 5.254111279049141
+      transition_end_sec: 92.86470527709255
+      hold_end_sec: 98.1188165561417
+      target_start_kpa: 192.25990271157883
+      target_end_kpa: 172.52119855415714
+    - start_sec: 98.1188165561417
+      transition_sec: 1.1974113527852734
+      hold_sec: 3.0837720910730217
+      transition_end_sec: 99.31622790892696
+      hold_end_sec: 102.39999999999998
+      target_start_kpa: 172.52119855415714
+      target_end_kpa: 202.6874814906961
+  neg_schedule:
+    transition_count: 39
+    transition_duration_sec:
+    - 0.6802278359464824
+    - 2.003246077816081
+    - 0.45000502193217073
+    - 0.4500000364504863
+    - 0.5103267964182344
+    - 0.4992295664490621
+    - 0.45000000000000306
+    - 0.45000000000130086
+    - 0.8505880701610015
+    - 0.45731968576715826
+    - 1.0379185790438228
+    - 1.2890351526894432
+    - 1.0416427554694625
+    - 0.47398660125075404
+    - 1.9989484341278114
+    - 1.07209509768859
+    - 0.45000000000000007
+    - 0.8955650008203059
+    - 1.5060426757409597
+    - 0.45000000000019763
+    - 1.5188839712436901
+    - 1.0154760651014834
+    - 0.45000000000488016
+    - 1.2849985015019845
+    - 0.7011007327732891
+    - 1.2507585651489743
+    - 0.45
+    - 0.583075320935413
+    - 0.45
+    - 0.45
+    - 0.5163471618938061
+    - 0.45000051465591223
+    - 0.4501578661901099
+    - 1.7168476047287022
+    - 0.45133612913799065
+    - 0.6991934619007839
+    - 0.4500793932948448
+    - 1.5316673627675346
+    - 0.4500000000165491
+    hold_duration_sec:
+    - 2.1792296138372276
+    - 1.0000000000016118
+    - 1.0046738075989743
+    - 3.1205431606524163
+    - 1.0169912327244994
+    - 1.0000000000001357
+    - 1.000000000009329
+    - 1.0000000000000007
+    - 1.0
+    - 1.0
+    - 1.675099530362898
+    - 6.9897405941139015
+    - 7.152817393760828
+    - 4.4386202349778685
+    - 1.000000000007522
+    - 3.1699231974644935
+    - 1.0000000513118312
+    - 1.0006157769279858
+    - 1.0004672181616556
+    - 1.000000000000476
+    - 1.0000013138199928
+    - 1.0672824053328773
+    - 1.050619733301743
+    - 1.0000000001050398
+    - 1.0000000586848843
+    - 1.003012171389095
+    - 1.4085702316467796
+    - 3.1824482370243103
+    - 1.0000000000000173
+    - 1.0110518521114142
+    - 1.0000000000000004
+    - 1.0000000005739917
+    - 1.0
+    - 1.0
+    - 1.00000003585728
+    - 1.0000341549016738
+    - 8.042152744933528
+    - 1.0000000052779219
+    - 1.0000052040565188
+    segments:
+    - start_sec: 0.0
+      transition_sec: 0.6802278359464824
+      hold_sec: 2.1792296138372276
+      transition_end_sec: 0.6802278359464824
+      hold_end_sec: 2.8594574497837097
+      target_start_kpa: 25.0469241461166
+      target_end_kpa: 21.352193461694778
+    - start_sec: 2.8594574497837097
+      transition_sec: 2.003246077816081
+      hold_sec: 1.0000000000016118
+      transition_end_sec: 4.862703527599791
+      hold_end_sec: 5.862703527601403
+      target_start_kpa: 21.352193461694778
+      target_end_kpa: 25.725962751900123
+    - start_sec: 5.862703527601403
+      transition_sec: 0.45000502193217073
+      hold_sec: 1.0046738075989743
+      transition_end_sec: 6.312708549533574
+      hold_end_sec: 7.317382357132548
+      target_start_kpa: 25.725962751900123
+      target_end_kpa: 26.405519676221807
+    - start_sec: 7.317382357132548
+      transition_sec: 0.4500000364504863
+      hold_sec: 3.1205431606524163
+      transition_end_sec: 7.767382393583034
+      hold_end_sec: 10.887925554235451
+      target_start_kpa: 26.405519676221807
+      target_end_kpa: 18.147435048817552
+    - start_sec: 10.887925554235451
+      transition_sec: 0.5103267964182344
+      hold_sec: 1.0169912327244994
+      transition_end_sec: 11.398252350653685
+      hold_end_sec: 12.415243583378185
+      target_start_kpa: 18.147435048817552
+      target_end_kpa: 15.529477928193625
+    - start_sec: 12.415243583378185
+      transition_sec: 0.4992295664490621
+      hold_sec: 1.0000000000001357
+      transition_end_sec: 12.914473149827247
+      hold_end_sec: 13.914473149827382
+      target_start_kpa: 15.529477928193625
+      target_end_kpa: 18.477256880317462
+    - start_sec: 13.914473149827382
+      transition_sec: 0.45000000000000306
+      hold_sec: 1.000000000009329
+      transition_end_sec: 14.364473149827385
+      hold_end_sec: 15.364473149836714
+      target_start_kpa: 18.477256880317462
+      target_end_kpa: 16.892844759648145
+    - start_sec: 15.364473149836714
+      transition_sec: 0.45000000000130086
+      hold_sec: 1.0000000000000007
+      transition_end_sec: 15.814473149838015
+      hold_end_sec: 16.814473149838015
+      target_start_kpa: 16.892844759648145
+      target_end_kpa: 25.77730156393411
+    - start_sec: 16.814473149838015
+      transition_sec: 0.8505880701610015
+      hold_sec: 1.0
+      transition_end_sec: 17.665061219999018
+      hold_end_sec: 18.665061219999018
+      target_start_kpa: 25.77730156393411
+      target_end_kpa: 17.862863697424572
+    - start_sec: 18.665061219999018
+      transition_sec: 0.45731968576715826
+      hold_sec: 1.0
+      transition_end_sec: 19.122380905766175
+      hold_end_sec: 20.122380905766175
+      target_start_kpa: 17.862863697424572
+      target_end_kpa: 24.566381955290773
+    - start_sec: 20.122380905766175
+      transition_sec: 1.0379185790438228
+      hold_sec: 1.675099530362898
+      transition_end_sec: 21.160299484809997
+      hold_end_sec: 22.835399015172896
+      target_start_kpa: 24.566381955290773
+      target_end_kpa: 26.258592965397682
+    - start_sec: 22.835399015172896
+      transition_sec: 1.2890351526894432
+      hold_sec: 6.9897405941139015
+      transition_end_sec: 24.12443416786234
+      hold_end_sec: 31.11417476197624
+      target_start_kpa: 26.258592965397682
+      target_end_kpa: 26.365253061267897
+    - start_sec: 31.11417476197624
+      transition_sec: 1.0416427554694625
+      hold_sec: 7.152817393760828
+      transition_end_sec: 32.155817517445705
+      hold_end_sec: 39.30863491120653
+      target_start_kpa: 26.365253061267897
+      target_end_kpa: 21.443203263098326
+    - start_sec: 39.30863491120653
+      transition_sec: 0.47398660125075404
+      hold_sec: 4.4386202349778685
+      transition_end_sec: 39.78262151245728
+      hold_end_sec: 44.22124174743515
+      target_start_kpa: 21.443203263098326
+      target_end_kpa: 15.007490256011645
+    - start_sec: 44.22124174743515
+      transition_sec: 1.9989484341278114
+      hold_sec: 1.000000000007522
+      transition_end_sec: 46.22019018156296
+      hold_end_sec: 47.22019018157049
+      target_start_kpa: 15.007490256011645
+      target_end_kpa: 16.90344387722775
+    - start_sec: 47.22019018157049
+      transition_sec: 1.07209509768859
+      hold_sec: 3.1699231974644935
+      transition_end_sec: 48.292285279259076
+      hold_end_sec: 51.46220847672357
+      target_start_kpa: 16.90344387722775
+      target_end_kpa: 14.462663728153169
+    - start_sec: 51.46220847672357
+      transition_sec: 0.45000000000000007
+      hold_sec: 1.0000000513118312
+      transition_end_sec: 51.91220847672357
+      hold_end_sec: 52.9122085280354
+      target_start_kpa: 14.462663728153169
+      target_end_kpa: 23.01407031820745
+    - start_sec: 52.9122085280354
+      transition_sec: 0.8955650008203059
+      hold_sec: 1.0006157769279858
+      transition_end_sec: 53.807773528855705
+      hold_end_sec: 54.80838930578369
+      target_start_kpa: 23.01407031820745
+      target_end_kpa: 16.12403618385491
+    - start_sec: 54.80838930578369
+      transition_sec: 1.5060426757409597
+      hold_sec: 1.0004672181616556
+      transition_end_sec: 56.31443198152465
+      hold_end_sec: 57.3148991996863
+      target_start_kpa: 16.12403618385491
+      target_end_kpa: 16.3066190722313
+    - start_sec: 57.3148991996863
+      transition_sec: 0.45000000000019763
+      hold_sec: 1.000000000000476
+      transition_end_sec: 57.764899199686496
+      hold_end_sec: 58.76489919968697
+      target_start_kpa: 16.3066190722313
+      target_end_kpa: 16.18159645194966
+    - start_sec: 58.76489919968697
+      transition_sec: 1.5188839712436901
+      hold_sec: 1.0000013138199928
+      transition_end_sec: 60.28378317093066
+      hold_end_sec: 61.283784484750655
+      target_start_kpa: 16.18159645194966
+      target_end_kpa: 21.242435250750226
+    - start_sec: 61.283784484750655
+      transition_sec: 1.0154760651014834
+      hold_sec: 1.0672824053328773
+      transition_end_sec: 62.299260549852136
+      hold_end_sec: 63.36654295518501
+      target_start_kpa: 21.242435250750226
+      target_end_kpa: 20.933317942353302
+    - start_sec: 63.36654295518501
+      transition_sec: 0.45000000000488016
+      hold_sec: 1.050619733301743
+      transition_end_sec: 63.81654295518989
+      hold_end_sec: 64.86716268849163
+      target_start_kpa: 20.933317942353302
+      target_end_kpa: 17.282604482317208
+    - start_sec: 64.86716268849163
+      transition_sec: 1.2849985015019845
+      hold_sec: 1.0000000001050398
+      transition_end_sec: 66.15216118999362
+      hold_end_sec: 67.15216119009867
+      target_start_kpa: 17.282604482317208
+      target_end_kpa: 14.387589306256679
+    - start_sec: 67.15216119009867
+      transition_sec: 0.7011007327732891
+      hold_sec: 1.0000000586848843
+      transition_end_sec: 67.85326192287195
+      hold_end_sec: 68.85326198155684
+      target_start_kpa: 14.387589306256679
+      target_end_kpa: 27.319831020601725
+    - start_sec: 68.85326198155684
+      transition_sec: 1.2507585651489743
+      hold_sec: 1.003012171389095
+      transition_end_sec: 70.10402054670581
+      hold_end_sec: 71.1070327180949
+      target_start_kpa: 27.319831020601725
+      target_end_kpa: 16.91463140560983
+    - start_sec: 71.1070327180949
+      transition_sec: 0.45
+      hold_sec: 1.4085702316467796
+      transition_end_sec: 71.5570327180949
+      hold_end_sec: 72.96560294974168
+      target_start_kpa: 16.91463140560983
+      target_end_kpa: 25.700502199153227
+    - start_sec: 72.96560294974168
+      transition_sec: 0.583075320935413
+      hold_sec: 3.1824482370243103
+      transition_end_sec: 73.54867827067709
+      hold_end_sec: 76.73112650770139
+      target_start_kpa: 25.700502199153227
+      target_end_kpa: 15.50655162564414
+    - start_sec: 76.73112650770139
+      transition_sec: 0.45
+      hold_sec: 1.0000000000000173
+      transition_end_sec: 77.18112650770139
+      hold_end_sec: 78.1811265077014
+      target_start_kpa: 15.50655162564414
+      target_end_kpa: 18.59547251251445
+    - start_sec: 78.1811265077014
+      transition_sec: 0.45
+      hold_sec: 1.0110518521114142
+      transition_end_sec: 78.63112650770141
+      hold_end_sec: 79.64217835981282
+      target_start_kpa: 18.59547251251445
+      target_end_kpa: 23.900882460465397
+    - start_sec: 79.64217835981282
+      transition_sec: 0.5163471618938061
+      hold_sec: 1.0000000000000004
+      transition_end_sec: 80.15852552170662
+      hold_end_sec: 81.15852552170662
+      target_start_kpa: 23.900882460465397
+      target_end_kpa: 27.714078869105045
+    - start_sec: 81.15852552170662
+      transition_sec: 0.45000051465591223
+      hold_sec: 1.0000000005739917
+      transition_end_sec: 81.60852603636253
+      hold_end_sec: 82.60852603693652
+      target_start_kpa: 27.714078869105045
+      target_end_kpa: 15.24009591643212
+    - start_sec: 82.60852603693652
+      transition_sec: 0.4501578661901099
+      hold_sec: 1.0
+      transition_end_sec: 83.05868390312664
+      hold_end_sec: 84.05868390312664
+      target_start_kpa: 15.24009591643212
+      target_end_kpa: 17.39908749522513
+    - start_sec: 84.05868390312664
+      transition_sec: 1.7168476047287022
+      hold_sec: 1.0
+      transition_end_sec: 85.77553150785533
+      hold_end_sec: 86.77553150785533
+      target_start_kpa: 17.39908749522513
+      target_end_kpa: 27.52005983345444
+    - start_sec: 86.77553150785533
+      transition_sec: 0.45133612913799065
+      hold_sec: 1.00000003585728
+      transition_end_sec: 87.22686763699332
+      hold_end_sec: 88.2268676728506
+      target_start_kpa: 27.52005983345444
+      target_end_kpa: 16.724996702526674
+    - start_sec: 88.2268676728506
+      transition_sec: 0.6991934619007839
+      hold_sec: 1.0000341549016738
+      transition_end_sec: 88.9260611347514
+      hold_end_sec: 89.92609528965306
+      target_start_kpa: 16.724996702526674
+      target_end_kpa: 20.22970689791186
+    - start_sec: 89.92609528965306
+      transition_sec: 0.4500793932948448
+      hold_sec: 8.042152744933528
+      transition_end_sec: 90.3761746829479
+      hold_end_sec: 98.41832742788144
+      target_start_kpa: 20.22970689791186
+      target_end_kpa: 21.479701106583633
+    - start_sec: 98.41832742788144
+      transition_sec: 1.5316673627675346
+      hold_sec: 1.0000000052779219
+      transition_end_sec: 99.94999479064897
+      hold_end_sec: 100.9499947959269
+      target_start_kpa: 21.479701106583633
+      target_end_kpa: 16.976764582473656
+    - start_sec: 100.9499947959269
+      transition_sec: 0.4500000000165491
+      hold_sec: 1.0000052040565188
+      transition_end_sec: 101.39999479594344
+      hold_end_sec: 102.39999999999996
+      target_start_kpa: 16.976764582473656
+      target_end_kpa: 15.557473247434562
+  validation:
+    duration_sec: 102.4
+    episode_boundaries_512: 10
+    pressure_min_after_startup:
+    - 134.01522559699538
+    - 18.12090473825878
+    pressure_max_after_startup:
+    - 188.54504199028287
+    - 23.25940643656849
+    pressure_span_after_startup:
+    - 54.52981639328749
+    - 5.13850169830971
+    reference_rate_abs_max_after_startup:
+    - 12.74146990006031
+    - 9.091640980537452
+    action_min_raw:
+    - 0.06989815304538684
+    - 0.6542994084615655
+    action_max_raw:
+    - 0.8557976363936103
+    - 0.858388027774399
+    feasible: true
+  note: Reference-generation feedback is not used by the RL policy.

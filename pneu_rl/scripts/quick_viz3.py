@@ -19,6 +19,9 @@ from pneu_env.sim3 import PneuSim
 from pneu_env.pred3 import PneuPred
 from pneu_env.real.real9 import PneuReal
 from pneu_rl.sac_with_loss import SAC
+from pneu_rl.exp_paths import ensure_model_exp_dir
+from pneu_rl.exp_paths import find_experiment_file
+from pneu_rl.plotting import plot_lib3_pressure_and_controls
 from pneu_utils.utils import (
     delete_lines, 
     color, 
@@ -30,14 +33,6 @@ from quick_viz_utils import (
     datas_to_df,
     print_tracking_metrics,
 )
-
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import matplotlib.font_manager as fm
-
-font_path = '/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf'
-Times_New_Roman = fm.FontProperties(fname=font_path)
-
 
 ATM = 101.325
 
@@ -225,10 +220,10 @@ def save_datas(
     obs_mode = "real" if obs_mode.lower() == "real" else "simulation"
 
     if save_name is not None:
-        os.makedirs(f'{get_pkg_path("pneu_rl")}/exp/{save_name}')
+        output_dir = ensure_model_exp_dir(model_name, save_name)
         df = datas_to_df(datas)
         # df.to_csv(f'/Users/greenlandshark/MATLAB/main/datas/{save_name}.csv', index=False)
-        df.to_csv(f'{get_pkg_path("pneu_rl")}/exp/{save_name}/{save_name}.csv', index=False)
+        df.to_csv(output_dir / f'{save_name}.csv', index=False)
 
     metrics = calc_metrics(datas)
     print_tracking_metrics(metrics)
@@ -247,107 +242,22 @@ def save_datas(
     save_cfg["env"]["pid_enabled"] = bool(pid_enabled)
 
     if save_name is not None:
-        with open(f'{get_pkg_path("pneu_rl")}/exp/{save_name}/cfg.yaml', 'w') as f:
+        with open(output_dir / 'cfg.yaml', 'w') as f:
             yaml.dump(save_cfg, f)
     
     if save_name is not None:
         print('[ INFO] Saving data Done!')
 
-def plot_datas(datas, save_name=None):
-    fontname = Times_New_Roman
-    label_font_size = 18
-    
-    fig = plt.figure(figsize=(8, 8))
-    gs = gridspec.GridSpec(6, 1, figure=fig)
-
-    ax1 = fig.add_subplot(gs[0:2,0])
-    ax2 = fig.add_subplot(gs[2:4,0])
-    ax3 = fig.add_subplot(gs[4:6,0])
-
-    ax1.plot(
-        np.array(datas['curr_time']),
-        np.array(datas['press_pos']),
-        linewidth=2, color='red', label='CH_POS'
-    )
-    ax1.plot(
-        np.array(datas['curr_time']),
-        np.array(datas['press_neg']),
-        linewidth=2, color='blue', label='CH_NEG'
-    )
-    ax1.set_xlabel('Time [sec]', fontproperties=fontname, fontsize=label_font_size)
-    ax1.set_ylabel('Chamber [kPa]', fontproperties=fontname, fontsize=label_font_size)
-    ax1.grid(which='major', color='silver', linewidth=1)
-    ax1.grid(which='minor', color='lightgray', linewidth=0.5)
-    ax1.minorticks_on()
-    ax1.legend(loc='upper right')
-    ax1.set(xlim=(0, None), ylim=(None, None))
-    
-    ax2.plot(
-        np.array(datas['curr_time']),
-        np.array(datas['ref_act_pos']),
-        linewidth=2, color='black', label='REF'
-    )
-    ax2.plot(
-        np.array(datas['curr_time']),
-        np.array(datas['act_pos_press']),
-        linewidth=2, color='red', label='ACT_POS'
-    )
-    ax2.set_xlabel('Time [sec]', fontproperties=fontname, fontsize=label_font_size)
-    ax2.set_ylabel('Act Pos [kPa]', fontproperties=fontname, fontsize=label_font_size)
-    ax2.grid(True)
-    ax2.grid(which='major', color='silver', linewidth=1)
-    ax2.grid(which='minor', color='lightgray', linewidth=0.5)
-    ax2.minorticks_on()
-    ax2.legend(loc='upper right')
-    ax2.sharex(ax1)
-    ax2.set(xlim=(0, None), ylim=(None, None))
-
-    ax3.plot(
-        np.array(datas['curr_time']),
-        np.array(datas['ref_act_neg']),
-        linewidth=2, color='black', label='REF'
-    )
-    ax3.plot(
-        np.array(datas['curr_time']),
-        np.array(datas['act_neg_press']),
-        linewidth=2, color='blue', label='ACT_NEG'
-    )
-    ax3.set_xlabel('Time [sec]', fontproperties=fontname, fontsize=label_font_size)
-    ax3.set_ylabel('Act Neg [kPa]', fontproperties=fontname, fontsize=label_font_size)
-    ax3.grid(True)
-    ax3.grid(which='major', color='silver', linewidth=1)
-    ax3.grid(which='minor', color='lightgray', linewidth=0.5)
-    ax3.minorticks_on()
-    ax3.legend(loc='upper right')
-    ax3.sharex(ax1)
-    ax3.set(xlim=(0, None), ylim=(None, None))
-
-    plt.tight_layout()
+def plot_datas(datas, model_name, save_name=None):
+    output_prefix = None
     if save_name is not None:
-        plt.savefig(f'{get_pkg_path("pneu_rl")}/exp/{save_name}/{save_name}_main.png')
-
-    ctrl_fig, ctrl_axes = plt.subplots(6, 1, figsize=(9, 10), sharex=True)
-    ctrl_series = [
-        ("ctrl_ch_pos", "Positive Chamber", "#d62728"),
-        ("ctrl_ch_neg", "Negative Chamber", "#1f77b4"),
-        ("ctrl_act_pos_in", "Actuator Positive In", "#2ca02c"),
-        ("ctrl_act_pos_out", "Actuator Positive Out", "#ff7f0e"),
-        ("ctrl_act_neg_in", "Actuator Negative In", "#9467bd"),
-        ("ctrl_act_neg_out", "Actuator Negative Out", "#8c564b"),
-    ]
-    time_arr = np.array(datas["curr_time"])
-    for ax, (key, title, color_code) in zip(ctrl_axes, ctrl_series):
-        ax.plot(time_arr, np.array(datas[key]), linewidth=1.8, color=color_code)
-        ax.set_ylabel(title, fontproperties=fontname, fontsize=12)
-        ax.grid(which='major', color='silver', linewidth=1)
-        ax.grid(which='minor', color='lightgray', linewidth=0.5)
-        ax.minorticks_on()
-        ax.set(xlim=(0, None), ylim=(None, None))
-    ctrl_axes[-1].set_xlabel('Time [sec]', fontproperties=fontname, fontsize=label_font_size)
-    ctrl_fig.tight_layout()
-    if save_name is not None:
-        ctrl_fig.savefig(f'{get_pkg_path("pneu_rl")}/exp/{save_name}/{save_name}_ctrl.png')
-    plt.show()
+        output_dir = ensure_model_exp_dir(model_name, save_name)
+        output_prefix = output_dir / save_name
+    plot_lib3_pressure_and_controls(
+        datas_to_df(datas),
+        output_prefix,
+        show=True,
+    )
 
 if __name__ == '__main__':
     print('[ INFO] Control Mode: RL')
@@ -385,8 +295,7 @@ if __name__ == '__main__':
     elif ref_mode =='3':
         print(f'[ INFO] Reference Mode: Trajectory')
         csv_file_name = viz_kwargs["ref"]["traj"]["file"]
-        csv_file_name = f"{get_pkg_path('pneu_rl')}/exp/{csv_file_name}/{csv_file_name}"
-        csv_file_name = f"{csv_file_name}.csv"
+        csv_file_name = find_experiment_file(csv_file_name, f"{csv_file_name}.csv")
         csv_data = pd.read_csv(csv_file_name).to_dict(orient="list")
         keys = [
             "curr_time",
@@ -514,7 +423,7 @@ if __name__ == '__main__':
             viz_kwargs,
             pid_enabled=pid_enabled,
         )
-        plot_datas(datas, save_name)
+        plot_datas(datas, model_name, save_name)
 
     except KeyboardInterrupt:
         print()
@@ -529,7 +438,7 @@ if __name__ == '__main__':
             viz_kwargs,
             pid_enabled=pid_enabled,
         )
-        plot_datas(datas, save_name)
+        plot_datas(datas, model_name, save_name)
     
     finally:
         env.close()

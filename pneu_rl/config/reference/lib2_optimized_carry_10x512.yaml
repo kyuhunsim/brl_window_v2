@@ -1,0 +1,48 @@
+kind: optimized_trajectory_bank
+kwargs:
+  trajectory_npz: pneu_rl/config/reference/lib2_optimized_carry_10x512.npz
+  seed: 90210
+  sample_mode: coverage
+  repeat_after_end: false
+design:
+  library: 2
+  continuous_carry: true
+  duration_sec: 102.4
+  horizon_512_sec: 10.24
+  episode_boundaries_inside_rollout: 10
+  generator: one continuous lib2 simulator rollout
+  rate_filter_ignore_initial_sec: 5.0
+  parameters:
+    base_pos: 0.4908761819903292
+    base_neg: 0.7544720992681698
+    amp_pos: 0.21055524413133983
+    amp_neg: 0.12182158634364418
+    freq_pos: 0.024361451599196976
+    freq_neg: 0.11023273998085223
+    freq_pos2: 0.10373392143443806
+    freq_neg2: 0.08186507182241776
+    phase_pos: -2.2538061801448457
+    phase_neg: 2.3549240489626317
+  validation:
+    pressure_min_after_startup:
+    - 119.04043979711341
+    - 15.857456281151197
+    pressure_max_after_startup:
+    - 155.91149280388603
+    - 23.54185811942085
+    pressure_span_after_startup:
+    - 36.87105300677263
+    - 7.684401838269654
+    reference_rate_abs_max_after_startup:
+    - 6.0362884736051114
+    - 2.4978726099443627
+    full_pressure_min_including_startup:
+    - 101.325
+    - 15.857456281151197
+    full_pressure_max_including_startup:
+    - 155.91149280388603
+    - 101.325
+    score: 0.7560012915786066
+    feasible: true
+  note: Do not use beyond duration when repeat_after_end is false; generate a longer
+    rollout for longer training.

@@ -1,0 +1,775 @@
+kind: optimized_trajectory_bank
+kwargs:
+  trajectory_npz: pneu_rl/config/reference/lib2_constrained_random_carry_final10x512.npz
+  seed: 921
+  sample_mode: coverage
+  repeat_after_end: false
+design:
+  library: 2
+  continuous_carry: true
+  duration_sec: 102.4
+  horizon_512_sec: 10.24
+  episode_boundaries_inside_rollout: 10
+  generator: offline constrained random task specification with simulator-in-the-loop
+    command-program optimisation
+  reference_initial_pressure_kpa:
+  - 150.0
+  - 24.0
+  expected_training_initial_pressure_kpa:
+  - 101.325
+  - 101.325
+  rate_filter_ignore_initial_sec: 1.0
+  pressure_filter_kpa:
+    pos:
+    - 115.0
+    - 220.0
+    neg:
+    - 10.0
+    - 30.0
+  rate_filter_kpa_s:
+  - 32.0
+  - 9.5
+  raw_command_range:
+    pos:
+    - 0.2
+    - 0.75
+    neg:
+    - 0.55
+    - 0.92
+  randomness:
+    seeded: true
+    task_families:
+    - pos_sweep
+    - neg_sweep
+    - opposite
+    - mixed
+    independent_pos_neg_timing: true
+    random_variables:
+    - family
+    - transition_count
+    - transition_duration
+    - hold_duration
+    - command_target
+    - amplitude
+  optimisation:
+    method: per-block simulator replay candidate search
+    candidates_per_block: 8
+    objective: pressure/rate coverage gain + span + activity, subject to all hard
+      constraints
+    feedback_controller_used: false
+    dither_used: false
+  schedule:
+  - block: 0
+    start_sec: 0.0
+    family: mixed
+    candidate_count: 8
+    pos_amplitude_scale: 0.5992962024149375
+    neg_amplitude_scale: 0.4882661349900532
+    pos_segments:
+    - start_sec: 1.0
+      transition_sec: 0.9737178703632627
+      hold_sec: 2.6431867902351796
+      raw_start: 0.5
+      raw_target: 0.37468792458013944
+      end_sec: 4.6169046605984425
+    - start_sec: 4.6169046605984425
+      transition_sec: 0.885411721925154
+      hold_sec: 1.5943886202489954
+      raw_start: 0.37468792458013944
+      raw_target: 0.521350467035075
+      end_sec: 7.096705002772592
+    - start_sec: 7.096705002772592
+      transition_sec: 2.199821252212926
+      hold_sec: 0.9434737450144821
+      raw_start: 0.521350467035075
+      raw_target: 0.7064463885837338
+      end_sec: 10.240000000000002
+    neg_segments:
+    - start_sec: 1.0
+      transition_sec: 0.7834233015646118
+      hold_sec: 3.146529383206622
+      raw_start: 0.87
+      raw_target: 0.795479954445217
+      end_sec: 4.929952684771234
+    - start_sec: 4.929952684771234
+      transition_sec: 0.9712595194579612
+      hold_sec: 0.9101452519779979
+      raw_start: 0.795479954445217
+      raw_target: 0.8535369630124721
+      end_sec: 6.811357456207193
+    - start_sec: 6.811357456207193
+      transition_sec: 0.8879955108526005
+      hold_sec: 0.8704754074090845
+      raw_start: 0.8535369630124721
+      raw_target: 0.6743524919319451
+      end_sec: 8.569828374468877
+    - start_sec: 8.569828374468877
+      transition_sec: 0.7117011657161356
+      hold_sec: 0.9584704598149864
+      raw_start: 0.6743524919319451
+      raw_target: 0.5736781215624653
+      end_sec: 10.239999999999998
+    pos_first_direction_raw: lower
+    neg_first_direction_raw: lower
+    score: 93.22569435665866
+    coverage_gain: 23
+    pressure_min:
+    - 128.61277880956393
+    - 13.775827957386618
+    pressure_max:
+    - 158.1200902063155
+    - 23.618595492353894
+    pressure_span:
+    - 29.50731139675156
+    - 9.842767534967276
+    rate_abs_max:
+    - 11.891161490158453
+    - 7.447009954139983
+    rate_mean_abs:
+    - 3.767984600860397
+    - 1.3876228917552142
+    raw_action_min:
+    - 0.37468792458013944
+    - 0.5736781215624653
+    raw_action_max:
+    - 0.7064463885837338
+    - 0.87
+  - block: 1
+    start_sec: 10.24
+    family: neg_sweep
+    candidate_count: 8
+    pos_amplitude_scale: 0.2070420322184322
+    neg_amplitude_scale: 0.8535169582819162
+    pos_segments:
+    - start_sec: 0.0
+      transition_sec: 1.6235235285230614
+      hold_sec: 1.8303165970496598
+      raw_start: 0.7064463885837338
+      raw_target: 0.609086098193896
+      end_sec: 3.453840125572721
+    - start_sec: 3.453840125572721
+      transition_sec: 1.0903312079128833
+      hold_sec: 5.695828666514396
+      raw_start: 0.609086098193896
+      raw_target: 0.5209628439705437
+      end_sec: 10.24
+    neg_segments:
+    - start_sec: 0.0
+      transition_sec: 0.7000158381220282
+      hold_sec: 0.8000159213901477
+      raw_start: 0.5736781215624653
+      raw_target: 0.7351096186446493
+      end_sec: 1.5000317595121757
+    - start_sec: 1.5000317595121757
+      transition_sec: 0.7151266559668654
+      hold_sec: 2.3444217703575054
+      raw_start: 0.7351096186446493
+      raw_target: 0.8110787378273133
+      end_sec: 4.559580185836547
+    - start_sec: 4.559580185836547
+      transition_sec: 0.7000131812263242
+      hold_sec: 0.8086065852716345
+      raw_start: 0.8110787378273133
+      raw_target: 0.9103336087682539
+      end_sec: 6.068199952334505
+    - start_sec: 6.068199952334505
+      transition_sec: 0.7000123660209076
+      hold_sec: 0.8000562952149411
+      raw_start: 0.9103336087682539
+      raw_target: 0.7501243400924025
+      end_sec: 7.568268613570354
+    - start_sec: 7.568268613570354
+      transition_sec: 1.8717294572344723
+      hold_sec: 0.8000019291951738
+      raw_start: 0.7501243400924025
+      raw_target: 0.8956425631347178
+      end_sec: 10.24
+    pos_first_direction_raw: null
+    neg_first_direction_raw: null
+    score: 94.17740265073913
+    coverage_gain: 23
+    pressure_min:
+    - 123.21252611831724
+    - 13.709332067121377
+    pressure_max:
+    - 144.74396107641937
+    - 24.169085513649904
+    pressure_span:
+    - 21.531434958102125
+    - 10.459753446528527
+    rate_abs_max:
+    - 10.07753690502824
+    - 8.637370676449496
+    rate_mean_abs:
+    - 3.0013483190682737
+    - 1.7670850870642818
+    raw_action_min:
+    - 0.5209628439705437
+    - 0.5736781215624653
+    raw_action_max:
+    - 0.7064463885837338
+    - 0.9103336087682539
+  - block: 2
+    start_sec: 20.48
+    family: opposite
+    candidate_count: 8
+    pos_amplitude_scale: 0.5848042559116238
+    neg_amplitude_scale: 0.6964162311851808
+    pos_segments:
+    - start_sec: 0.0
+      transition_sec: 1.85632754897594
+      hold_sec: 4.608726069444323
+      raw_start: 0.5209628439705437
+      raw_target: 0.33252470734222916
+      end_sec: 6.465053618420264
+    - start_sec: 6.465053618420264
+      transition_sec: 1.266590556903843
+      hold_sec: 2.5083558246758937
+      raw_start: 0.33252470734222916
+      raw_target: 0.2107808689101038
+      end_sec: 10.24
+    neg_segments:
+    - start_sec: 0.0
+      transition_sec: 1.3676496116403403
+      hold_sec: 2.232859929474421
+      raw_start: 0.8956425631347178
+      raw_target: 0.7740279500666516
+      end_sec: 3.600509541114761
+    - start_sec: 3.600509541114761
+      transition_sec: 1.037690745863152
+      hold_sec: 2.7519523551070515
+      raw_start: 0.7740279500666516
+      raw_target: 0.6139021541056592
+      end_sec: 7.390152642084964
+    - start_sec: 7.390152642084964
+      transition_sec: 1.7739260095259333
+      hold_sec: 1.0759213483891024
+      raw_start: 0.6139021541056592
+      raw_target: 0.8692849609517272
+      end_sec: 10.239999999999998
+    pos_first_direction_raw: null
+    neg_first_direction_raw: null
+    score: 57.0774891316529
+    coverage_gain: 14
+    pressure_min:
+    - 142.32808925369628
+    - 15.432332925091332
+    pressure_max:
+    - 158.70492432053217
+    - 24.02851502541628
+    pressure_span:
+    - 16.376835066835895
+    - 8.596182100324947
+    rate_abs_max:
+    - 9.866388444724095
+    - 7.073485472106267
+    rate_mean_abs:
+    - 3.977358403548228
+    - 1.6512947431920206
+    raw_action_min:
+    - 0.2107808689101038
+    - 0.6139021541056592
+    raw_action_max:
+    - 0.5209628439705437
+    - 0.8956425631347178
+  - block: 3
+    start_sec: 30.72
+    family: mixed
+    candidate_count: 8
+    pos_amplitude_scale: 0.5467128863608363
+    neg_amplitude_scale: 0.4464873383035178
+    pos_segments:
+    - start_sec: 0.0
+      transition_sec: 1.3439325066062555
+      hold_sec: 4.81272130753138
+      raw_start: 0.2107808689101038
+      raw_target: 0.2679231601011702
+      end_sec: 6.156653814137635
+    - start_sec: 6.156653814137635
+      transition_sec: 0.8753091285151269
+      hold_sec: 3.208037057347238
+      raw_start: 0.2679231601011702
+      raw_target: 0.4988939909084026
+      end_sec: 10.24
+    neg_segments:
+    - start_sec: 0.0
+      transition_sec: 0.7569266714809177
+      hold_sec: 1.31840247736904
+      raw_start: 0.8692849609517272
+      raw_target: 0.7603820409163029
+      end_sec: 2.0753291488499577
+    - start_sec: 2.0753291488499577
+      transition_sec: 1.3973473881736762
+      hold_sec: 2.1063944784412985
+      raw_start: 0.7603820409163029
+      raw_target: 0.8705641093209957
+      end_sec: 5.579071015464932
+    - start_sec: 5.579071015464932
+      transition_sec: 2.176690653815882
+      hold_sec: 2.4842383307191858
+      raw_start: 0.8705641093209957
+      raw_target: 0.7078326373943649
+      end_sec: 10.24
+    pos_first_direction_raw: null
+    neg_first_direction_raw: null
+    score: 69.00170297375986
+    coverage_gain: 17
+    pressure_min:
+    - 158.70492432053217
+    - 19.4392356065199
+    pressure_max:
+    - 196.63894126322992
+    - 24.508071442926486
+    pressure_span:
+    - 37.93401694269775
+    - 5.068835836406585
+    rate_abs_max:
+    - 9.72078188315706
+    - 4.100355394353361
+    rate_mean_abs:
+    - 6.556186568181479
+    - 1.0794109270798249
+    raw_action_min:
+    - 0.2107808689101038
+    - 0.7078326373943649
+    raw_action_max:
+    - 0.4988939909084026
+    - 0.8705641093209957
+  - block: 4
+    start_sec: 40.96
+    family: pos_sweep
+    candidate_count: 8
+    pos_amplitude_scale: 0.8028758168524786
+    neg_amplitude_scale: 0.31960412566829244
+    pos_segments:
+    - start_sec: 0.0
+      transition_sec: 1.6263833487928712
+      hold_sec: 0.8069030365859347
+      raw_start: 0.4988939909084026
+      raw_target: 0.2052295857953154
+      end_sec: 2.433286385378806
+    - start_sec: 2.433286385378806
+      transition_sec: 1.153746255621062
+      hold_sec: 0.8004669179957372
+      raw_start: 0.2052295857953154
+      raw_target: 0.6128992975751858
+      end_sec: 4.387499558995605
+    - start_sec: 4.387499558995605
+      transition_sec: 0.7011922796504054
+      hold_sec: 0.8056150879747241
+      raw_start: 0.6128992975751858
+      raw_target: 0.313645661070783
+      end_sec: 5.894306926620735
+    - start_sec: 5.894306926620735
+      transition_sec: 1.8787175321115046
+      hold_sec: 2.466975541267761
+      raw_start: 0.313645661070783
+      raw_target: 0.6498839217713194
+      end_sec: 10.24
+    neg_segments:
+    - start_sec: 0.0
+      transition_sec: 2.0491128017451747
+      hold_sec: 5.137125666116217
+      raw_start: 0.7078326373943649
+      raw_target: 0.765762058269867
+      end_sec: 7.186238467861392
+    - start_sec: 7.186238467861392
+      transition_sec: 1.4376754998272259
+      hold_sec: 1.6160860323113821
+      raw_start: 0.765762058269867
+      raw_target: 0.8338388612954907
+      end_sec: 10.239999999999998
+    pos_first_direction_raw: null
+    neg_first_direction_raw: null
+    score: 36.805356559489525
+    coverage_gain: 9
+    pressure_min:
+    - 147.0698815987521
+    - 19.377102660416316
+    pressure_max:
+    - 170.53660279340505
+    - 22.70793100502001
+    pressure_span:
+    - 23.466721194652962
+    - 3.3308283446036953
+    rate_abs_max:
+    - 8.69937791815758
+    - 1.7711468228667648
+    rate_mean_abs:
+    - 4.396363068856319
+    - 0.3818867843230155
+    raw_action_min:
+    - 0.2052295857953154
+    - 0.7078326373943649
+    raw_action_max:
+    - 0.6498839217713194
+    - 0.8338388612954907
+  - block: 5
+    start_sec: 51.2
+    family: neg_sweep
+    candidate_count: 8
+    pos_amplitude_scale: 0.2842351146953954
+    neg_amplitude_scale: 0.7481910589060977
+    pos_segments:
+    - start_sec: 0.0
+      transition_sec: 1.552715351667942
+      hold_sec: 3.372367898639789
+      raw_start: 0.6498839217713194
+      raw_target: 0.7196115022930005
+      end_sec: 4.925083250307731
+    - start_sec: 4.925083250307731
+      transition_sec: 1.100100787733577
+      hold_sec: 4.214815961958693
+      raw_start: 0.7196115022930005
+      raw_target: 0.6032924560027157
+      end_sec: 10.240000000000002
+    neg_segments:
+    - start_sec: 0.0
+      transition_sec: 1.6968951675022674
+      hold_sec: 0.8206466769519797
+      raw_start: 0.8338388612954907
+      raw_target: 0.7581865451523201
+      end_sec: 2.517541844454247
+    - start_sec: 2.517541844454247
+      transition_sec: 0.7304062289101666
+      hold_sec: 3.15136427748977
+      raw_start: 0.7581865451523201
+      raw_target: 0.5973992488532215
+      end_sec: 6.399312350854183
+    - start_sec: 6.399312350854183
+      transition_sec: 0.8006320059531253
+      hold_sec: 0.825791129811802
+      raw_start: 0.5973992488532215
+      raw_target: 0.696153952653154
+      end_sec: 8.02573548661911
+    - start_sec: 8.02573548661911
+      transition_sec: 1.3423968688553467
+      hold_sec: 0.8718676445255422
+      raw_start: 0.696153952653154
+      raw_target: 0.8690775293321373
+      end_sec: 10.24
+    pos_first_direction_raw: null
+    neg_first_direction_raw: null
+    score: 41.40055770555963
+    coverage_gain: 10
+    pressure_min:
+    - 116.79888454650586
+    - 14.259480193350488
+    pressure_max:
+    - 147.0698815987521
+    - 23.003063279224587
+    pressure_span:
+    - 30.27099705224623
+    - 8.7435830858741
+    rate_abs_max:
+    - 8.773878821784109
+    - 8.625439955767611
+    rate_mean_abs:
+    - 4.239972179609614
+    - 1.6740752511080852
+    raw_action_min:
+    - 0.6032924560027157
+    - 0.5973992488532215
+    raw_action_max:
+    - 0.7196115022930005
+    - 0.8690775293321373
+  - block: 6
+    start_sec: 61.44
+    family: opposite
+    candidate_count: 8
+    pos_amplitude_scale: 0.646544935578337
+    neg_amplitude_scale: 0.5573088172060057
+    pos_segments:
+    - start_sec: 0.0
+      transition_sec: 1.096022190110666
+      hold_sec: 3.1158046639172525
+      raw_start: 0.6032924560027157
+      raw_target: 0.2683028120281695
+      end_sec: 4.211826854027919
+    - start_sec: 4.211826854027919
+      transition_sec: 1.8764290501455205
+      hold_sec: 1.2975986188446058
+      raw_start: 0.2683028120281695
+      raw_target: 0.20652936015071116
+      end_sec: 7.385854523018045
+    - start_sec: 7.385854523018045
+      transition_sec: 1.9723585151239378
+      hold_sec: 0.8817869618580177
+      raw_start: 0.20652936015071116
+      raw_target: 0.3108752029258627
+      end_sec: 10.24
+    neg_segments:
+    - start_sec: 0.0
+      transition_sec: 1.3335857491391774
+      hold_sec: 0.8424752532484705
+      raw_start: 0.8690775293321373
+      raw_target: 0.7847038331866353
+      end_sec: 2.176061002387648
+    - start_sec: 2.176061002387648
+      transition_sec: 0.7266904150059924
+      hold_sec: 0.8403504479353852
+      raw_start: 0.7847038331866353
+      raw_target: 0.6634940316817974
+      end_sec: 3.7431018653290256
+    - start_sec: 3.7431018653290256
+      transition_sec: 1.6347514625072335
+      hold_sec: 1.563540188536863
+      raw_start: 0.6634940316817974
+      raw_target: 0.8272056561554257
+      end_sec: 6.941393516373123
+    - start_sec: 6.941393516373123
+      transition_sec: 0.7098376681160065
+      hold_sec: 0.8222546123404478
+      raw_start: 0.8272056561554257
+      raw_target: 0.7381081985950517
+      end_sec: 8.473485796829577
+    - start_sec: 8.473485796829577
+      transition_sec: 0.9569623246181569
+      hold_sec: 0.8095518785522668
+      raw_start: 0.7381081985950517
+      raw_target: 0.5955379936496267
+      end_sec: 10.24
+    pos_first_direction_raw: null
+    neg_first_direction_raw: null
+    score: 53.54061023162519
+    coverage_gain: 13
+    pressure_min:
+    - 129.95395152234929
+    - 15.644796693909292
+    pressure_max:
+    - 180.612582031954
+    - 23.073501548953487
+    pressure_span:
+    - 50.658630509604706
+    - 7.428704855044195
+    rate_abs_max:
+    - 9.676599008235343
+    - 6.773530599336031
+    rate_mean_abs:
+    - 5.447336487026652
+    - 1.7850904474514202
+    raw_action_min:
+    - 0.20652936015071116
+    - 0.5955379936496267
+    raw_action_max:
+    - 0.6032924560027157
+    - 0.8690775293321373
+  - block: 7
+    start_sec: 71.68
+    family: mixed
+    candidate_count: 8
+    pos_amplitude_scale: 0.5044720272505089
+    neg_amplitude_scale: 0.4540226802625354
+    pos_segments:
+    - start_sec: 0.0
+      transition_sec: 1.185367065838006
+      hold_sec: 1.3115391270604144
+      raw_start: 0.3108752029258627
+      raw_target: 0.5324499618163159
+      end_sec: 2.4969061928984204
+    - start_sec: 2.4969061928984204
+      transition_sec: 1.4837105669681554
+      hold_sec: 1.9709192127313098
+      raw_start: 0.5324499618163159
+      raw_target: 0.25632832066487526
+      end_sec: 5.951535972597886
+    - start_sec: 5.951535972597886
+      transition_sec: 1.1869975800759012
+      hold_sec: 3.101466447326213
+      raw_start: 0.25632832066487526
+      raw_target: 0.31562743131685067
+      end_sec: 10.239999999999998
+    neg_segments:
+    - start_sec: 0.0
+      transition_sec: 1.428678576845245
+      hold_sec: 2.761933265235637
+      raw_start: 0.5955379936496267
+      raw_target: 0.6740742364042938
+      end_sec: 4.190611842080882
+    - start_sec: 4.190611842080882
+      transition_sec: 2.005577901872339
+      hold_sec: 1.5609807079187346
+      raw_start: 0.6740742364042938
+      raw_target: 0.5605251919648729
+      end_sec: 7.757170451871955
+    - start_sec: 7.757170451871955
+      transition_sec: 0.7663859461679512
+      hold_sec: 1.7164436019600933
+      raw_start: 0.5605251919648729
+      raw_target: 0.677485935211072
+      end_sec: 10.239999999999998
+    pos_first_direction_raw: null
+    neg_first_direction_raw: null
+    score: 52.96933076150527
+    coverage_gain: 13
+    pressure_min:
+    - 136.50052568096945
+    - 13.296186762033427
+    pressure_max:
+    - 175.49908404458085
+    - 17.93314143310094
+    pressure_span:
+    - 38.99855836361141
+    - 4.636954671067512
+    rate_abs_max:
+    - 11.780168885371012
+    - 6.344556438987414
+    rate_mean_abs:
+    - 4.430527192355036
+    - 1.133289395609722
+    raw_action_min:
+    - 0.25632832066487526
+    - 0.5605251919648729
+    raw_action_max:
+    - 0.5324499618163159
+    - 0.677485935211072
+  - block: 8
+    start_sec: 81.92
+    family: pos_sweep
+    candidate_count: 8
+    pos_amplitude_scale: 0.7539362572361451
+    neg_amplitude_scale: 0.2816162379054994
+    pos_segments:
+    - start_sec: 0.0
+      transition_sec: 0.8404319930772702
+      hold_sec: 0.8060071239172433
+      raw_start: 0.31562743131685067
+      raw_target: 0.548910437995588
+      end_sec: 1.6464391169945136
+    - start_sec: 1.6464391169945136
+      transition_sec: 0.7472356780160526
+      hold_sec: 1.785421405052468
+      raw_start: 0.548910437995588
+      raw_target: 0.47258855419008716
+      end_sec: 4.179096200063034
+    - start_sec: 4.179096200063034
+      transition_sec: 0.707632427945838
+      hold_sec: 3.835210796477166
+      raw_start: 0.47258855419008716
+      raw_target: 0.2344346973040864
+      end_sec: 8.721939424486038
+    - start_sec: 8.721939424486038
+      transition_sec: 0.7149134170419083
+      hold_sec: 0.8031471584720541
+      raw_start: 0.2344346973040864
+      raw_target: 0.5925377514210479
+      end_sec: 10.24
+    neg_segments:
+    - start_sec: 0.0
+      transition_sec: 0.9625350093051858
+      hold_sec: 5.289234290104143
+      raw_start: 0.677485935211072
+      raw_target: 0.5871618734976759
+      end_sec: 6.251769299409329
+    - start_sec: 6.251769299409329
+      transition_sec: 0.7585050129255592
+      hold_sec: 3.2297256876651117
+      raw_start: 0.5871618734976759
+      raw_target: 0.6558822457180349
+      end_sec: 10.239999999999998
+    pos_first_direction_raw: null
+    neg_first_direction_raw: null
+    score: 32.70696169662056
+    coverage_gain: 8
+    pressure_min:
+    - 120.74913609589457
+    - 13.923512029681255
+    pressure_max:
+    - 138.9820916757406
+    - 17.679244194346236
+    pressure_span:
+    - 18.232955579846035
+    - 3.7557321646649804
+    rate_abs_max:
+    - 7.446504894355144
+    - 4.457049901106114
+    rate_mean_abs:
+    - 3.539790505322671
+    - 0.6521749084045115
+    raw_action_min:
+    - 0.2344346973040864
+    - 0.5871618734976759
+    raw_action_max:
+    - 0.5925377514210479
+    - 0.677485935211072
+  - block: 9
+    start_sec: 92.16
+    family: neg_sweep
+    candidate_count: 8
+    pos_amplitude_scale: 0.3204516027983686
+    neg_amplitude_scale: 0.9433145950068937
+    pos_segments:
+    - start_sec: 0.0
+      transition_sec: 1.5060441749936426
+      hold_sec: 3.367976848062015
+      raw_start: 0.5925377514210479
+      raw_target: 0.452070554705827
+      end_sec: 4.874021023055658
+    - start_sec: 4.874021023055658
+      transition_sec: 0.8414132570671393
+      hold_sec: 4.524565719877203
+      raw_start: 0.452070554705827
+      raw_target: 0.2970253083958307
+      end_sec: 10.24
+    neg_segments:
+    - start_sec: 0.0
+      transition_sec: 1.4560349176865726
+      hold_sec: 4.212283682016473
+      raw_start: 0.6558822457180349
+      raw_target: 0.8232062702037073
+      end_sec: 5.668318599703046
+    - start_sec: 5.668318599703046
+      transition_sec: 1.572830888583706
+      hold_sec: 2.9988505117132487
+      raw_start: 0.8232062702037073
+      raw_target: 0.7148759348515146
+      end_sec: 10.24
+    pos_first_direction_raw: null
+    neg_first_direction_raw: null
+    score: 4.99065569394454
+    coverage_gain: 1
+    pressure_min:
+    - 128.01082139297057
+    - 16.74870457414594
+    pressure_max:
+    - 163.89427810902828
+    - 22.441154351483142
+    pressure_span:
+    - 35.88345671605771
+    - 5.6924497773372025
+    rate_abs_max:
+    - 7.483471262891328
+    - 5.243627422739294
+    rate_mean_abs:
+    - 3.685452526918857
+    - 0.8477249968354492
+    raw_action_min:
+    - 0.2970253083958307
+    - 0.6558822457180349
+    raw_action_max:
+    - 0.5925377514210479
+    - 0.8232062702037073
+  validation:
+    samples: 5121
+    duration_sec: 102.4
+    episode_boundaries_512: 10
+    pressure_min_after_startup:
+    - 116.79888454650586
+    - 13.296186762033427
+    pressure_max_after_startup:
+    - 196.63894126322992
+    - 24.508071442926486
+    pressure_span_after_startup:
+    - 79.84005671672406
+    - 11.211884680893059
+    reference_rate_abs_max_after_startup:
+    - 11.891161490158453
+    - 8.637370676449496
+    action_min_raw:
+    - 0.2052295857953154
+    - 0.5605251919648729
+    action_max_raw:
+    - 0.7196115022930005
+    - 0.9103336087682539
+  note: The stored pressure is a simulator output of selected continuous command programmes.
+    raw_action is oracle-only and is not given to RL.

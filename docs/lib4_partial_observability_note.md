@@ -2,14 +2,13 @@
 
 ## 한 줄 요약
 
-`lib4`는 단순한 fully observed MDP라기보다,  
-**delay + coupling + hidden valve dynamics + redundant action**이 섞인  
-**partially observed control problem (부분관측 제어 문제)** 로 보는 게 더 맞다.
+`lib4`의 instantaneous sensor는 full simulator execution state를 직접 측정하지 않는다.
+다만 pressure/action history가 control-relevant state를 충분히 복원한다면 history policy는 approximate fully observed controller일 수 있다. 따라서 현재 정확한 표현은 **candidate partially observed control problem**이며, local observability/output-map test로 판정해야 한다.
 
 즉 문제의 핵심은 단순히 "valve nonlinearity가 있어서 어렵다"가 아니라,
 
 - 내부적으로 안 보이는 상태(hidden state)가 있고
-- 현재 관측만으로는 다음 반응을 완전히 알기 어렵고
+- current sensor만으로는 다음 반응을 완전히 알기 어려울 수 있으며
 - action도 6D direct valve라서 너무 redundant하다는 점이다.
 
 ---
@@ -208,6 +207,8 @@ lib4에서 제일 현실적인 첫 단계는:
 - multi-objective reward
 
 이 한꺼번에 걸려 있기 때문이다.
+
+수식, source audit, 그리고 reward/observation을 분리한 실험 순서는 [observer/POMDP system audit](observer_pomdp_system_audit.md)에 정리했다. 이 문서는 그 audit 결과가 나오기 전의 설계 가설로 읽는다.
 
 ### Q2. PID가 안 되면 RL도 안 되는가?
 

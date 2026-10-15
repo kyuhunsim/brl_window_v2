@@ -1,0 +1,58 @@
+schema: lib4_evaluation_protocol_v1
+name: lib4_p0_pre_real_fixed_v1
+status: provisional_until_real_noise_floor_and_step_delay_are_measured
+sample_period_sec: 0.02
+
+channels:
+  pos: {actual: act_pos, reference: ref_pos, kind: pressure}
+  neg: {actual: act_neg, reference: ref_neg, kind: pressure}
+  disp: {actual: disp, reference: ref_disp, kind: displacement}
+
+control_columns:
+  - ctrl_ch_pos
+  - ctrl_ch_neg
+  - ctrl_act_pos_in
+  - ctrl_act_pos_out
+  - ctrl_act_neg_in
+  - ctrl_act_neg_out
+
+# Fixed before checkpoint comparison. The 5-step lag is the known 0.1 s
+# nominal simulator delay, not a per-model best-lag search.
+direction:
+  pressure:
+    min_reference_rate: 0.5       # kPa/s
+    lag_steps: 5
+  displacement:
+    min_reference_rate: 0.1       # mm/s
+    lag_steps: 5
+
+segmentation:
+  minimum_plateau_samples: 25
+  settling_hold_samples: 10
+  pressure:
+    transition_rate_min: 0.5      # kPa/s
+    plateau_rate_max: 0.1         # kPa/s
+    settling_tolerance: 1.0       # kPa
+  displacement:
+    transition_rate_min: 0.1      # mm/s
+    plateau_rate_max: 0.02        # mm/s
+    settling_tolerance: 0.5       # mm
+
+safety:
+  pos_reserve_min_kpa: 3.0
+  neg_reserve_min_kpa: 3.0
+  control_saturation_low: 0.801
+  control_saturation_high: 0.999
+
+# These are stop gates for screening, not final paper thresholds. Freeze or
+# replace this entire protocol from independently measured real noise/delay;
+# never tune one field after looking at a checkpoint result.
+provisional_gates:
+  pos_rmse_max_kpa: 2.0
+  neg_rmse_max_kpa: 2.0
+  disp_rmse_max_mm: 1.0
+  direction_min: 0.8
+  pressure_plateau_std_max_kpa: 0.75
+  disp_plateau_std_max_mm: 0.5
+  mean_abs_delta_u_max: 0.01
+  large_action_delta: 0.02

@@ -1,0 +1,103 @@
+schema: lib4_followup_plan_v1
+python: /home/rise/miniconda3/envs/env_1/bin/python
+train_script: pneu_rl/scripts/train_lib4_screening.py
+evaluate_script: pneu_rl/scripts/evaluate_lib4_screening.py
+train_reference: pneu_rl/config/reference/lib4_capacity_core_16x4x512_seed64001.yaml
+evaluation_reference: pneu_rl/config/reference/lib4_capacity_core_idtest_8x4x512_seed65002.yaml
+evaluation_protocol: pneu_rl/config/evaluation/lib4_p0_protocol.yaml
+evaluation_root: pneu_rl/exp/lib4_followup_plan
+
+phases:
+  p1_causal_recovery:
+    gate: immediate
+    purpose: complete Direct/History causality and test A4 seed reproducibility
+    jobs:
+      - name: 260824_lib4_r3_direct_clean_seed0
+        variant: sac
+        seed: 0
+        episodes: 1000
+        enabled: true
+      - name: 260824_lib4_r3_history_seed0
+        variant: history_sac
+        seed: 0
+        episodes: 1000
+        enabled: true
+      - name: 260824_lib4_r3_history_rate_reserve_seed1
+        variant: history_rate_reserve
+        seed: 1
+        episodes: 1000
+        enabled: true
+      - name: 260824_lib4_r3_history_rate_reserve_seed2
+        variant: history_rate_reserve
+        seed: 2
+        episodes: 1000
+        enabled: true
+
+  p2_plateau_diagnosis:
+    gate: run_only_after_p1_and_segment_metrics_confirm_bias_or_oscillation
+    purpose: never mix integral and smoothness in one diagnostic job
+    jobs:
+      - name: 260824_lib4_r3_rate_reserve_integral_seed0
+        variant: history_rate_reserve_integral
+        seed: 0
+        episodes: 1000
+        enabled: false
+        run_when: plateau_bias_large_and_plateau_oscillation_small
+        args:
+          integral_decay: 0.999
+          integral_limit: 100.0
+          integral_scale: 20.0
+      - name: 260824_lib4_r3_rate_reserve_action_delta005_seed0
+        variant: history_rate_reserve_smooth
+        seed: 0
+        episodes: 1000
+        enabled: false
+        run_when: plateau_bias_small_and_plateau_oscillation_large
+        args:
+          action_delta_reward: 0.05
+          temporal_weight: 0.0
+      - name: 260824_lib4_r3_rate_reserve_caps001_seed0
+        variant: history_rate_reserve_smooth
+        seed: 0
+        episodes: 1000
+        enabled: false
+        run_when: action_delta_pair_does_not_slow_transition_tracking
+        args:
+          action_delta_reward: 0.0
+          temporal_weight: 0.01
+
+  p3_k2_cause_split:
+    gate: run_only_after_p1; do_not_add_seeds_to_failed_free_k2
+    purpose: separate 25 Hz decision rate from independent two-action parameterization
+    jobs:
+      - name: 260824_lib4_r3_rate_reserve_k2_hold_seed0
+        variant: history_rate_reserve_k2_hold
+        seed: 0
+        episodes: 1000
+        enabled: false
+      - name: 260824_lib4_r3_rate_reserve_k2_consistency_seed0
+        variant: history_rate_reserve_k2_consistency
+        seed: 0
+        episodes: 1000
+        enabled: false
+        args:
+          chunk_consistency_weight: 1.0
+      - name: 260824_lib4_r3_rate_reserve_k2_entropy_matched_seed0
+        variant: history_rate_reserve_k2
+        seed: 0
+        episodes: 1000
+        enabled: false
+        run_when: only_if_hold_and_consistency_do_not_explain_the_failure
+        args:
+          target_entropy: -6.0
+
+# Final paper interaction claims require these after the winner is stable.
+  p4_factorial_replication:
+    gate: run_before_claiming_rate_or_reserve_main_effects
+    purpose: repeat the rate/reserve 2x2 ablation beyond seed 0
+    jobs:
+      - {name: 260824_lib4_r3_history_rate_seed1, variant: history_rate, seed: 1, episodes: 1000, enabled: false}
+      - {name: 260824_lib4_r3_history_rate_seed2, variant: history_rate, seed: 2, episodes: 1000, enabled: false}
+      - {name: 260824_lib4_r3_history_reserve_seed1, variant: history_reserve, seed: 1, episodes: 1000, enabled: false}
+      - {name: 260824_lib4_r3_history_reserve_seed2, variant: history_reserve, seed: 2, episodes: 1000, enabled: false}
+

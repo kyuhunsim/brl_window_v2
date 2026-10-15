@@ -1,0 +1,51 @@
+kind: optimized_trajectory_bank
+kwargs:
+  trajectory_npz: pneu_rl/config/reference/lib2_stabilized_carry_1000x512.npz
+  seed: 90210
+  sample_mode: coverage
+  repeat_after_end: false
+design:
+  library: 2
+  continuous_carry: true
+  duration_sec: 10240.0
+  horizon_512_sec: 10.24
+  episode_boundaries_inside_rollout: 1000
+  generator: one continuous lib2 simulator rollout with bounded reference-generation
+    feedback
+  rate_filter_ignore_initial_sec: 5.0
+  parameters:
+    target_pos: 145.0
+    target_neg: 20.0
+    target_amp_pos: 12.0
+    target_amp_neg: 3.0
+    freq_pos: 0.018
+    freq_neg: 0.047
+    freq_pos2: 0.061
+    freq_neg2: 0.083
+    kp_pos: 0.004
+    kp_neg: 0.004
+    dither_amp_pos: 0.035
+    dither_amp_neg: 0.025
+  validation:
+    duration_sec: 10240.0
+    episode_boundaries_512: 1000
+    pressure_min_after_startup:
+    - 118.28120041065749
+    - 18.873245198633334
+    pressure_max_after_startup:
+    - 144.88984211248865
+    - 21.383502409506203
+    pressure_span_after_startup:
+    - 26.60864170183116
+    - 2.5102572108728687
+    reference_rate_abs_max_after_startup:
+    - 1.8124245669305594
+    - 0.8532612336282774
+    action_min_raw:
+    - 0.2816664389094217
+    - 0.39630821148255024
+    action_max_raw:
+    - 0.5210647805341766
+    - 0.7968982963831744
+    feasible: true
+  note: Reference-generation feedback is not used by the RL policy.

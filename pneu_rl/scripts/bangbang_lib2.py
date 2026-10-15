@@ -11,6 +11,7 @@ import yaml
 from pneu_env.sim import PneuSim as PneuSimBase
 from pneu_env.sim2 import PneuSim as PneuSim2
 from pneu_utils.utils import get_pkg_path
+from pneu_rl.exp_paths import ensure_model_exp_dir
 
 
 ATM = 101.325
@@ -432,8 +433,7 @@ def save_outputs(dfs: dict[str, pd.DataFrame], periods: list[float], args: argpa
         sim_tag = "_".join(args.sims)
         save_name = f"{stamp}_{sim_tag}_bangbang"
 
-    out_dir = f'{get_pkg_path("pneu_rl")}/exp/{save_name}'
-    os.makedirs(out_dir, exist_ok=True)
+    out_dir = ensure_model_exp_dir("lib2_bangbang", save_name)
     for sim_name, df in dfs.items():
         df.to_csv(f"{out_dir}/{save_name}_{sim_name}.csv", index=False)
         save_overview_plot(

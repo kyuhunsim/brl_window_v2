@@ -1,0 +1,31 @@
+kind: feasible_random
+kwargs:
+  seed: 61098
+  pos_min: 130.0
+  pos_max: 150.0
+  neg_min: 20.0
+  neg_max: 27.0
+  pos_rate_up: 12.990965053962498
+  pos_rate_down: 11.316712701408711
+  neg_rate_up: 1.0610575022928097
+  neg_rate_down: 6.560159299057709
+  hold_min: 1.5
+  hold_max: 4.0
+  min_transition: 2.0
+  max_frequency_hz: 0.17507043740108488
+  initial_pos: 140.0
+  initial_neg: 25.0
+  initial_hold: 2.0
+  min_pos_delta: 5.0
+  min_neg_delta: 2.0
+design:
+  library: 2
+  action_scale:
+  - 0.8
+  - 1.0
+  state_quantile: 0.2
+  pressure_rate_safety_factor: 0.5
+  valve_wn_min_rad_s: 11.0
+  valve_natural_frequency_min_hz: 1.7507043740108488
+  reference_bandwidth_fraction: 0.1
+  source: lib2 full-plant state/action sweep

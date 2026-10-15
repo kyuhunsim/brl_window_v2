@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import sys
+import shutil
 
 import numpy as np
 from typing import Any, Dict, Optional, Tuple, Union
@@ -42,6 +45,17 @@ class PneuEnv4:
         action_low: float = 0.0,
         action_high: float = 1.0,
         episode_carry_state: bool = True,
+        episode_carry_blocks: int = 0,
+        action_history_len: int = 0,
+        include_physics_features: bool = False,
+        physics_feature_mode: str = "rate_reserve",
+        include_integral_error: bool = False,
+        integral_error_decay: float = 1.0,
+        integral_error_limit: float = 100.0,
+        integral_error_scale: float = 20.0,
+        action_chunk_steps: int = 1,
+        action_chunk_gamma: float = 0.99,
+        action_chunk_mode: str = "free",
         fixed_chamber_ctrl: Optional[Tuple[float, float]] = None,
         steady_chamber_ctrl: Optional[Dict[str, float]] = None,
         displacement_obs_key: str = "sen_total_contraction_from_rest",
@@ -63,6 +77,17 @@ class PneuEnv4:
         self.num_prev = num_prev
         self.num_pred = num_pred
         self.num_act = num_act
+        self.action_chunk_steps = max(int(action_chunk_steps), 1)
+        if self.action_chunk_steps > 1 and self.num_act > 1:
+            raise ValueError("action_chunk_steps>1 cannot be combined with num_act>1")
+        self.action_chunk_gamma = float(action_chunk_gamma)
+        if not 0.0 < self.action_chunk_gamma <= 1.0:
+            raise ValueError("action_chunk_gamma must lie in (0, 1]")
+        self.action_chunk_mode = str(action_chunk_mode).lower()
+        if self.action_chunk_mode not in {"free", "hold"}:
+            raise ValueError("action_chunk_mode must be 'free' or 'hold'")
+        if self.action_chunk_steps == 1:
+            self.action_chunk_mode = "free"
 
         self.num_obs = num_prev + 1
         self.num_ref = num_prev + num_pred + 1
@@ -74,6 +99,48 @@ class PneuEnv4:
         self.base_obs_dim = 5 + (1 if self.include_displacement_velocity_obs else 0)
         self.dim_ref = 3
         self.dim_act = 6
+        self.action_history_len = max(int(action_history_len), 0)
+        self.dim_action_history = self.action_history_len * self.dim_act
+        self.include_physics_features = bool(include_physics_features)
+        self.physics_feature_mode = str(physics_feature_mode).lower()
+        physics_feature_dims = {
+            "none": 0,
+            "rate": 4,
+            "reserve": 2,
+            "rate_reserve": 6,
+            # ``hrr`` is an explicit spelling of history-rate-reserve.  It is
+            # kept as an alias so experiment manifests can use the paper
+            # abbreviation without changing the feature definition.
+            "hrr": 6,
+            # Tracking-error derivative (PIDE-style D coordinate).
+            "edot": 2,
+            # HRR plus tracking-error derivative.
+            "rate_reserve_edot": 8,
+            # Fixed P/I/D summary of the two actuator tracking errors.
+            "pide": 6,
+            # GPIDE-style generalized difference/action summary.  The raw
+            # reward is deliberately not used: reward is computed after the
+            # next state and would leak post-transition information.
+            "gpide": 18,
+            "all": 18,
+        }
+        if self.physics_feature_mode not in physics_feature_dims:
+            raise ValueError(
+                "physics_feature_mode must be one of none, rate, reserve, "
+                "rate_reserve, hrr, edot, rate_reserve_edot, pide, gpide, all"
+            )
+        self.dim_physics_features = (
+            physics_feature_dims[self.physics_feature_mode]
+            if self.include_physics_features
+            else 0
+        )
+        self.include_integral_error = bool(include_integral_error)
+        self.dim_integral_error = 2 if self.include_integral_error else 0
+        self.integral_error_decay = float(integral_error_decay)
+        if not 0.0 < self.integral_error_decay <= 1.0:
+            raise ValueError("integral_error_decay must lie in (0, 1]")
+        self.integral_error_limit = max(float(integral_error_limit), 1e-9)
+        self.integral_error_scale = max(float(integral_error_scale), 1e-9)
         self.include_prev_action_obs = bool(include_prev_action_obs)
         self.include_pressure_diff_velocity_obs = bool(include_pressure_diff_velocity_obs)
         self.prev_action_obs_dim = self.dim_act if self.include_prev_action_obs else 0
@@ -135,8 +202,20 @@ class PneuEnv4:
         self.dim_obs_traj = self.num_obs * self.dim_obs
         self.dim_fut_traj = self.num_act * self.dim_obs if pred is not None else 0
         self.dim_ref_traj = self.num_ref * self.dim_ref
-        self.dim_act_traj = self.num_act * self.dim_policy_act
-        self.dim_state = self.dim_obs_traj + self.dim_fut_traj + self.dim_ref_traj
+        self.action_output_steps = (
+            1
+            if self.action_chunk_steps > 1 and self.action_chunk_mode == "hold"
+            else (self.action_chunk_steps if self.action_chunk_steps > 1 else self.num_act)
+        )
+        self.dim_act_traj = self.action_output_steps * self.dim_policy_act
+        self.dim_state = (
+            self.dim_obs_traj
+            + self.dim_action_history
+            + self.dim_physics_features
+            + self.dim_integral_error
+            + self.dim_fut_traj
+            + self.dim_ref_traj
+        )
 
         self.observation_space = Box(
             low=-np.inf,
@@ -164,9 +243,69 @@ class PneuEnv4:
         self.is_pid = False
         self.verbose_enabled = bool(verbose)
         self.episode_carry_state = bool(episode_carry_state)
+        self.episode_carry_blocks = max(int(episode_carry_blocks), 0)
+        self.carry_block_index = 0
+        self.hard_reset_count = 0
+        self.force_hard_reset_next = False
         self.has_episode_state = False
         self.chamber_integral_err = np.zeros(2, dtype=np.float64)
+        self.actuator_integral_error = np.zeros(2, dtype=np.float64)
         self.prev_action = self._expand_ctrl_traj(self.action_space.low)[0]
+        self.prev_applied_action = self._raw_to_physical_action(self.prev_action)
+        self.action_history = np.tile(self.prev_action, (self.action_history_len, 1))
+        self.last_policy_action = np.asarray(self.action_space.low, dtype=np.float64).copy()
+        self._verbose_rows = 0
+
+        # Keep the SAC input convention aligned with lib3: the environment
+        # retains physical units for reward/logging, while the policy sees
+        # fixed, unit-aware scales.  Displacement and velocity use the nominal
+        # 32 mm stroke and the 20 mm/s reference feasibility bound.
+        obs_feature_scale = np.r_[
+            np.full(4, 100.0, dtype=np.float64),
+            32.0,
+            20.0 if self.include_displacement_velocity_obs else np.empty(0),
+            np.ones(self.prev_action_obs_dim, dtype=np.float64),
+            np.full(self.pressure_diff_velocity_obs_dim, 50.0, dtype=np.float64),
+        ]
+        ref_feature_scale = np.array([100.0, 100.0, 32.0], dtype=np.float64)
+        physics_scale = np.empty(0, dtype=np.float64)
+        if self.include_physics_features:
+            rate_scale = np.full(4, 50.0, dtype=np.float64)
+            reserve_scale = np.full(2, 100.0, dtype=np.float64)
+            action_scale = np.ones(12, dtype=np.float64)
+            if self.physics_feature_mode == "rate":
+                physics_scale = rate_scale
+            elif self.physics_feature_mode == "reserve":
+                physics_scale = reserve_scale
+            elif self.physics_feature_mode == "rate_reserve":
+                physics_scale = np.r_[rate_scale, reserve_scale]
+            elif self.physics_feature_mode == "hrr":
+                physics_scale = np.r_[rate_scale, reserve_scale]
+            elif self.physics_feature_mode == "edot":
+                physics_scale = np.full(2, 50.0, dtype=np.float64)
+            elif self.physics_feature_mode == "rate_reserve_edot":
+                physics_scale = np.r_[rate_scale, reserve_scale, np.full(2, 50.0)]
+            elif self.physics_feature_mode == "pide":
+                # error [kPa], integral error [kPa*s], error derivative [kPa/s]
+                physics_scale = np.r_[np.full(2, 100.0), np.full(2, 20.0), np.full(2, 50.0)]
+            elif self.physics_feature_mode == "gpide":
+                delta_obs_scale = obs_feature_scale[: self.base_obs_dim]
+                physics_scale = np.r_[delta_obs_scale, np.ones(12, dtype=np.float64)]
+            elif self.physics_feature_mode == "all":
+                physics_scale = np.r_[rate_scale, reserve_scale, action_scale]
+        self.policy_state_scale = np.r_[
+            np.tile(obs_feature_scale, self.num_obs),
+            np.ones(self.dim_action_history, dtype=np.float64),
+            physics_scale,
+            np.ones(self.dim_integral_error, dtype=np.float64),
+            np.tile(obs_feature_scale, self.num_act) if self.pred is not None else np.empty(0),
+            np.tile(ref_feature_scale, self.num_ref),
+        ]
+        if self.policy_state_scale.shape != (self.dim_state,):
+            raise RuntimeError(
+                "lib4 policy-state scale does not match observation dimension: "
+                f"{self.policy_state_scale.shape} != {(self.dim_state,)}"
+            )
 
     def _initial_obs_vector(self) -> np.ndarray:
         base_obs = np.array(
@@ -213,6 +352,104 @@ class PneuEnv4:
             components.append(np.array([diff_velocity], dtype=np.float64))
 
         return np.concatenate(components, dtype=np.float64)
+
+    def _raw_to_physical_action(self, action: np.ndarray) -> np.ndarray:
+        """Map normalized policy commands to the simulator's applied range."""
+        raw = np.asarray(action, dtype=np.float64).reshape(self.dim_act)
+        if bool(getattr(self.obs, "scale", False)):
+            low = float(getattr(self.obs, "scale_low", 0.0))
+            high = float(getattr(self.obs, "scale_high", 1.0))
+            return low + (high - low) * raw
+        return raw.copy()
+
+    def _append_action_history(self, raw_action: np.ndarray) -> np.ndarray:
+        if self.action_history_len == 0:
+            return np.empty((0, self.dim_act), dtype=np.float64)
+        action = np.asarray(raw_action, dtype=np.float64).reshape(1, self.dim_act)
+        if self.action_history_len == 1:
+            return action.copy()
+        return np.r_[self.action_history[1:], action]
+
+    def _physics_features(
+        self,
+        obs_traj: np.ndarray,
+        applied_action: np.ndarray,
+        reference_traj: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
+        if not self.include_physics_features:
+            return np.empty(0, dtype=np.float64)
+        current = np.asarray(obs_traj[-1, :self.base_obs_dim], dtype=np.float64)
+        previous = np.asarray(obs_traj[-2, :self.base_obs_dim], dtype=np.float64)
+        rate = (current[:4] - previous[:4]) * float(self.obs.freq)
+        reserve = np.array(
+            [current[0] - current[2], current[3] - current[1]],
+            dtype=np.float64,
+        )
+        if reference_traj is None:
+            reference_traj = np.asarray(self.goal.buf, dtype=np.float64).reshape(
+                -1, self.dim_ref
+            )
+        references = np.asarray(reference_traj, dtype=np.float64).reshape(-1, self.dim_ref)
+        if len(references) >= self.num_obs:
+            history_refs = references[: self.num_obs, :2]
+        elif len(references) > 0:
+            history_refs = np.tile(references[-1, :2], (self.num_obs, 1))
+        else:
+            history_refs = np.zeros((self.num_obs, 2), dtype=np.float64)
+        current_error = history_refs[-1] - current[2:4]
+        previous_error = history_refs[-2] - previous[2:4]
+        error_rate = (current_error - previous_error) * float(self.obs.freq)
+        error_integral = np.sum(history_refs - obs_traj[:, 2:4], axis=0) / max(
+            float(self.obs.freq), 1e-9
+        )
+        error_integral = np.clip(
+            error_integral,
+            -self.integral_error_limit,
+            self.integral_error_limit,
+        )
+        delta_base = current - previous
+        action_delta = np.asarray(applied_action, dtype=np.float64) - self.prev_applied_action
+        if self.physics_feature_mode == "rate":
+            return rate
+        if self.physics_feature_mode == "reserve":
+            return reserve
+        if self.physics_feature_mode == "rate_reserve":
+            return np.r_[rate, reserve]
+        if self.physics_feature_mode == "hrr":
+            return np.r_[rate, reserve]
+        if self.physics_feature_mode == "edot":
+            return error_rate
+        if self.physics_feature_mode == "rate_reserve_edot":
+            return np.r_[rate, reserve, error_rate]
+        if self.physics_feature_mode == "pide":
+            return np.r_[current_error, error_integral, error_rate]
+        if self.physics_feature_mode == "gpide":
+            return np.r_[delta_base, applied_action, action_delta]
+        if self.physics_feature_mode == "all":
+            return np.r_[rate, reserve, applied_action, self.prev_applied_action]
+        return np.empty(0, dtype=np.float64)
+
+    def _integral_feature(self, integral_error: np.ndarray | None = None) -> np.ndarray:
+        if not self.include_integral_error:
+            return np.empty(0, dtype=np.float64)
+        values = self.actuator_integral_error if integral_error is None else integral_error
+        return np.clip(np.asarray(values, dtype=np.float64) / self.integral_error_scale, -5.0, 5.0)
+
+    def _state_prefix(
+        self,
+        obs_traj: np.ndarray,
+        applied_action: np.ndarray,
+        integral_error: np.ndarray | None = None,
+        action_history: np.ndarray | None = None,
+        reference_traj: Optional[np.ndarray] = None,
+    ) -> np.ndarray:
+        history = self.action_history if action_history is None else action_history
+        return np.r_[
+            obs_traj.reshape(-1),
+            np.asarray(history, dtype=np.float64).reshape(-1),
+            self._physics_features(obs_traj, applied_action, reference_traj),
+            self._integral_feature(integral_error),
+        ]
 
     def _sim_cell_length_to_ref_disp(self, cell_length: float, sim: Any) -> float:
         if self.displacement_obs_key == "sen_total_length":
@@ -308,6 +545,27 @@ class PneuEnv4:
         )
         return np.c_[chamber_ctrl, ctrl_traj]
 
+    def decode_action_chunk(self, action: np.ndarray) -> np.ndarray:
+        """Return the physical-step policy commands represented by one action.
+
+        ``free`` preserves the historical K-by-action_dim output. ``hold``
+        deliberately exposes only one command to the policy and repeats it K
+        times. Keeping the decoder on the environment makes training and
+        matched-actual-step evaluation use exactly the same semantics.
+        """
+        raw = np.asarray(action, dtype=np.float64).reshape(-1, self.dim_policy_act)
+        expected = self.action_output_steps
+        if len(raw) != expected:
+            raise ValueError(
+                "policy action contains the wrong number of commands: "
+                f"mode={self.action_chunk_mode}, expected={expected}, got={raw.shape}"
+            )
+        if self.action_chunk_steps <= 1:
+            return raw.copy()
+        if self.action_chunk_mode == "hold":
+            return np.repeat(raw, self.action_chunk_steps, axis=0)
+        return raw.copy()
+
     def _compute_steady_chamber_ctrl(
         self,
         chamber_press: np.ndarray,
@@ -362,12 +620,37 @@ class PneuEnv4:
             self.chamber_integral_err = integral_err
         return ctrl
 
+    def request_hard_reset(self) -> None:
+        """Make the next episode boundary reset the complete lib4 plant."""
+        self.force_hard_reset_next = True
+
     def reset(self) -> Tuple[np.ndarray, Dict[str, Any]]:
+        # A carried episode is only an RL horizon boundary.  The simulator,
+        # reference clock, observation history, last applied command, and
+        # chamber-controller integral must remain continuous across it.
+        can_carry = (
+            self.episode_carry_state
+            and self.has_episode_state
+            and not self.force_hard_reset_next
+            and (
+                self.episode_carry_blocks == 0
+                or self.carry_block_index < self.episode_carry_blocks
+            )
+        )
+        if can_carry:
+            self.carry_block_index += 1
+            state, state_info = self._state_from_current(self.last_policy_action)
+            return state, self.get_info(state_info, {})
+
         base_init_press = self._initial_obs_vector()
-        if self.episode_carry_state and self.has_episode_state:
-            init_press = self.curr_full_press.copy()
-        else:
-            init_press = base_init_press
+        init_press = base_init_press
+        self.force_hard_reset_next = False
+        # ``set_init_press`` restores pressure/length buffers but the lib4 C++
+        # simulator owns a separate clock.  A hard reset must restart both;
+        # otherwise the next reference episode begins at t=0 while the plant
+        # time and delayed observation buffer remain in the previous rollout.
+        if hasattr(self.obs, "lib") and hasattr(self.obs.lib, "time_reset_c"):
+            self.obs.lib.time_reset_c()
         if hasattr(self.obs, "set_init_press"):
             init_length, init_velocity = self._env_motion_to_sim_state(
                 init_press[self.disp_idx:self.base_obs_dim],
@@ -382,26 +665,62 @@ class PneuEnv4:
                 init_velocity,
             )
         if hasattr(self.goal, "reset"):
-            self.goal.reset()
+            self.goal.reset(initial_state=init_press[:2])
         self.obs_traj = np.tile(init_press, (self.num_obs, 1))
         self.curr_full_press = init_press.copy()
         self.t = 0.0
         self.chamber_integral_err = np.zeros(2, dtype=np.float64)
+        self.actuator_integral_error = np.zeros(2, dtype=np.float64)
         self.prev_action = self._expand_ctrl_traj(self.action_space.low)[0]
+        self.prev_applied_action = self._raw_to_physical_action(self.prev_action)
+        self.action_history = np.tile(
+            self.prev_action, (self.action_history_len, 1)
+        )
+        self.last_policy_action = np.asarray(self.action_space.low, dtype=np.float64).copy()
+        self.has_episode_state = False
+        self.carry_block_index = 1
+        self.hard_reset_count += 1
 
         if self.is_pid:
             self.obs.reset_pid()
 
-        ctrl = np.asarray(self.action_space.low, dtype=np.float64)
-        state, _, _, _, info = self.step(ctrl)
-        self.t = info["obs"]["curr_time"]
-
-        if self.is_pid:
-            self.obs.reset_pid()
-
-        return state, info
+        # Do not inject action_space.low into the pneumatic plant at reset.
+        # The first policy action must be the first physical command.
+        state, state_info = self._state_from_current(self.last_policy_action)
+        return state, self.get_info(state_info, {})
 
     def step(
+        self,
+        action: np.ndarray,
+    ) -> Tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
+        if self.action_chunk_steps > 1:
+            raw_action = self.decode_action_chunk(action)
+            total_reward = 0.0
+            substep_rewards: list[float] = []
+            substep_infos: list[dict[str, Any]] = []
+            final = None
+            for index, sub_action in enumerate(raw_action):
+                final = self._step_single(sub_action)
+                total_reward += (self.action_chunk_gamma ** index) * float(final[1])
+                substep_rewards.append(float(final[1]))
+                substep_infos.append(final[4])
+            assert final is not None
+            state, _, terminated, truncated, info = final
+            # Copy the final info before attaching the list. The original
+            # final substep dict is inside ``substep_infos``; mutating it here
+            # would create a recursive object that cannot be serialized.
+            info = dict(info)
+            info["chunk_steps"] = int(self.action_chunk_steps)
+            info["chunk_mode"] = self.action_chunk_mode
+            info["chunk_substep_rewards"] = np.asarray(substep_rewards, dtype=np.float64)
+            info["chunk_substep_infos"] = substep_infos
+            info["chunk_reward"] = float(total_reward)
+            info["reward"]["chunk_steps"] = int(self.action_chunk_steps)
+            info["reward"]["chunk_reward"] = float(total_reward)
+            return state, float(total_reward), terminated, truncated, info
+        return self._step_single(action)
+
+    def _step_single(
         self,
         action: np.ndarray,
     ) -> Tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
@@ -420,6 +739,11 @@ class PneuEnv4:
             self.publish_observation(info)
 
         self.prev_action = np.asarray(state_info["ctrl"], dtype=np.float64)[0].copy()
+        self.prev_applied_action = np.asarray(state_info["applied_ctrl"], dtype=np.float64).copy()
+        self.action_history = np.asarray(state_info["action_history"], dtype=np.float64).copy()
+        self.actuator_integral_error = np.asarray(
+            state_info["actuator_integral_error"], dtype=np.float64
+        ).copy()
 
         return state, reward, terminated, truncated, info
 
@@ -449,6 +773,22 @@ class PneuEnv4:
         ]
 
         pred_info = None
+        next_action_history = self._append_action_history(ctrl_traj[0])
+        current_ref = goal_traj[self.num_obs - 1, :2]
+        next_integral_error = np.clip(
+            self.integral_error_decay * self.actuator_integral_error
+            + (current_ref - base_obs[2:4]) / max(float(self.obs.freq), 1e-9),
+            -self.integral_error_limit,
+            self.integral_error_limit,
+        )
+        state_prefix = self._state_prefix(
+            obs_traj,
+            applied_ctrl,
+            integral_error=next_integral_error,
+            action_history=next_action_history,
+            reference_traj=goal_traj,
+        )
+
         if self.pred is not None:
             pred_traj, pred_info = self.predict_obs(
                 init_press=obs_traj[-1],
@@ -456,20 +796,18 @@ class PneuEnv4:
                 ref_traj=goal_traj[self.num_obs:self.num_obs + self.num_act],
             )
             state = np.r_[
-                obs_traj.reshape(-1),
+                state_prefix,
                 pred_traj.reshape(-1),
                 goal_traj.reshape(-1),
             ]
         else:
-            state = np.r_[
-                obs_traj.reshape(-1),
-                goal_traj.reshape(-1),
-            ]
+            state = np.r_[state_prefix, goal_traj.reshape(-1)]
 
         self.t = obs[0]
         self.obs_traj = obs_traj
         self.curr_full_press = obs_traj[-1].copy()
         self.has_episode_state = True
+        self.last_policy_action = np.asarray(ctrl, dtype=np.float64).copy()
         obs_info["Observation"]["sen_env_displacement"] = float(full_press[0, 4])
         obs_info["Observation"]["sen_env_velocity"] = (
             float(full_press[0, self.vel_idx]) if self.vel_idx is not None else 0.0
@@ -477,11 +815,89 @@ class PneuEnv4:
         if self.include_pressure_diff_velocity_obs:
             obs_info["Observation"]["sen_pressure_diff_velocity"] = float(full_press[0, -1])
         obs_info["ctrl"] = ctrl_traj
+        obs_info["applied_ctrl"] = applied_ctrl.copy()
+        obs_info["action_history"] = next_action_history.copy()
+        obs_info["actuator_integral_error"] = next_integral_error.copy()
         obs_info["pred"] = pred_info
         obs_info["goal_traj"] = goal_traj
         obs_info["full_press"] = self.curr_full_press.copy()
 
         return state, obs_info
+
+    def _state_from_current(
+        self,
+        ctrl: np.ndarray,
+    ) -> Tuple[np.ndarray, Dict[str, Any]]:
+        """Build a policy state without advancing the lib4 simulator."""
+        ctrl_traj = self._expand_ctrl_traj(
+            np.asarray(ctrl, dtype=np.float64),
+            update_chamber_integral=False,
+        )
+        goal_traj = np.asarray(self.goal.buf, dtype=np.float64).copy().reshape(
+            -1, self.dim_ref
+        )
+        obs_traj = np.asarray(self.obs_traj, dtype=np.float64).copy()
+        current = obs_traj[-1].copy()
+        state_prefix = self._state_prefix(
+            obs_traj,
+            self.prev_applied_action,
+            integral_error=self.actuator_integral_error,
+            action_history=self.action_history,
+            reference_traj=goal_traj,
+        )
+
+        pred_info = None
+        if self.pred is not None:
+            pred_traj, pred_info = self.predict_obs(
+                init_press=current,
+                ctrl_traj=ctrl_traj,
+                ref_traj=goal_traj[self.num_obs:self.num_obs + self.num_act],
+            )
+            state = np.r_[
+                state_prefix,
+                pred_traj.reshape(-1),
+                goal_traj.reshape(-1),
+            ]
+        else:
+            state = np.r_[state_prefix, goal_traj.reshape(-1)]
+
+        base = current[:self.base_obs_dim]
+        observation = dict(
+            curr_time=float(self.t),
+            sen_pos=float(base[0]),
+            sen_neg=float(base[1]),
+            sen_act_pos=float(base[2]),
+            sen_act_neg=float(base[3]),
+            ref_pos=101.325,
+            ref_neg=101.325,
+            ref_act_pos=float(goal_traj[self.num_obs - 1, 0]),
+            ref_act_neg=float(goal_traj[self.num_obs - 1, 1]),
+            ref_displacement=float(goal_traj[self.num_obs - 1, 2]),
+            ctrl_pos=float(ctrl_traj[0, 0]),
+            ctrl_neg=float(ctrl_traj[0, 1]),
+            ctrl_act_pos_in=float(ctrl_traj[0, 2]),
+            ctrl_act_pos_out=float(ctrl_traj[0, 3]),
+            ctrl_act_neg_in=float(ctrl_traj[0, 4]),
+            ctrl_act_neg_out=float(ctrl_traj[0, 5]),
+        )
+        if self.vel_idx is not None:
+            observation["sen_velocity"] = float(base[self.vel_idx])
+            observation["sen_env_velocity"] = float(base[self.vel_idx])
+        observation["sen_env_displacement"] = float(base[self.disp_idx])
+        if self.include_pressure_diff_velocity_obs:
+            observation["sen_pressure_diff_velocity"] = float(current[-1])
+
+        state_info = dict(
+            Observation=observation,
+            **{
+                "obs_w/o_noise": np.r_[self.t, base].copy(),
+                "ctrl": ctrl_traj.copy(),
+                "pred": pred_info,
+                "goal_traj": goal_traj,
+                "full_press": current.copy(),
+            },
+        )
+        return state, state_info
 
     def predict_obs(
         self,
@@ -549,10 +965,11 @@ class PneuEnv4:
         obs_traj = state[:idx0].reshape(self.num_obs, self.dim_obs)
 
         pred_traj = None
-        idx1 = idx0
+        idx1 = idx0 + self.dim_action_history + self.dim_physics_features + self.dim_integral_error
         if self.pred is not None:
-            idx1 = idx0 + self.dim_fut_traj
-            pred_traj = state[idx0:idx1].reshape(self.num_act, self.dim_obs)
+            pred_end = idx1 + self.dim_fut_traj
+            pred_traj = state[idx1:pred_end].reshape(self.num_act, self.dim_obs)
+            idx1 = pred_end
 
         ref_traj = state[idx1:].reshape(self.num_ref, self.dim_ref)
         return obs_traj, pred_traj, ref_traj
@@ -789,11 +1206,27 @@ class PneuEnv4:
             ),
             f'\t    : Total\t{sum(value for key, value in info["reward"].items() if key.endswith("_reward")):.4f}',
         ]
+        terminal_width = max(shutil.get_terminal_size((120, 20)).columns, 1)
+        rows = sum(
+            max(1, (len(line.expandtabs(8)) + terminal_width - 1) // terminal_width)
+            for line in lines
+        )
         output = "\n".join(lines)
-        print(output)
-        for _ in range(len(lines)):
-            sys.stdout.write("\x1b[1A")
-            sys.stdout.write("\x1b[2K")
+
+        if self._verbose_rows > 0:
+            sys.stdout.write("\033[J")
+        sys.stdout.write(output + "\n")
+        if rows > 0:
+            sys.stdout.write(f"\033[{rows}F")
+        sys.stdout.flush()
+        self._verbose_rows = rows
+
+    def clear_verbose(self) -> None:
+        if self._verbose_rows <= 0:
+            return
+        sys.stdout.write("\033[J")
+        sys.stdout.flush()
+        self._verbose_rows = 0
 
     def set_volume(self, vol1: float, vol2: float) -> None:
         self.obs.set_volume(vol1, vol2)

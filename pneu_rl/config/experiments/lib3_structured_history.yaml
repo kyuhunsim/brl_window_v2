@@ -1,0 +1,53 @@
+schema: lib3_structured_history_v1
+python: /home/rise/miniconda3/envs/env_1/bin/python
+train_script: pneu_rl/scripts/train_screening.py
+run_script: pneu_rl/scripts/run_lib3_structured_history.sh
+
+# lib3 is the primary ablation system.  Keep reward, reference, history length,
+# normalization, SAC budget, and seed fixed across these jobs.
+lib: 3
+variant: history_action_sac
+reference_kind: rate_limited_random
+ref_seed: 61098
+seed: 0
+episodes: 1000
+horizon: 512
+carry: true
+carry_reset_blocks: 4
+history_len: 10
+physics_rate_scale_kpa_s: 50.0
+normalize_observation: true
+
+jobs:
+  - name: 260906_lib3_hrr_seed0
+    physics_feature_mode: hrr
+    feature_dim: 6
+  - name: 260906_lib3_pide_seed0
+    physics_feature_mode: pide
+    feature_dim: 6
+  - name: 260906_lib3_gpide_seed0
+    physics_feature_mode: gpide
+    feature_dim: 16
+    enabled: false
+    note: optional; overlaps pressure difference and action history
+  - name: 260906_lib3_edot_seed0
+    physics_feature_mode: edot
+    feature_dim: 2
+    enabled: true
+  - name: 260906_lib3_rate_reserve_edot_seed0
+    physics_feature_mode: rate_reserve_edot
+    feature_dim: 8
+    enabled: false
+
+# The two disabled jobs are interaction follow-ups.  Run them only after the
+# three primary baselines are interpreted; they are not part of the first
+# 2-by-2 split.
+
+interpretation:
+  hrr: pressure rate plus chamber/actuator reserve
+  pide: tracking error, finite-window error integral, and error derivative
+  gpide: pressure difference, current valve action, and action difference
+  note: >-
+    These are fixed feature baselines implementing the sum/difference
+    inductive bias; they are not a claim to reproduce a learned PIDE/GPIDE
+    recurrent encoder exactly.

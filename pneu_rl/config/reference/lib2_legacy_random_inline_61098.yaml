@@ -1,0 +1,13 @@
+kind: random
+kwargs:
+  pos_max_ts: 5
+  pos_max_amp: 20
+  pos_max_per: 10
+  pos_min_off: 140
+  pos_max_off: 240
+  neg_max_ts: 5
+  neg_max_amp: 5
+  neg_max_per: 10
+  neg_min_off: 10
+  neg_max_off: 32
+  seed: 61098
