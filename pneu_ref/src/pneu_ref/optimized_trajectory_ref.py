@@ -27,6 +27,10 @@ class OptimizedTrajectoryBankRef(BaseRef):
     duration; it is therefore unsafe to use that profile beyond its recorded
     horizon.  When it is true, the bank members are concatenated at the
     boundary and the transition is reported in ``selection_log``.
+    ``repeat_same=True`` instead wraps time within the selected trajectory,
+    including look-ahead queries. ``trajectory_index`` pins selection across
+    resets for reproducible evaluation. Wrapping does not smooth the endpoint
+    back to the initial pressure.
     """
 
     def __init__(
@@ -36,6 +40,8 @@ class OptimizedTrajectoryBankRef(BaseRef):
         seed: int = 61098,
         sample_mode: str = "random",
         repeat_after_end: bool = True,
+        repeat_same: bool = False,
+        trajectory_index: int | None = None,
     ) -> None:
         super().__init__()
         if trajectory_npz is not None:
@@ -62,6 +68,8 @@ class OptimizedTrajectoryBankRef(BaseRef):
         if self.sample_mode not in {"random", "coverage"}:
             raise ValueError("sample_mode must be 'random' or 'coverage'")
         self.repeat_after_end = bool(repeat_after_end)
+        self.repeat_same = bool(repeat_same)
+        self.trajectory_index = trajectory_index
         self.trajectories: list[dict[str, np.ndarray | float | int]] = []
         for index, item in enumerate(trajectories):
             times = np.asarray(item["time"], dtype=np.float64).reshape(-1)
@@ -74,6 +82,8 @@ class OptimizedTrajectoryBankRef(BaseRef):
                 raise ValueError(f"trajectory {index} contains non-finite values")
             if np.any(np.diff(times) <= 0.0):
                 raise ValueError(f"trajectory {index} time must be strictly increasing")
+            if self.repeat_same and times[-1] <= 0:
+                raise ValueError("Repeated trajectory duration must be positive")
             self.trajectories.append(
                 {
                     "time": times,
@@ -82,6 +92,8 @@ class OptimizedTrajectoryBankRef(BaseRef):
                     "id": int(item.get("id", index)),
                 }
             )
+        if trajectory_index is not None and not 0 <= trajectory_index < len(self.trajectories):
+            raise ValueError("trajectory_index is outside the reference bank")
         self.visit_counts = np.zeros(len(self.trajectories), dtype=np.int64)
         self.selection_log: list[dict[str, float | int]] = []
         self._active_index = 0
@@ -90,6 +102,8 @@ class OptimizedTrajectoryBankRef(BaseRef):
         self.time_reset()
 
     def _select_index(self) -> int:
+        if self.trajectory_index is not None:
+            return self.trajectory_index
         if self.sample_mode == "coverage":
             minimum = int(np.min(self.visit_counts))
             candidates = np.flatnonzero(self.visit_counts == minimum)
@@ -112,6 +126,11 @@ class OptimizedTrajectoryBankRef(BaseRef):
 
     def _advance_if_needed(self, time_value: float) -> float:
         local_time = float(time_value - self._time_origin)
+        if self.repeat_after_end and self.repeat_same:
+            # Stateless lookup: future-reference queries must not advance the
+            # active trajectory or change subsequent current/past queries.
+            duration = float(self.trajectories[self._active_index]["duration"])
+            return max(local_time, 0.0) % duration
         if not self.repeat_after_end:
             return min(max(local_time, 0.0), float(self.trajectories[self._active_index]["duration"]))
         while local_time > float(self.trajectories[self._active_index]["duration"]):

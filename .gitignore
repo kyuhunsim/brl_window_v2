@@ -173,3 +173,5 @@ img/
 !docs/img/
 !docs/img/**
 exp/
+# Experiment exports live in Drive; keep TCP measurement CSVs local.
+/pneu_env/src/pneu_env/tcpip/*.csv

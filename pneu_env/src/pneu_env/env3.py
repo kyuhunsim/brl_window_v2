@@ -726,6 +726,9 @@ class PneuEnv3:
         )
 
     def close(self) -> None:
+        if hasattr(self.obs, "safe_open"):
+            self.obs.safe_open()
+            return
         ctrl = np.zeros(self.dim_act, dtype=np.float64)
         goal = np.array([101.325, 101.325], dtype=np.float64)
         _, _ = self.obs.observe(ctrl, goal)

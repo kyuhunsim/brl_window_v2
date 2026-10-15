@@ -638,6 +638,11 @@ class PneuReal:
     ) -> None:
         del pos_offset, neg_offset, act_pos_offset, act_neg_offset
 
+    def safe_open(self) -> None:
+        ctrl = np.ones(6, dtype=np.float64)
+        goal = np.array([101.325, 101.325, 0.0], dtype=np.float64)
+        _, _ = self.observe(ctrl, goal)
+
     def set_volume(self, vol1: float, vol2: float) -> None:
         del vol1, vol2
 

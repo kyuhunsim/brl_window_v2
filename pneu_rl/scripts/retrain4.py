@@ -73,188 +73,217 @@ TUNED_INIT_ACT_POS_PRESS_KPA = 110.0009307861328
 TUNED_INIT_ACT_NEG_PRESS_KPA = 87.99779510498047
 
 
-print(color("[INPUT] Retrain Model:", "blue"))
-models = sorted(os.listdir(f"{get_pkg_path('pneu_rl')}/models"))
-for i, model in enumerate(models):
-    print(color(f"\t{i+1}. {model}", "yellow"))
-print(color("\t---", "blue"))
-model_idx = int(input(color("\tMODEL: ", "blue"))) - 1
-model_name = models[model_idx]
-delete_lines(len(models) + 3)
-print(f"[ INFO] Model name: {model_name}")
-
-retrain_model_name = input(color("[INPUT] Retrain Model Name: ", "blue"))
-delete_lines(1)
-if retrain_model_name == "":
-    print("[ INFO] Retrain model name is set automatically.")
-else:
-    print(f"[ INFO] Retrain model name: {retrain_model_name}")
-
-print(color("[INPUT] Observation Mode:", "blue"))
-print(color("\t1. Sim", "yellow"))
-print(color("\t2. Real", "yellow"))
-print(color("\t---", "blue"))
-obs_mode = input(color("\tOBS: ", "blue"))
-delete_lines(5)
-
-kwargs = load_yaml(model_name)
-
-kwargs["env"]["rwd_kwargs"].update(
-    action_delta_rwd_coeff=0.08,
-    conflict_rwd_coeff=0.15,
-)
-disp_reward = DISP_REWARD_WITH_PRED if kwargs.get("pred") is not None else DISP_REWARD_DEFAULTS
-kwargs["env"]["rwd_kwargs"].update(disp_reward)
-kwargs["env"].setdefault("displacement_obs_key", "sen_total_contraction_from_rest")
-kwargs["env"].setdefault("displacement_scale", 1000.0)
-kwargs["env"].setdefault("velocity_scale", 1000.0)
-kwargs["env"].setdefault("fixed_chamber_ctrl", None)
-kwargs["env"].setdefault("steady_chamber_ctrl", None)
-kwargs.setdefault("disp_ref", DEFAULT_DISP_REF.copy())
-kwargs.setdefault("ref_mode", "pressure_diff_displacement")
-kwargs.setdefault("pressure_diff_disp_ref", DEFAULT_PRESSURE_DIFF_DISP_REF.copy())
-kwargs["obs"].setdefault("init_length", TUNED_INIT_CELL_LENGTH_M)
-kwargs["obs"].setdefault("init_pos_press", TUNED_INIT_POS_PRESS_KPA)
-kwargs["obs"].setdefault("init_neg_press", TUNED_INIT_NEG_PRESS_KPA)
-kwargs["obs"].setdefault("init_act_pos_press", TUNED_INIT_ACT_POS_PRESS_KPA)
-kwargs["obs"].setdefault("init_act_neg_press", TUNED_INIT_ACT_NEG_PRESS_KPA)
-if kwargs.get("pred") is not None:
-    kwargs["pred"].setdefault("init_length", TUNED_INIT_CELL_LENGTH_M)
-    kwargs["pred"].setdefault("init_pos_press", TUNED_INIT_POS_PRESS_KPA)
-    kwargs["pred"].setdefault("init_neg_press", TUNED_INIT_NEG_PRESS_KPA)
-    kwargs["pred"].setdefault("init_act_pos_press", TUNED_INIT_ACT_POS_PRESS_KPA)
-    kwargs["pred"].setdefault("init_act_neg_press", TUNED_INIT_ACT_NEG_PRESS_KPA)
-
-kwargs["parent_model"] = model_name
-kwargs["retrain_epi"] = 200
-kwargs["type"] = "simulation" if obs_mode == "1" else "real"
-
-if obs_mode == "2":
-    kwargs["env"]["verbose"] = False
-    kwargs["model"]["update_every"] = 5
-    warmup_input = input(
-        color("[INPUT] Real warmup steps before update (blank: 5120, 0: off): ", "blue")
-    ).strip()
-    delete_lines(1)
-    kwargs["real_warmup_steps"] = 5120 if warmup_input == "" else int(warmup_input)
-    kwargs["real_warmup_deterministic"] = False
-    print(f"[ INFO] Real warmup steps: {kwargs['real_warmup_steps']}")
-
-    print(color("[INPUT] PID on for this real retrain?", "blue"))
-    print(color("\t1. Yes", "yellow"))
-    print(color("\t2. No", "yellow"))
+def main():
+    print(color("[INPUT] Retrain Model:", "blue"))
+    models = sorted(os.listdir(f"{get_pkg_path('pneu_rl')}/models"))
+    for i, model in enumerate(models):
+        print(color(f"\t{i+1}. {model}", "yellow"))
     print(color("\t---", "blue"))
-    pid_mode = input(color("\tPID: ", "blue"))
-    delete_lines(5)
-    if pid_mode == "1":
-        kwargs["pid"] = REAL_RETRAIN_PID.copy()
-        print("[ INFO] PID: enabled for this real retrain")
-    elif pid_mode == "2":
-        kwargs["pid"] = None
-        print("[ INFO] PID: disabled for this real retrain")
-    else:
-        raise ValueError(color(f"[ERROR] Unknown PID mode: {pid_mode}", "red"))
+    model_idx = int(input(color("\tMODEL: ", "blue"))) - 1
+    model_name = models[model_idx]
+    delete_lines(len(models) + 3)
+    print(f"[ INFO] Model name: {model_name}")
 
-    print(
-        color(
-            "[ACTION] Vent/set the actuator to max extension at the low-pressure "
-            "baseline, then enter that encoder angle as displacement 0 mm.",
-            "blue",
-        )
+    retrain_model_name = input(color("[INPUT] Retrain Model Name: ", "blue"))
+    delete_lines(1)
+    if retrain_model_name == "":
+        print("[ INFO] Retrain model name is set automatically.")
+    else:
+        print(f"[ INFO] Retrain model name: {retrain_model_name}")
+
+    print(color("[INPUT] Observation Mode:", "blue"))
+    print(color("\t1. Sim", "yellow"))
+    print(color("\t2. Real", "yellow"))
+    print(color("\t---", "blue"))
+    obs_mode = input(color("\tOBS: ", "blue"))
+    delete_lines(5)
+
+    kwargs = load_yaml(model_name)
+
+    kwargs["env"]["rwd_kwargs"].update(
+        action_delta_rwd_coeff=0.08,
+        conflict_rwd_coeff=0.15,
     )
-    rest_angle_input = input(
-        color("[INPUT] Max extension/rest encoder angle deg (blank: tuned 8.073mm): ", "blue")
+    disp_reward = DISP_REWARD_WITH_PRED if kwargs.get("pred") is not None else DISP_REWARD_DEFAULTS
+    kwargs["env"]["rwd_kwargs"].update(disp_reward)
+    kwargs["env"].setdefault("displacement_obs_key", "sen_total_contraction_from_rest")
+    kwargs["env"].setdefault("displacement_scale", 1000.0)
+    kwargs["env"].setdefault("velocity_scale", 1000.0)
+    kwargs["env"].setdefault("fixed_chamber_ctrl", None)
+    kwargs["env"].setdefault("steady_chamber_ctrl", None)
+    kwargs.setdefault("disp_ref", DEFAULT_DISP_REF.copy())
+    kwargs.setdefault("ref_mode", "pressure_diff_displacement")
+    kwargs.setdefault("pressure_diff_disp_ref", DEFAULT_PRESSURE_DIFF_DISP_REF.copy())
+    kwargs["obs"].setdefault("init_length", TUNED_INIT_CELL_LENGTH_M)
+    kwargs["obs"].setdefault("init_pos_press", TUNED_INIT_POS_PRESS_KPA)
+    kwargs["obs"].setdefault("init_neg_press", TUNED_INIT_NEG_PRESS_KPA)
+    kwargs["obs"].setdefault("init_act_pos_press", TUNED_INIT_ACT_POS_PRESS_KPA)
+    kwargs["obs"].setdefault("init_act_neg_press", TUNED_INIT_ACT_NEG_PRESS_KPA)
+    if kwargs.get("pred") is not None:
+        kwargs["pred"].setdefault("init_length", TUNED_INIT_CELL_LENGTH_M)
+        kwargs["pred"].setdefault("init_pos_press", TUNED_INIT_POS_PRESS_KPA)
+        kwargs["pred"].setdefault("init_neg_press", TUNED_INIT_NEG_PRESS_KPA)
+        kwargs["pred"].setdefault("init_act_pos_press", TUNED_INIT_ACT_POS_PRESS_KPA)
+        kwargs["pred"].setdefault("init_act_neg_press", TUNED_INIT_ACT_NEG_PRESS_KPA)
+
+    kwargs["parent_model"] = model_name
+    kwargs["retrain_epi"] = 200
+    kwargs["type"] = "simulation" if obs_mode == "1" else "real"
+
+    default_horizon = int(kwargs["model"]["horizon"])
+    horizon_input = input(
+        color(f"[INPUT] Retrain horizon steps (blank: {default_horizon}): ", "blue")
     ).strip()
     delete_lines(1)
-    if rest_angle_input:
-        kwargs["obs"]["encoder_rest_angle"] = float(rest_angle_input)
-        print(f"[ INFO] Encoder rest angle: {kwargs['obs']['encoder_rest_angle']:.6f} deg")
+    if horizon_input:
+        retrain_horizon = int(horizon_input)
+        if retrain_horizon <= 0:
+            raise ValueError(color(f"[ERROR] Horizon must be positive: {retrain_horizon}", "red"))
+        kwargs["model"]["horizon"] = retrain_horizon
     else:
-        print("[ INFO] Encoder rest angle: not set; using tuned initial displacement")
-    input(
-        color(
-            "[ACTION] Turn pump on, wait until initial pressures/angle are stable, "
-            "then press Enter to start real retrain: ",
-            "blue",
+        retrain_horizon = default_horizon
+    print(f"[ INFO] Retrain horizon: {retrain_horizon}")
+
+    if obs_mode == "2":
+        kwargs["env"]["verbose"] = False
+        kwargs["model"]["update_every"] = 5
+        warmup_input = input(
+            color("[INPUT] Real warmup steps before update (blank: 5120, 0: off): ", "blue")
+        ).strip()
+        delete_lines(1)
+        kwargs["real_warmup_steps"] = 5120 if warmup_input == "" else int(warmup_input)
+        kwargs["real_warmup_deterministic"] = False
+        print(f"[ INFO] Real warmup steps: {kwargs['real_warmup_steps']}")
+
+        print(color("[INPUT] PID on for this real retrain?", "blue"))
+        print(color("\t1. Yes", "yellow"))
+        print(color("\t2. No", "yellow"))
+        print(color("\t---", "blue"))
+        pid_mode = input(color("\tPID: ", "blue"))
+        delete_lines(5)
+        if pid_mode == "1":
+            kwargs["pid"] = REAL_RETRAIN_PID.copy()
+            print("[ INFO] PID: enabled for this real retrain")
+        elif pid_mode == "2":
+            kwargs["pid"] = None
+            print("[ INFO] PID: disabled for this real retrain")
+        else:
+            raise ValueError(color(f"[ERROR] Unknown PID mode: {pid_mode}", "red"))
+
+        print(
+            color(
+                "[ACTION] Vent/set the actuator to max extension at the low-pressure "
+                "baseline, then enter that encoder angle as displacement 0 mm.",
+                "blue",
+            )
         )
+        rest_angle_input = input(
+            color("[INPUT] Max extension/rest encoder angle deg (blank: tuned 8.073mm): ", "blue")
+        ).strip()
+        delete_lines(1)
+        if rest_angle_input:
+            kwargs["obs"]["encoder_rest_angle"] = float(rest_angle_input)
+            print(f"[ INFO] Encoder rest angle: {kwargs['obs']['encoder_rest_angle']:.6f} deg")
+        else:
+            print("[ INFO] Encoder rest angle: not set; using tuned initial displacement")
+        input(
+            color(
+                "[ACTION] Turn pump on, wait until initial pressures/angle are stable, "
+                "then press Enter to start real retrain: ",
+                "blue",
+            )
+        )
+        delete_lines(1)
+
+    # Keep the selected model's reference distribution for sim2real.
+    # For 0528Ours this matches the no-PID simulation training condition.
+
+    kwargs["temporal_weight_hardening"] = dict(
+        initial_weight=1.25,
+        max_weight=1.25,
     )
-    delete_lines(1)
+    total_steps = 100 * kwargs["model"]["horizon"]
+    kwargs["temporal_weight_hardening"]["rate"] = (
+        kwargs["temporal_weight_hardening"]["max_weight"]
+        - kwargs["temporal_weight_hardening"]["initial_weight"]
+    ) / total_steps
 
-# Keep the selected model's reference distribution for sim2real.
-# For 0528Ours this matches the no-PID simulation training condition.
+    if obs_mode == "1":
+        print("[ INFO] Observation Mode: Simulation")
+        obs = PneuSim(**kwargs["obs"])
+    elif obs_mode == "2":
+        print("[ INFO] Observation Mode: Real")
+        real_kwargs = dict(kwargs["obs"])
+        real_kwargs.setdefault("auto_zero_encoder", True)
+        real_kwargs.setdefault("reset_encoder_zero_each_episode", False)
+        real_kwargs.setdefault("initial_displacement_mm", TUNED_INITIAL_CONTRACTION_MM)
+        real_kwargs.setdefault("clamp_displacement_ref", True)
+        obs = PneuReal(**real_kwargs)
+    else:
+        raise ValueError(color(f"[ERROR] Unknown observation mode: {obs_mode}", "red"))
 
-kwargs["temporal_weight_hardening"] = dict(
-    initial_weight=1.25,
-    max_weight=1.25,
-)
-total_steps = 100 * kwargs["model"]["horizon"]
-kwargs["temporal_weight_hardening"]["rate"] = (
-    kwargs["temporal_weight_hardening"]["max_weight"]
-    - kwargs["temporal_weight_hardening"]["initial_weight"]
-) / total_steps
-
-if obs_mode == "1":
-    print("[ INFO] Observation Mode: Simulation")
-    obs = PneuSim(**kwargs["obs"])
-elif obs_mode == "2":
-    print("[ INFO] Observation Mode: Real")
-    real_kwargs = dict(kwargs["obs"])
-    real_kwargs.setdefault("auto_zero_encoder", True)
-    real_kwargs.setdefault("reset_encoder_zero_each_episode", False)
-    real_kwargs.setdefault("initial_displacement_mm", TUNED_INITIAL_CONTRACTION_MM)
-    real_kwargs.setdefault("clamp_displacement_ref", True)
-    obs = PneuReal(**real_kwargs)
-else:
-    raise ValueError(color(f"[ERROR] Unknown observation mode: {obs_mode}", "red"))
-
-pred = PneuPred(**kwargs["pred"]) if kwargs["pred"] is not None else None
-pressure_ref = RandomRef(**kwargs["rnd_ref"])
-if kwargs.get("ref_mode") == "pressure_diff_displacement":
-    ref = PressureDiffDisplacementRef(
-        pressure_ref,
-        **kwargs["pressure_diff_disp_ref"],
+    pred = PneuPred(**kwargs["pred"]) if kwargs["pred"] is not None else None
+    pressure_ref = RandomRef(**kwargs["rnd_ref"])
+    if kwargs.get("ref_mode") == "pressure_diff_displacement":
+        ref = PressureDiffDisplacementRef(
+            pressure_ref,
+            **kwargs["pressure_diff_disp_ref"],
+        )
+    else:
+        displacement_ref = RandomDispRef(**kwargs["disp_ref"])
+        ref = PressureDisplacementRef(pressure_ref, displacement_ref)
+    env = PneuEnv4(
+        obs=obs,
+        ref=ref,
+        pred=pred,
+        **kwargs["env"],
     )
-else:
-    displacement_ref = RandomDispRef(**kwargs["disp_ref"])
-    ref = PressureDisplacementRef(pressure_ref, displacement_ref)
-env = PneuEnv4(
-    obs=obs,
-    ref=ref,
-    pred=pred,
-    **kwargs["env"],
-)
 
-if kwargs.get("pid") is not None:
-    env.set_pid(**kwargs["pid"])
-else:
-    print("[ INFO] PID: disabled")
+    if kwargs.get("pid") is not None:
+        env.set_pid(**kwargs["pid"])
+    else:
+        print("[ INFO] PID: disabled")
 
-model = SAC(env, **kwargs["model"])
-load_existing_buffer = obs_mode != "2"
-model.load(name=model_name, train=True, load_buffer=load_existing_buffer)
+    model = SAC(env, **kwargs["model"])
+    load_existing_buffer = obs_mode != "2"
+    model.load(name=model_name, train=True, load_buffer=load_existing_buffer)
 
-retrain_model_name = model.set_retrain(
-    retrain_model_name,
-    load_buffer=load_existing_buffer,
-    copy_buffer=load_existing_buffer,
-)
-if "alpha" in kwargs:
-    model.set_alpha(**kwargs["alpha"])
-if "temporal_weight_hardening" in kwargs:
-    model.set_temporal_weight_hardening(**kwargs["temporal_weight_hardening"])
-model.clear_buffer()
-
-if kwargs.get("real_warmup_steps", 0) > 0:
-    model.warmup_buffer(
-        steps=kwargs["real_warmup_steps"],
-        deterministic=kwargs.get("real_warmup_deterministic", False),
-        reset_on_horizon=True,
+    retrain_model_name = model.set_retrain(
+        retrain_model_name,
+        load_buffer=load_existing_buffer,
+        copy_buffer=load_existing_buffer,
     )
-    model.buffer.save_buffer(model.logger.buffer_path)
+    if "alpha" in kwargs:
+        model.set_alpha(**kwargs["alpha"])
+    if "temporal_weight_hardening" in kwargs:
+        model.set_temporal_weight_hardening(**kwargs["temporal_weight_hardening"])
+    model.clear_buffer()
 
-save_yaml(retrain_model_name, kwargs, "retrain_cfg.yaml")
+    if obs_mode == "2":
+        from pneu_rl.async_training import train_async
 
-try:
-    model.train(episode=kwargs["retrain_epi"])
-finally:
-    env.close()
+        kwargs["async_training"] = dict(queue_capacity=4096, sync_every=5)
+        save_yaml(retrain_model_name, kwargs, "retrain_cfg.yaml")
+        train_async(
+            model, episode=kwargs["retrain_epi"],
+            warmup_steps=kwargs.get("real_warmup_steps", 0),
+            warmup_deterministic=kwargs.get("real_warmup_deterministic", False),
+            **kwargs["async_training"],
+        )
+    else:
+        try:
+            if kwargs.get("real_warmup_steps", 0) > 0:
+                model.warmup_buffer(
+                    steps=kwargs["real_warmup_steps"],
+                    deterministic=kwargs.get("real_warmup_deterministic", False),
+                    reset_on_horizon=True,
+                )
+                model.buffer.save_buffer(model.logger.buffer_path)
+            save_yaml(retrain_model_name, kwargs, "retrain_cfg.yaml")
+            model.train(episode=kwargs["retrain_epi"])
+        finally:
+            env.close()
+
+
+if __name__ == "__main__":
+    main()

@@ -41,10 +41,16 @@ class PneuReal:
         init_neg_press: float = 101.325,
         init_act_pos_press: float = 101.325,
         init_act_neg_press: float = 101.325,
+        scale_low: float = 0.8,
+        scale_high: float = 1.0,
         **_: Any,
     ):
         self.freq = float(freq)
         self.scale = bool(scale)
+        self.scale_low = float(scale_low)
+        self.scale_high = float(scale_high)
+        if not 0.8 <= self.scale_low <= self.scale_high <= 1.0:
+            raise ValueError("Real scaled commands must satisfy 0.8 <= scale_low <= scale_high <= 1.0")
         self.backend = PneuRealAct(freq=self.freq, scale=self.scale)
         self._step_count = 0
         self._last_time = 0.0
@@ -141,10 +147,10 @@ class PneuReal:
         main_ctrl, act_ctrls = self._split_ctrl(ctrl)
         ctrl_unit = np.r_[main_ctrl, act_ctrls]
         if self.scale:
-            # PneuRealAct currently maps bipolar input x to 0.1*x + 0.9 when
-            # scale=True. Pre-compensate so the real command matches sim3's
-            # trained valve command: 0.85 + 0.15*action.
-            backend_ctrl = 1.5 * ctrl_unit - 0.5
+            # Backend applies u = 0.9 + 0.1*x. Invert it so all six
+            # channels use the same physical range as the trained simulator.
+            physical_ctrl = self.scale_low + (self.scale_high - self.scale_low) * ctrl_unit
+            backend_ctrl = (physical_ctrl - 0.9) / 0.1
         else:
             backend_ctrl = 2.0 * ctrl_unit - 1.0
         backend_ctrl = np.clip(backend_ctrl, -1.0, 1.0)
@@ -346,6 +352,19 @@ class PneuReal:
         act_neg_offset: float = 0.0,
     ) -> None:
         del pos_offset, neg_offset, act_pos_offset, act_neg_offset
+
+    def safe_open(self) -> None:
+        """Publish one all-open command, bypassing policy scaling and PID.
+
+        The running TCP bridge transmits this latest command. No sensor reply
+        is required here, so a stale observation cannot delay shutdown.
+        """
+        for field in (
+            "pos_ctrl", "neg_ctrl", "act_pos_ctrl1", "act_pos_ctrl2",
+            "act_neg_ctrl1", "act_neg_ctrl2",
+        ):
+            setattr(self.backend, field, 1.0)
+        self.backend.write_ctrl_file()
 
     def set_volume(self, vol1: float, vol2: float) -> None:
         del vol1, vol2

@@ -17,7 +17,7 @@ from tcpip_bridge_common import (
     write_json_atomic,
 )
 
-SERVER_IP = "192.168.1.1"    # RT.vi가 돌고 있는 cRIO/RT의 IP
+SERVER_IP = "192.168.0.110"    # RT.vi가 돌고 있는 cRIO/RT의 IP
 SERVER_PORT = 5555           # RT.vi TCP 서버 포트
 
 RECV_TIMEOUT_SEC = float(os.getenv("PNEU_TCP_RECV_TIMEOUT", "1.0"))

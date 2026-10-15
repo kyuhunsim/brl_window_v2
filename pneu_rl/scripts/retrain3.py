@@ -1,6 +1,6 @@
 import os
 
-from pneu_ref.random_ref import RandomRef
+from pneu_ref.factory import make_pressure_reference, reference_spec_from_model_config
 from pneu_env.env3 import PneuEnv3
 from pneu_env.sim3 import PneuSim
 from pneu_env.pred3 import PneuPred
@@ -32,106 +32,101 @@ REAL_RETRAIN_PID = dict(
 )
 
 
-print(color("[INPUT] Retrain Model:", "blue"))
-models = sorted(os.listdir(f"{get_pkg_path('pneu_rl')}/models"))
-for i, model in enumerate(models):
-    print(color(f"\t{i+1}. {model}", "yellow"))
-print(color("\t---", "blue"))
-model_idx = int(input(color("\tMODEL: ", "blue"))) - 1
-model_name = models[model_idx]
-delete_lines(len(models) + 3)
-print(f"[ INFO] Model name: {model_name}")
-
-retrain_model_name = input(color("[INPUT] Retrain Model Name: ", "blue"))
-delete_lines(1)
-if retrain_model_name == "":
-    print("[ INFO] Retrain model name is set automatically.")
-else:
-    print(f"[ INFO] Retrain model name: {retrain_model_name}")
-
-print(color("[INPUT] Observation Mode:", "blue"))
-print(color("\t1. Sim", "yellow"))
-print(color("\t2. Real", "yellow"))
-print(color("\t---", "blue"))
-obs_mode = input(color("\tOBS: ", "blue"))
-delete_lines(5)
-
-kwargs = load_yaml(model_name)
-
-kwargs["env"]["rwd_kwargs"].update(
-    action_delta_rwd_coeff=0.08,
-    conflict_rwd_coeff=0.15,
-)
-
-kwargs["parent_model"] = model_name
-kwargs["retrain_epi"] = 200
-kwargs["type"] = "simulation" if obs_mode == "1" else "real"
-
-if obs_mode == "2":
-    print(color("[INPUT] PID on for this real retrain?", "blue"))
-    print(color("\t1. Yes", "yellow"))
-    print(color("\t2. No", "yellow"))
+def main():
+    print(color("[INPUT] Retrain Model:", "blue"))
+    models = sorted(os.listdir(f"{get_pkg_path('pneu_rl')}/models"))
+    for i, model in enumerate(models):
+        print(color(f"\t{i+1}. {model}", "yellow"))
     print(color("\t---", "blue"))
-    pid_mode = input(color("\tPID: ", "blue"))
-    delete_lines(5)
-    if pid_mode == "1":
-        kwargs["pid"] = REAL_RETRAIN_PID.copy()
-        print("[ INFO] PID: enabled for this real retrain")
-    elif pid_mode == "2":
-        kwargs["pid"] = None
-        print("[ INFO] PID: disabled for this real retrain")
+    model_idx = int(input(color("\tMODEL: ", "blue"))) - 1
+    model_name = models[model_idx]
+    delete_lines(len(models) + 3)
+    print(f"[ INFO] Model name: {model_name}")
+
+    retrain_model_name = input(color("[INPUT] Retrain Model Name: ", "blue"))
+    delete_lines(1)
+    if retrain_model_name == "":
+        print("[ INFO] Retrain model name is set automatically.")
     else:
-        raise ValueError(color(f"[ERROR] Unknown PID mode: {pid_mode}", "red"))
+        print(f"[ INFO] Retrain model name: {retrain_model_name}")
 
-# Keep the selected model's reference distribution for sim2real.
-# For 0528Ours this matches the no-PID simulation training condition.
+    print(color("[INPUT] Observation Mode:", "blue"))
+    print(color("\t1. Sim", "yellow"))
+    print(color("\t2. Real", "yellow"))
+    print(color("\t---", "blue"))
+    obs_mode = input(color("\tOBS: ", "blue"))
+    delete_lines(5)
 
-kwargs["temporal_weight_hardening"] = dict(
-    initial_weight=1.25,
-    max_weight=1.25,
-)
-total_steps = 100 * kwargs["model"]["horizon"]
-kwargs["temporal_weight_hardening"]["rate"] = (
-    kwargs["temporal_weight_hardening"]["max_weight"]
-    - kwargs["temporal_weight_hardening"]["initial_weight"]
-) / total_steps
+    kwargs = load_yaml(model_name)
 
-if obs_mode == "1":
-    print("[ INFO] Observation Mode: Simulation")
-    obs = PneuSim(**kwargs["obs"])
-elif obs_mode == "2":
-    print("[ INFO] Observation Mode: Real")
-    obs = PneuReal(**kwargs["obs"])
-else:
-    raise ValueError(color(f"[ERROR] Unknown observation mode: {obs_mode}", "red"))
+    kwargs["parent_model"] = model_name
+    kwargs["retrain_epi"] = 200
+    kwargs["type"] = "simulation" if obs_mode == "1" else "real"
 
-pred = PneuPred(**kwargs["pred"]) if kwargs["pred"] is not None else None
-ref = RandomRef(**kwargs["rnd_ref"])
-env = PneuEnv3(
-    obs=obs,
-    ref=ref,
-    pred=pred,
-    **kwargs["env"],
-)
+    if obs_mode == "2":
+        print(color("[INPUT] PID on for this real retrain?", "blue"))
+        print(color("\t1. Yes", "yellow"))
+        print(color("\t2. No", "yellow"))
+        print(color("\t---", "blue"))
+        pid_mode = input(color("\tPID: ", "blue"))
+        delete_lines(5)
+        if pid_mode == "1":
+            kwargs["pid"] = REAL_RETRAIN_PID.copy()
+            print("[ INFO] PID: enabled for this real retrain")
+        elif pid_mode == "2":
+            kwargs["pid"] = None
+            print("[ INFO] PID: disabled for this real retrain")
+        else:
+            raise ValueError(color(f"[ERROR] Unknown PID mode: {pid_mode}", "red"))
 
-if kwargs.get("pid") is not None:
-    env.set_pid(**kwargs["pid"])
-else:
-    print("[ INFO] PID: disabled")
+    # Preserve the selected model's reward, CAPS and reference configuration.
 
-model = SAC(env, **kwargs["model"])
-model.load(name=model_name, train=True)
+    if obs_mode == "1":
+        print("[ INFO] Observation Mode: Simulation")
+        obs = PneuSim(**kwargs["obs"])
+    elif obs_mode == "2":
+        print("[ INFO] Observation Mode: Real")
+        obs = PneuReal(**kwargs["obs"])
+    else:
+        raise ValueError(color(f"[ERROR] Unknown observation mode: {obs_mode}", "red"))
 
-retrain_model_name = model.set_retrain(retrain_model_name)
-if "alpha" in kwargs:
-    model.set_alpha(**kwargs["alpha"])
-if "temporal_weight_hardening" in kwargs:
-    model.set_temporal_weight_hardening(**kwargs["temporal_weight_hardening"])
-model.clear_buffer()
+    pred = PneuPred(**kwargs["pred"]) if kwargs["pred"] is not None else None
+    ref = make_pressure_reference(reference_spec_from_model_config(kwargs))
+    env = PneuEnv3(
+        obs=obs,
+        ref=ref,
+        pred=pred,
+        **kwargs["env"],
+    )
 
-save_yaml(retrain_model_name, kwargs, "retrain_cfg.yaml")
+    if kwargs.get("pid") is not None:
+        env.set_pid(**kwargs["pid"])
+    else:
+        print("[ INFO] PID: disabled")
 
-try:
-    model.train(episode=kwargs["retrain_epi"])
-finally:
-    env.close()
+    model = SAC(env, **kwargs["model"])
+    model.load(name=model_name, train=True, load_buffer=False)
+
+    retrain_model_name = model.set_retrain(retrain_model_name, load_buffer=False, copy_buffer=False)
+    if "alpha" in kwargs:
+        model.set_alpha(**kwargs["alpha"])
+    if "temporal_weight_hardening" in kwargs:
+        model.set_temporal_weight_hardening(**kwargs["temporal_weight_hardening"])
+    model.clear_buffer()
+
+    if obs_mode == "2":
+        from pneu_rl.async_training import train_async
+
+        kwargs["async_training"] = dict(queue_capacity=4096, sync_every=5)
+        save_yaml(retrain_model_name, kwargs, "retrain_cfg.yaml")
+        train_async(model, episode=kwargs["retrain_epi"], **kwargs["async_training"])
+    else:
+        save_yaml(retrain_model_name, kwargs, "retrain_cfg.yaml")
+        try:
+            model.train(episode=kwargs["retrain_epi"])
+        finally:
+            env.close()
+
+
+if __name__ == "__main__":
+    main()

@@ -10,6 +10,7 @@ import pickle
 import yaml
 import threading
 
+from pneu_ref.factory import make_pressure_reference, reference_spec_from_model_config
 from pneu_ref.random_ref import RandomRef
 from pneu_ref.step_ref import StepCasesRef, StepRef
 from pneu_ref.sine_ref import SineRef, DynamicOscillatorRef, CenterStepOscillationRef
@@ -233,7 +234,7 @@ def save_datas(
     save_cfg["obs_mode"] = obs_mode
     save_cfg["ref_mode"] = ref_mode
     save_cfg["metrics"] = metrics
-    save_cfg["runtime"] = dict(
+    save_cfg.setdefault("runtime", {}).update(
         pid_enabled=bool(pid_enabled),
         pid_label="On" if pid_enabled else "Off",
     )
@@ -259,6 +260,36 @@ def plot_datas(datas, model_name, save_name=None):
         show=True,
     )
 
+def model_bank_reference(config, trajectory_index=0):
+    spec = copy.deepcopy(reference_spec_from_model_config(config))
+    if spec.get("kind") not in ("optimized_trajectory_bank", "simulator_trajectory_bank", "trajectory_bank"):
+        raise ValueError("Selected model does not contain a trajectory bank; choose another reference mode")
+    spec["kwargs"].update(repeat_after_end=False, repeat_same=False,
+                          trajectory_index=trajectory_index)
+    ref = make_pressure_reference(spec)
+    ref.max_time = 40.0
+    return ref, spec
+
+
+def collect_rollout(env, model, ref):
+    """Close exactly once before saving/plotting, including Ctrl+C/errors."""
+    infos = deque()
+    try:
+        state, _ = env.reset()
+        curr_time = 0.0
+        duration = 100.0 if ref.max_time == float('inf') else ref.max_time
+        while curr_time < duration:
+            action = model.predict(state)
+            state, _, _, _, info = env.step(action)
+            curr_time = info['obs']['curr_time']
+            infos.append(info)
+    except KeyboardInterrupt:
+        print('\n[ INFO] Interrupted; publishing shutdown command before saving.')
+    finally:
+        env.close()
+    return infos
+
+
 if __name__ == '__main__':
     print('[ INFO] Control Mode: RL')
     print(color('[INPUT] Control Model:', 'blue'))
@@ -280,11 +311,17 @@ if __name__ == '__main__':
     print(color('\t3. Trajectory', 'yellow'))
     print(color('\t4. Sinusoidal', 'yellow'))
     print(color('\t5. Paper(dynamic oscillator)', 'yellow'))
+    print(color('\t6. Model bank: trajectory 0 for 40s (no repeat) (default)', 'yellow'))
     print(color('\t---', 'blue'))
-    ref_mode = input(color('\tREF: ', 'blue')) 
-    delete_lines(8)
+    ref_mode = input(color('\tREF: ', 'blue')).strip() or '6'
+    delete_lines(9)
 
-    if ref_mode == '1':
+    if ref_mode == '6':
+        ref, reference_spec = model_bank_reference(kwargs)
+        viz_kwargs['reference'] = reference_spec
+        viz_kwargs['duration_sec'] = 40.0
+        ref_type = 'model_bank_0_40s'
+    elif ref_mode == '1':
         print(f'[ INFO] Reference Mode: Step case')
         ref = StepCasesRef(**viz_kwargs['ref']['stepcases'])
         ref_type = "stepcases"
@@ -370,13 +407,15 @@ if __name__ == '__main__':
         save_name = None
     print(f'[ INFO] Data logging: {"False" if data_log == "2" else f"{save_name}.csv"}')
 
-    if obs_mode == '1':
-        obs = PneuSim(**viz_kwargs["env"]["sim"])
-    else:
-        obs = PneuReal(**viz_kwargs["env"]["real"])
-    pred = PneuPred(**viz_kwargs["env"]["pred"])
+    # Match the selected model's timing, scaling and initial state.
+    obs_config = copy.deepcopy(kwargs['obs'])
+    viz_kwargs['env']['sim'] = copy.deepcopy(obs_config)
+    viz_kwargs['env']['real'] = copy.deepcopy(obs_config)
+    obs = PneuSim(**obs_config) if obs_mode == '1' else PneuReal(**obs_config)
+    pred_config = copy.deepcopy(kwargs.get('pred'))
+    viz_kwargs['env']['pred'] = pred_config
+    pred = PneuPred(**pred_config) if pred_config is not None else None
 
-    obs.set_init_press(**viz_kwargs["env"]["init_press"] )
     env = PneuEnv3(
         obs = obs,
         ref = ref,
@@ -395,57 +434,15 @@ if __name__ == '__main__':
     model.set_logger(model_name)
     model.load_model(path=model.logger.model_path, evaluate=True)
 
-    try:
-        state, info = env.reset()
-        curr_time = 0
-        if ref.max_time == float('inf'):
-            # ref.max_time = 100
-            ref.max_time = 100
-        
-        infos = deque()
-        time_flag = 0
-        while curr_time < ref.max_time:
-            action = model.predict(state)
-            state, _, _, _, info = env.step(action)
-            curr_time = info['obs']['curr_time']
-            elapsed_time_flag = curr_time - time_flag
-            infos.append(info)
-
-        env.close()
-
+    if obs_mode == '2':
+        viz_kwargs['runtime'] = dict(start_protocol='continuous_pump_on_no_start_wait')
+    infos = collect_rollout(env, model, ref)
+    if obs_mode == '2':
+        print('[ END] All-open command published. The pump is not controlled by this script.')
+    if infos:
         datas = infos_to_datas(infos)
         save_datas(
-            datas,
-            model_name,
-            obs_type,
-            ref_type,
-            save_name,
-            viz_kwargs,
+            datas, model_name, obs_type, ref_type, save_name, viz_kwargs,
             pid_enabled=pid_enabled,
         )
         plot_datas(datas, model_name, save_name)
-
-    except KeyboardInterrupt:
-        print()
-        print(color('[ INFO] Keyboard interrupt received.', 'red'))
-        datas = infos_to_datas(infos)
-        save_datas(
-            datas,
-            model_name,
-            obs_type,
-            ref_type,
-            save_name,
-            viz_kwargs,
-            pid_enabled=pid_enabled,
-        )
-        plot_datas(datas, model_name, save_name)
-    
-    finally:
-        env.close()
-
-
-    
-
-    
-
-        
