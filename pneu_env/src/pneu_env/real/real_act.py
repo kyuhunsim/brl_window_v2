@@ -75,8 +75,8 @@ class PneuRealAct:
         self.flowrate6 = 0.0
 
         # 타이밍
-        self.flag_time = time.time()
-        self.start_time = time.time()
+        self.flag_time = time.monotonic()
+        self.start_time = time.monotonic()
 
         # 메인/액추에이터 밸브를 [0,1] 또는 [0.7,1.0]로 스케일할지 여부
         self.scale = scale
@@ -110,7 +110,7 @@ class PneuRealAct:
         ctrl_act.json 에 '원자적으로' 기록.
         """
         data = {
-            "time": float(time.time() - self.start_time),
+            "time": float(time.monotonic() - self.start_time),
 
             "pos_press": float(self.pos_press),
             "neg_press": float(self.neg_press),
@@ -146,6 +146,7 @@ class PneuRealAct:
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f)
         os.replace(tmp, dst)  # 원자적 교체
+        self._sent_time = data["time"]
 
     def read_obs_file(self) -> None:
         """
@@ -157,7 +158,7 @@ class PneuRealAct:
         obs_wait_timeout = float(
             getattr(self, "obs_wait_timeout", max(0.03, 3.0 * self.sen_period))
         )
-        deadline = time.time() + max(0.0, obs_wait_timeout)
+        deadline = time.monotonic() + max(0.0, obs_wait_timeout)
 
         def _get_float(data: Dict, key: str, default: float) -> float:
             """
@@ -176,15 +177,23 @@ class PneuRealAct:
             return default
 
         while not self.stop_flag.is_set():
+            if time.monotonic() >= deadline:
+                raise TimeoutError("No observation for the current command before timeout")
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     obs = json.load(f)
                 obs_time = _get_float(obs, "time", self.time)
                 # Prefer a fresh sample. If bridge update is delayed, keep trying
                 # until timeout and then fall back to the latest readable sample.
-                if obs_time <= prev_time + 1e-9 and time.time() < deadline:
+                sent = getattr(self, "_sent_time", None)
+                echoed = _get_float(obs, "time_ctrl_sent", obs_time)
+                fresh = (abs(echoed - sent) <= 1e-6 if sent is not None
+                         else obs_time > prev_time + 1e-9)
+                if not fresh:
                     time.sleep(min(0.002, 0.2 * self.sen_period))
                     continue
+                self._observation_timing = {key: obs.get(key) for key in
+                    ("time_ctrl_sent", "time_rt_raw", "time_delta_ms")}
                 # 필드 매핑
                 self.time = obs_time
 
@@ -227,33 +236,34 @@ class PneuRealAct:
 
             except FileNotFoundError:
                 # 아직 obs_act.json 이 안 생겼으면 계속 기다림
-                if time.time() >= deadline:
-                    break
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("Observation file unavailable or invalid")
                 continue
             except json.JSONDecodeError:
                 # 쓰는 중에 읽어서 깨진 경우: 다시 시도
-                if time.time() >= deadline:
-                    break
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("Observation file unavailable or invalid")
                 continue
             except Exception:
                 # 다른 에러는 일단 다시 시도 (필요하면 로깅 추가)
-                if time.time() >= deadline:
-                    break
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("Observation file unavailable or invalid")
                 continue
 
     # ------------------------------------------------------------------
     # 타이밍 제어
     # ------------------------------------------------------------------
-    def wait(self, margin: float = 0.004) -> None:
+    def wait(self) -> None:
+        """Pace command publication without subtracting a timing margin.
+
+        Late iterations restart the deadline; never send catch-up bursts.
         """
-        self.freq 에 맞춰 루프 주기를 맞추기 위한 대기 함수.
-        margin 만큼 여유를 두고 깨어나도록 조정.
-        """
-        curr_flag_time = time.time()
-        sleep_time = self.sen_period - (curr_flag_time - self.flag_time) - margin
-        if sleep_time > 0:
-            time.sleep(sleep_time)
-        self.flag_time = time.time()
+        now = time.monotonic()
+        deadline = getattr(self, "_next_command_deadline", now)
+        if now < deadline:
+            time.sleep(deadline - now)
+        self.flag_time = time.monotonic()
+        self._next_command_deadline = self.flag_time + self.sen_period
 
     # ------------------------------------------------------------------
     # 메인 스텝
@@ -366,10 +376,8 @@ class PneuRealAct:
 
 
         # 2) ctrl_act.json 쓰기 → LabVIEW/TCP 브리지 쪽에서 읽어서 실제 밸브 제어
-        self.write_ctrl_file()
-
-        # 3) 주기 맞춰 대기
         self.wait()
+        self.write_ctrl_file()
 
         # 4) obs_act.json 읽기 → 센서/상태 업데이트
         self.read_obs_file()
@@ -410,6 +418,7 @@ class PneuRealAct:
             flowrate5=self.flowrate5,
             flowrate6=self.flowrate6,
         )
+        obs_info.update(getattr(self, "_observation_timing", {}))
         info: Dict = {"Observation": obs_info}
         return next_obs, info
 

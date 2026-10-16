@@ -1,0 +1,21 @@
+{
+  "source": "pneu_rl/exp/261015_lib3_allopen30_HR_smooth_seed0/261016_16_15_14_261015_lib3_allopen30_HR_smooth_seed0_Real/261016_16_15_14_261015_lib3_allopen30_HR_smooth_seed0_Real.csv",
+  "sha256": "3acd001e6675791adb1f3082af461b6e84734ec17b6cdc6af548b01a3d97bf6f",
+  "command_mapping": [
+    "ctrl_ch_pos",
+    "ctrl_ch_neg",
+    "ctrl_act_pos_in",
+    "ctrl_act_pos_out",
+    "ctrl_act_neg_in",
+    "ctrl_act_neg_out"
+  ],
+  "sim_library_sha256": "119f01b377592d5ee8398b9bc43d436cb694c3bc2f054e79c813dbdd93d1084d",
+  "grid_dt": 0.001,
+  "positive_lag": "Real(t) matches Sim(t-lag)",
+  "limitations": [
+    "EXP uses command timestamps, not physical sensor timestamps",
+    "Returned controls are assumed to represent applied commands; RT implementation unavailable",
+    "Closed-loop periodic excitation makes correlation lag ambiguous",
+    "Measured pressure initialization does not identify hidden pump/valve state"
+  ]
+}
