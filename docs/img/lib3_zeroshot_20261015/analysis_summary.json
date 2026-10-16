@@ -1,0 +1,1642 @@
+{
+  "analysis_git_head": "eeb4d9b3d872cb60f7c807172092ee58fd51d3d1",
+  "source_manifest": {
+    "source_folder": "https://drive.google.com/drive/folders/1hSqSdtxOaVqdxTWE5W9G_IN1KgeYfO1W",
+    "files": [
+      {
+        "run": "HR_185930",
+        "file_name": "cfg.yaml",
+        "expected_bytes": 177928,
+        "drive_id": "1946vvs-U8j4zr6YaStNrIpAvFZgC4kK1",
+        "drive_url": "https://drive.google.com/file/d/1946vvs-U8j4zr6YaStNrIpAvFZgC4kK1/view?usp=drivesdk",
+        "folder_name": "261015_18_59_30_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real",
+        "local_path": "pneu_rl/exp/drive_zeroshot_20261015/261015_18_59_30_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real/cfg.yaml",
+        "sha256": "32df8c09695ec50edcab6ab1cba30e5dce800196ef215d86cba151a330618607"
+      },
+      {
+        "run": "HR_185930",
+        "file_name": "261015_18_59_30_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real_main.png",
+        "expected_bytes": 199237,
+        "drive_id": "1xf8J1UzsC5iIFuwYyi4qyj2SsOCQQmKp",
+        "drive_url": "https://drive.google.com/file/d/1xf8J1UzsC5iIFuwYyi4qyj2SsOCQQmKp/view?usp=drivesdk",
+        "folder_name": "261015_18_59_30_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real",
+        "local_path": "pneu_rl/exp/drive_zeroshot_20261015/261015_18_59_30_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real/261015_18_59_30_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real_main.png",
+        "sha256": "fa64fe833686099ab6456f68a3cffa13f1cece1a2fc4e5bcf0bc07237ed0ab27"
+      },
+      {
+        "run": "HR_185930",
+        "file_name": "261015_18_59_30_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real_ctrl.png",
+        "expected_bytes": 297349,
+        "drive_id": "1KLtun_SkSc_5CqWxWpmfWkwWN6lYihZs",
+        "drive_url": "https://drive.google.com/file/d/1KLtun_SkSc_5CqWxWpmfWkwWN6lYihZs/view?usp=drivesdk",
+        "folder_name": "261015_18_59_30_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real",
+        "local_path": "pneu_rl/exp/drive_zeroshot_20261015/261015_18_59_30_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real/261015_18_59_30_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real_ctrl.png",
+        "sha256": "266f69e4a1d1950c3fc5e7de6fe37e0777328f64a05c28aef15f0e4dc26d31a6"
+      },
+      {
+        "run": "HR_185930",
+        "file_name": "261015_18_59_30_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real.csv",
+        "expected_bytes": 1592149,
+        "drive_id": "1iTGa07lAR4reZ0aqdm0ZRTp_C8Adlhbc",
+        "drive_url": "https://drive.google.com/file/d/1iTGa07lAR4reZ0aqdm0ZRTp_C8Adlhbc/view?usp=drivesdk",
+        "folder_name": "261015_18_59_30_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real",
+        "local_path": "pneu_rl/exp/drive_zeroshot_20261015/261015_18_59_30_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real/261015_18_59_30_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real.csv",
+        "sha256": "2c2a1cb9b249c037162acc974d2e4e7569223961776d0c42ec605ecf642cad0a"
+      },
+      {
+        "run": "HR_191719",
+        "file_name": "cfg.yaml",
+        "expected_bytes": 177932,
+        "drive_id": "1puiUzUQVW1deTKpjfdKUyxp-Vusp22Ze",
+        "drive_url": "https://drive.google.com/file/d/1puiUzUQVW1deTKpjfdKUyxp-Vusp22Ze/view?usp=drivesdk",
+        "folder_name": "261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real",
+        "local_path": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real/cfg.yaml",
+        "sha256": "ce9375859741ecaa6a590374b8b304ffdc5db268352c851c12dba6c19ff82b78"
+      },
+      {
+        "run": "HR_191719",
+        "file_name": "261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real_main.png",
+        "expected_bytes": 144068,
+        "drive_id": "1NdF0MlE6gE6pPQbhFfUCQ9LBkZtE1bT-",
+        "drive_url": "https://drive.google.com/file/d/1NdF0MlE6gE6pPQbhFfUCQ9LBkZtE1bT-/view?usp=drivesdk",
+        "folder_name": "261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real",
+        "local_path": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real/261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real_main.png",
+        "sha256": "26beddd28014cccf2ce47be5afcc7bf8c3b6490a87e06d3de0a9f19eaa57fc8f"
+      },
+      {
+        "run": "HR_191719",
+        "file_name": "261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real_ctrl.png",
+        "expected_bytes": 359221,
+        "drive_id": "1fapiZt7tHk3QWxNa1q3hIMvSWBMiZLLe",
+        "drive_url": "https://drive.google.com/file/d/1fapiZt7tHk3QWxNa1q3hIMvSWBMiZLLe/view?usp=drivesdk",
+        "folder_name": "261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real",
+        "local_path": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real/261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real_ctrl.png",
+        "sha256": "e4da5b7f03aa3f49e0b209aee7b1685858946955cd515f2e213f5c0a16f423ad"
+      },
+      {
+        "run": "HR_191719",
+        "file_name": "261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real.csv",
+        "expected_bytes": 592106,
+        "drive_id": "1kFMqq55HH9OoyITITzXw70SpaODjNRSo",
+        "drive_url": "https://drive.google.com/file/d/1kFMqq55HH9OoyITITzXw70SpaODjNRSo/view?usp=drivesdk",
+        "folder_name": "261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real",
+        "local_path": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real/261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real.csv",
+        "sha256": "40fe3da3fce1d74a49968215c0f4acc55112bbf504fb46ee642c9783d306c47f"
+      },
+      {
+        "run": "H_190116",
+        "file_name": "cfg.yaml",
+        "expected_bytes": 177932,
+        "drive_id": "1Jcp3M4tex92Un6j8muKQ0qOCrjR5g3Pn",
+        "drive_url": "https://drive.google.com/file/d/1Jcp3M4tex92Un6j8muKQ0qOCrjR5g3Pn/view?usp=drivesdk",
+        "folder_name": "261015_19_01_16_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real",
+        "local_path": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_01_16_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real/cfg.yaml",
+        "sha256": "2e504ba5939c31aa80a26c324fffbf5331dff9cf9f59692792d16ee06309a4d7"
+      },
+      {
+        "run": "H_190116",
+        "file_name": "261015_19_01_16_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real_main.png",
+        "expected_bytes": 183594,
+        "drive_id": "1Cqqh_50ZffFS8mVOUdeEssVKC_9Fzre9",
+        "drive_url": "https://drive.google.com/file/d/1Cqqh_50ZffFS8mVOUdeEssVKC_9Fzre9/view?usp=drivesdk",
+        "folder_name": "261015_19_01_16_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real",
+        "local_path": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_01_16_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real/261015_19_01_16_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real_main.png",
+        "sha256": "a149e96e33890d69e907c5e480b46329fcd7ac5d7c27cfc71ebe120db1536612"
+      },
+      {
+        "run": "H_190116",
+        "file_name": "261015_19_01_16_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real_ctrl.png",
+        "expected_bytes": 350611,
+        "drive_id": "1qLSsiK8iKJmf87Fe8lJ5vkC5XVRPNCcs",
+        "drive_url": "https://drive.google.com/file/d/1qLSsiK8iKJmf87Fe8lJ5vkC5XVRPNCcs/view?usp=drivesdk",
+        "folder_name": "261015_19_01_16_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real",
+        "local_path": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_01_16_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real/261015_19_01_16_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real_ctrl.png",
+        "sha256": "c69223a779f92be6268c4121c7c4566c30675228f99add7fd2b8294780f094c2"
+      },
+      {
+        "run": "H_190116",
+        "file_name": "261015_19_01_16_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real.csv",
+        "expected_bytes": 1776051,
+        "drive_id": "1DtpIGO2majDC7cmKLn5yBDeKT8enGcYZ",
+        "drive_url": "https://drive.google.com/file/d/1DtpIGO2majDC7cmKLn5yBDeKT8enGcYZ/view?usp=drivesdk",
+        "folder_name": "261015_19_01_16_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real",
+        "local_path": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_01_16_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real/261015_19_01_16_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real.csv",
+        "sha256": "4f5d87132e37d6cc43fc2d2036f016811164bc38d8e894a9a65ef1627b1636b5"
+      },
+      {
+        "run": "H_191842",
+        "file_name": "cfg.yaml",
+        "expected_bytes": 177995,
+        "drive_id": "1sKkBJIBCquzhvAVZxgpe1NcwZnovcTgY",
+        "drive_url": "https://drive.google.com/file/d/1sKkBJIBCquzhvAVZxgpe1NcwZnovcTgY/view?usp=drivesdk",
+        "folder_name": "261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real",
+        "local_path": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real/cfg.yaml",
+        "sha256": "422fdf001237ec499d2f787ce9902e57dc4ae838b966f2de8803d1c76fe0b439"
+      },
+      {
+        "run": "H_191842",
+        "file_name": "261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real_main.png",
+        "expected_bytes": 142344,
+        "drive_id": "1qXul9Bc23_6wg0gIoEBHhoNN1bRQHJ8K",
+        "drive_url": "https://drive.google.com/file/d/1qXul9Bc23_6wg0gIoEBHhoNN1bRQHJ8K/view?usp=drivesdk",
+        "folder_name": "261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real",
+        "local_path": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real/261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real_main.png",
+        "sha256": "698a58da4277d14a219bddf5200ed7fece691b56ad7d0a62ff418eda06be3a59"
+      },
+      {
+        "run": "H_191842",
+        "file_name": "261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real_ctrl.png",
+        "expected_bytes": 316021,
+        "drive_id": "1mau_JO8pD9vxn9ak4yE5C4Rm5NUYJsl0",
+        "drive_url": "https://drive.google.com/file/d/1mau_JO8pD9vxn9ak4yE5C4Rm5NUYJsl0/view?usp=drivesdk",
+        "folder_name": "261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real",
+        "local_path": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real/261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real_ctrl.png",
+        "sha256": "80441b8f522bdead48f576504cc6cfe02ca919fa2f04c86f10037b98cc1cfc65"
+      },
+      {
+        "run": "H_191842",
+        "file_name": "261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real.csv",
+        "expected_bytes": 478392,
+        "drive_id": "1gL-5sWYoX3DvSy6lLWac39UBbYCchcQr",
+        "drive_url": "https://drive.google.com/file/d/1gL-5sWYoX3DvSy6lLWac39UBbYCchcQr/view?usp=drivesdk",
+        "folder_name": "261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real",
+        "local_path": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real/261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real.csv",
+        "sha256": "59ab41625908a0ea0440ec7c0cd4fa0f5bf77146ff62fe216a1556802bf5684e"
+      }
+    ]
+  },
+  "reference_bank": "pneu_rl/config/reference/lib3_capacity_random_medium_16x4x512_seed61098.npz",
+  "reference_bank_sha256": "b96de6b21f02a5cc18dc5b7847795a8968a727e5b3284bd7ec65cda1bbd0e415",
+  "pressure_order": [
+    "press_pos",
+    "press_neg",
+    "act_pos_press",
+    "act_neg_press"
+  ],
+  "runs": [
+    {
+      "run": "261015_18_59_30",
+      "policy": "HR",
+      "csv": "pneu_rl/exp/drive_zeroshot_20261015/261015_18_59_30_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real/261015_18_59_30_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real.csv",
+      "csv_sha256": "2c2a1cb9b249c037162acc974d2e4e7569223961776d0c42ec605ecf642cad0a",
+      "cfg_sha256": "32df8c09695ec50edcab6ab1cba30e5dce800196ef215d86cba151a330618607",
+      "model_name": "260831_lib3_histreward2x2_r025_HR_smooth_seed0",
+      "reference_mode": "model_bank_repeat_0",
+      "runtime": {
+        "pid_enabled": false,
+        "pid_label": "Off"
+      },
+      "configured_frequency_hz": 50,
+      "configured_init_pressure": {
+        "init_act_neg_press": 101.325,
+        "init_act_pos_press": 101.325,
+        "init_neg_press": 101.325,
+        "init_pos_press": 101.325
+      },
+      "samples": 5002,
+      "placeholder_rows": 0,
+      "first_logged_pressure_kpa": [
+        179.29824829101562,
+        44.15972137451172,
+        113.9733428955078,
+        91.13372039794922
+      ],
+      "first_non_placeholder_row": 0,
+      "first_non_placeholder_time_sec": 0.0,
+      "first_non_placeholder_pressure_kpa": [
+        179.29824829101562,
+        44.15972137451172,
+        113.9733428955078,
+        91.13372039794922
+      ],
+      "logged_end_sec": 100.01999999990905,
+      "non_placeholder_logged_span_sec": 100.01999999990905,
+      "first_timestamp_gap_sec": 0.0199999999999818,
+      "large_timestamp_gaps_sec": [],
+      "regular_timestamp_dt_median_sec": 0.01999999999998181,
+      "regular_timestamp_dt_p95_sec": 0.019999999999988916,
+      "inverse_regular_timestamp_dt_hz": 50.000000000045475,
+      "logged_command_min": [
+        0.8001874685287476,
+        0.800000011920929,
+        0.8000161647796631,
+        0.800000011920929,
+        0.800000011920929,
+        0.8000306487083435
+      ],
+      "logged_command_max": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "metrics": {
+        "all_logged_including_placeholders": {
+          "samples": 5002,
+          "rmse_pos_kpa": 79.15113581679664,
+          "rmse_neg_kpa": 29.70210855559722,
+          "combined_rmse_kpa": 59.77925038731026,
+          "mae_pos_kpa": 73.32546845458594,
+          "mae_neg_kpa": 28.577970565008858,
+          "bias_ref_minus_obs_pos_kpa": -72.47790034681928,
+          "bias_ref_minus_obs_neg_kpa": -28.415291566173824,
+          "act_pos_mean_kpa": 187.94675554460832,
+          "act_neg_mean_kpa": 97.46295852691638,
+          "act_pos_std_kpa": 31.076911100582738,
+          "act_neg_std_kpa": 4.836603500181601,
+          "pos_reserve_mean_kpa": 17.21797244237071,
+          "neg_reserve_mean_kpa": 59.741382090962446
+        },
+        "non_placeholder_reference": {
+          "samples": 5002,
+          "rmse_pos_kpa": 79.15113581679664,
+          "rmse_neg_kpa": 29.70210855559722,
+          "combined_rmse_kpa": 59.77925038731026,
+          "mae_pos_kpa": 73.32546845458594,
+          "mae_neg_kpa": 28.577970565008858,
+          "bias_ref_minus_obs_pos_kpa": -72.47790034681928,
+          "bias_ref_minus_obs_neg_kpa": -28.415291566173824,
+          "act_pos_mean_kpa": 187.94675554460832,
+          "act_neg_mean_kpa": 97.46295852691638,
+          "act_pos_std_kpa": 31.076911100582738,
+          "act_neg_std_kpa": 4.836603500181601,
+          "pos_reserve_mean_kpa": 17.21797244237071,
+          "neg_reserve_mean_kpa": 59.741382090962446
+        },
+        "first_5_active_seconds": {
+          "samples": 251,
+          "rmse_pos_kpa": 8.717009732898367,
+          "rmse_neg_kpa": 13.504083224209165,
+          "combined_rmse_kpa": 11.365441531454294,
+          "mae_pos_kpa": 6.91506274097944,
+          "mae_neg_kpa": 12.56823438667206,
+          "bias_ref_minus_obs_pos_kpa": 4.0473771114273385,
+          "bias_ref_minus_obs_neg_kpa": -10.704154329945842,
+          "act_pos_mean_kpa": 112.35894474470282,
+          "act_neg_mean_kpa": 88.28797645112908,
+          "act_pos_std_kpa": 7.159698282696539,
+          "act_neg_std_kpa": 5.04644630244234,
+          "pos_reserve_mean_kpa": 80.99030668707007,
+          "neg_reserve_mean_kpa": 49.62745084420618
+        },
+        "after_5_active_seconds": {
+          "samples": 4751,
+          "rmse_pos_kpa": 81.19032466378135,
+          "rmse_neg_kpa": 30.318134501257965,
+          "combined_rmse_kpa": 61.28237144010745,
+          "mae_pos_kpa": 76.83399546660766,
+          "mae_neg_kpa": 29.4237806640959,
+          "bias_ref_minus_obs_pos_kpa": -76.52080597553321,
+          "bias_ref_minus_obs_neg_kpa": -29.350988355543056,
+          "act_pos_mean_kpa": 191.94013388827835,
+          "act_neg_mean_kpa": 97.94768184853764,
+          "act_pos_std_kpa": 26.38733092848533,
+          "act_neg_std_kpa": 4.312874151911068,
+          "pos_reserve_mean_kpa": 13.84881733914622,
+          "neg_reserve_mean_kpa": 60.27571102022698
+        },
+        "absolute_30_to_40_seconds": {
+          "samples": 500,
+          "rmse_pos_kpa": 89.70925777353591,
+          "rmse_neg_kpa": 34.54049341207845,
+          "combined_rmse_kpa": 67.97351180948556,
+          "mae_pos_kpa": 89.61517073059082,
+          "mae_neg_kpa": 34.513512435913086,
+          "bias_ref_minus_obs_pos_kpa": -89.61517073059082,
+          "bias_ref_minus_obs_neg_kpa": -34.513512435913086,
+          "act_pos_mean_kpa": 204.24357815551758,
+          "act_neg_mean_kpa": 99.30051237487793,
+          "act_pos_std_kpa": 0.37566506687892914,
+          "act_neg_std_kpa": 1.906578822840484,
+          "pos_reserve_mean_kpa": 1.7960631408691388,
+          "neg_reserve_mean_kpa": 62.27999819946289
+        },
+        "absolute_first_40_96_seconds": {
+          "samples": 2049,
+          "rmse_pos_kpa": 81.28452435126206,
+          "rmse_neg_kpa": 30.66456808613111,
+          "combined_rmse_kpa": 61.43081325735435,
+          "mae_pos_kpa": 75.84793720831809,
+          "mae_neg_kpa": 29.68259307615579,
+          "bias_ref_minus_obs_pos_kpa": -74.5050517017519,
+          "bias_ref_minus_obs_neg_kpa": -29.453953854219687,
+          "act_pos_mean_kpa": 189.82971217470555,
+          "act_neg_mean_kpa": 97.90899439635307,
+          "act_pos_std_kpa": 31.272577359008025,
+          "act_neg_std_kpa": 4.756806670964739,
+          "pos_reserve_mean_kpa": 13.928076256770167,
+          "neg_reserve_mean_kpa": 61.008463685020345
+        }
+      }
+    },
+    {
+      "run": "261015_19_01_16",
+      "policy": "H",
+      "csv": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_01_16_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real/261015_19_01_16_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real.csv",
+      "csv_sha256": "4f5d87132e37d6cc43fc2d2036f016811164bc38d8e894a9a65ef1627b1636b5",
+      "cfg_sha256": "2e504ba5939c31aa80a26c324fffbf5331dff9cf9f59692792d16ee06309a4d7",
+      "model_name": "260831_lib3_histreward2x2_r025_H_smooth_seed0",
+      "reference_mode": "model_bank_repeat_0",
+      "runtime": {
+        "pid_enabled": false,
+        "pid_label": "Off"
+      },
+      "configured_frequency_hz": 50,
+      "configured_init_pressure": {
+        "init_act_neg_press": 101.325,
+        "init_act_pos_press": 101.325,
+        "init_neg_press": 101.325,
+        "init_pos_press": 101.325
+      },
+      "samples": 5001,
+      "placeholder_rows": 0,
+      "first_logged_pressure_kpa": [
+        322.07745361328125,
+        28.227272033691406,
+        201.1446533203125,
+        101.22283935546876
+      ],
+      "first_non_placeholder_row": 0,
+      "first_non_placeholder_time_sec": 0.0,
+      "first_non_placeholder_pressure_kpa": [
+        322.07745361328125,
+        28.227272033691406,
+        201.1446533203125,
+        101.22283935546876
+      ],
+      "logged_end_sec": 100.0000000000251,
+      "non_placeholder_logged_span_sec": 100.0000000000251,
+      "first_timestamp_gap_sec": 0.019999999999996,
+      "large_timestamp_gaps_sec": [],
+      "regular_timestamp_dt_median_sec": 0.020000000000010232,
+      "regular_timestamp_dt_p95_sec": 0.020000000000017337,
+      "inverse_regular_timestamp_dt_hz": 49.99999999997442,
+      "logged_command_min": [
+        0.800000011920929,
+        0.800000011920929,
+        0.800000011920929,
+        0.800000011920929,
+        0.800000011920929,
+        0.800000011920929
+      ],
+      "logged_command_max": [
+        0.9996912479400636,
+        0.9984217286109924,
+        0.999993085861206,
+        0.9999976754188538,
+        0.999892234802246,
+        0.9955776929855348
+      ],
+      "metrics": {
+        "all_logged_including_placeholders": {
+          "samples": 5001,
+          "rmse_pos_kpa": 15.651272901681045,
+          "rmse_neg_kpa": 11.631343284562847,
+          "combined_rmse_kpa": 13.788591118135324,
+          "mae_pos_kpa": 14.38420279353553,
+          "mae_neg_kpa": 11.263887317293621,
+          "bias_ref_minus_obs_pos_kpa": 13.429638585527524,
+          "bias_ref_minus_obs_neg_kpa": -11.209248882797903,
+          "act_pos_mean_kpa": 102.04010277198711,
+          "act_neg_mean_kpa": 80.25682376494672,
+          "act_pos_std_kpa": 4.455324902116916,
+          "act_neg_std_kpa": 6.648146475580982,
+          "pos_reserve_mean_kpa": 112.01419978608038,
+          "neg_reserve_mean_kpa": 39.97123632677029
+        },
+        "non_placeholder_reference": {
+          "samples": 5001,
+          "rmse_pos_kpa": 15.651272901681045,
+          "rmse_neg_kpa": 11.631343284562847,
+          "combined_rmse_kpa": 13.788591118135324,
+          "mae_pos_kpa": 14.38420279353553,
+          "mae_neg_kpa": 11.263887317293621,
+          "bias_ref_minus_obs_pos_kpa": 13.429638585527524,
+          "bias_ref_minus_obs_neg_kpa": -11.209248882797903,
+          "act_pos_mean_kpa": 102.04010277198711,
+          "act_neg_mean_kpa": 80.25682376494672,
+          "act_pos_std_kpa": 4.455324902116916,
+          "act_neg_std_kpa": 6.648146475580982,
+          "pos_reserve_mean_kpa": 112.01419978608038,
+          "neg_reserve_mean_kpa": 39.97123632677029
+        },
+        "first_5_active_seconds": {
+          "samples": 251,
+          "rmse_pos_kpa": 25.22615462627639,
+          "rmse_neg_kpa": 13.255687673572831,
+          "combined_rmse_kpa": 20.150336634013293,
+          "mae_pos_kpa": 21.958005502404443,
+          "mae_neg_kpa": 11.56010892951631,
+          "bias_ref_minus_obs_pos_kpa": 2.9912890552049616,
+          "bias_ref_minus_obs_neg_kpa": -11.547912476072275,
+          "act_pos_mean_kpa": 113.4150328009252,
+          "act_neg_mean_kpa": 89.13173459725552,
+          "act_pos_std_kpa": 16.020263480072828,
+          "act_neg_std_kpa": 10.205066025777223,
+          "pos_reserve_mean_kpa": 123.53336075862565,
+          "neg_reserve_mean_kpa": 51.78115318875864
+        },
+        "after_5_active_seconds": {
+          "samples": 4750,
+          "rmse_pos_kpa": 14.975984996151178,
+          "rmse_neg_kpa": 11.53915069375652,
+          "combined_rmse_kpa": 13.368472712658068,
+          "mae_pos_kpa": 13.98398711355109,
+          "mae_neg_kpa": 11.248234343679327,
+          "bias_ref_minus_obs_pos_kpa": 13.981222950182463,
+          "bias_ref_minus_obs_neg_kpa": -11.1913531855533,
+          "act_pos_mean_kpa": 101.43902752203691,
+          "act_neg_mean_kpa": 79.78785479254472,
+          "act_pos_std_kpa": 0.3721371456101792,
+          "act_neg_std_kpa": 6.053776863926431,
+          "pos_reserve_mean_kpa": 111.40550306942589,
+          "neg_reserve_mean_kpa": 39.34717545679996
+        },
+        "absolute_30_to_40_seconds": {
+          "samples": 500,
+          "rmse_pos_kpa": 13.807296632251758,
+          "rmse_neg_kpa": 10.552419002029449,
+          "combined_rmse_kpa": 12.28810374071978,
+          "mae_pos_kpa": 13.194898834228516,
+          "mae_neg_kpa": 10.392941291809082,
+          "bias_ref_minus_obs_pos_kpa": 13.194898834228516,
+          "bias_ref_minus_obs_neg_kpa": -10.392941291809082,
+          "act_pos_mean_kpa": 101.43350859069824,
+          "act_neg_mean_kpa": 75.17994123840332,
+          "act_pos_std_kpa": 0.4039164134388185,
+          "act_neg_std_kpa": 4.189191955160108,
+          "pos_reserve_mean_kpa": 109.64993952941894,
+          "neg_reserve_mean_kpa": 34.7117378616333
+        },
+        "absolute_first_40_96_seconds": {
+          "samples": 2049,
+          "rmse_pos_kpa": 16.184727137964046,
+          "rmse_neg_kpa": 11.976490492532335,
+          "combined_rmse_kpa": 14.236953976326312,
+          "mae_pos_kpa": 14.766960933419075,
+          "mae_neg_kpa": 11.56474596119439,
+          "bias_ref_minus_obs_pos_kpa": 12.443561310067649,
+          "bias_ref_minus_obs_neg_kpa": -11.553675832604128,
+          "act_pos_mean_kpa": 102.881099162886,
+          "act_neg_mean_kpa": 80.00871637659925,
+          "act_pos_std_kpa": 6.858865146146686,
+          "act_neg_std_kpa": 6.778167012173205,
+          "pos_reserve_mean_kpa": 113.13653620677555,
+          "neg_reserve_mean_kpa": 39.721840172875154
+        }
+      }
+    },
+    {
+      "run": "261015_19_17_19",
+      "policy": "HR",
+      "csv": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real/261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real.csv",
+      "csv_sha256": "40fe3da3fce1d74a49968215c0f4acc55112bbf504fb46ee642c9783d306c47f",
+      "cfg_sha256": "ce9375859741ecaa6a590374b8b304ffdc5db268352c851c12dba6c19ff82b78",
+      "model_name": "260831_lib3_histreward2x2_r025_HR_smooth_seed0",
+      "reference_mode": "model_bank_0_40s",
+      "runtime": {
+        "pid_enabled": false,
+        "pid_label": "Off"
+      },
+      "configured_frequency_hz": 50,
+      "configured_init_pressure": {
+        "init_act_neg_press": 101.325,
+        "init_act_pos_press": 101.325,
+        "init_neg_press": 101.325,
+        "init_pos_press": 101.325
+      },
+      "samples": 1698,
+      "placeholder_rows": 1,
+      "first_logged_pressure_kpa": [
+        137.89649963378906,
+        59.8973388671875,
+        104.22988891601562,
+        100.13874053955078
+      ],
+      "first_non_placeholder_row": 1,
+      "first_non_placeholder_time_sec": 12.722250699996948,
+      "first_non_placeholder_pressure_kpa": [
+        139.41165161132812,
+        58.66733932495117,
+        104.78123474121094,
+        99.769775390625
+      ],
+      "logged_end_sec": 40.00648903846741,
+      "non_placeholder_logged_span_sec": 27.28423833847046,
+      "first_timestamp_gap_sec": 12.722250699996948,
+      "large_timestamp_gaps_sec": [
+        12.722250699996948
+      ],
+      "regular_timestamp_dt_median_sec": 0.016066312789916992,
+      "regular_timestamp_dt_p95_sec": 0.016358554363250732,
+      "inverse_regular_timestamp_dt_hz": 62.2420348138365,
+      "logged_command_min": [
+        0.8688230514526367,
+        0.8000000715255737,
+        0.8002944588661194,
+        0.800000011920929,
+        0.800000011920929,
+        0.8019231557846069
+      ],
+      "logged_command_max": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "metrics": {
+        "all_logged_including_placeholders": {
+          "samples": 1698,
+          "rmse_pos_kpa": 10.689721012541328,
+          "rmse_neg_kpa": 14.916804636213973,
+          "combined_rmse_kpa": 12.976540291636717,
+          "mae_pos_kpa": 9.257654911216493,
+          "mae_neg_kpa": 14.534876173039628,
+          "bias_ref_minus_obs_pos_kpa": -9.249370700759798,
+          "bias_ref_minus_obs_neg_kpa": -14.427477015482944,
+          "act_pos_mean_kpa": 123.71217287330941,
+          "act_neg_mean_kpa": 80.75356075255414,
+          "act_pos_std_kpa": 3.2731925792571657,
+          "act_neg_std_kpa": 1.7328677972208255,
+          "pos_reserve_mean_kpa": 55.10746195852686,
+          "neg_reserve_mean_kpa": 38.661873077194876
+        },
+        "non_placeholder_reference": {
+          "samples": 1697,
+          "rmse_pos_kpa": 10.389208966913206,
+          "rmse_neg_kpa": 14.721856753586783,
+          "combined_rmse_kpa": 12.741050373327125,
+          "mae_pos_kpa": 9.20169012983476,
+          "mae_neg_kpa": 14.484431939470676,
+          "bias_ref_minus_obs_pos_kpa": -9.193401037698361,
+          "bias_ref_minus_obs_neg_kpa": -14.376969494254855,
+          "act_pos_mean_kpa": 123.72365329991949,
+          "act_neg_mean_kpa": 80.74213754702261,
+          "act_pos_std_kpa": 3.23980034878617,
+          "act_neg_std_kpa": 1.668241263649908,
+          "pos_reserve_mean_kpa": 55.12009652024799,
+          "neg_reserve_mean_kpa": 38.66094230017946
+        },
+        "first_5_active_seconds": {
+          "samples": 312,
+          "rmse_pos_kpa": 6.926559599639243,
+          "rmse_neg_kpa": 13.046990674299911,
+          "combined_rmse_kpa": 10.445123109437807,
+          "mae_pos_kpa": 5.2017451799832815,
+          "mae_neg_kpa": 12.81806468963623,
+          "bias_ref_minus_obs_pos_kpa": -5.156659957690112,
+          "bias_ref_minus_obs_neg_kpa": -12.233565428318121,
+          "act_pos_mean_kpa": 118.25380970881535,
+          "act_neg_mean_kpa": 81.61689401284242,
+          "act_pos_std_kpa": 4.199049622179396,
+          "act_neg_std_kpa": 3.758869182767305,
+          "pos_reserve_mean_kpa": 51.242385032849434,
+          "neg_reserve_mean_kpa": 39.675182782686676
+        },
+        "after_5_active_seconds": {
+          "samples": 1385,
+          "rmse_pos_kpa": 11.02009732636015,
+          "rmse_neg_kpa": 15.073493511091616,
+          "combined_rmse_kpa": 13.203271407332563,
+          "mae_pos_kpa": 10.102760761137043,
+          "mae_neg_kpa": 14.859815753151794,
+          "bias_ref_minus_obs_pos_kpa": -10.102760761137043,
+          "bias_ref_minus_obs_neg_kpa": -14.859815753151794,
+          "act_pos_mean_kpa": 124.95584911250035,
+          "act_neg_mean_kpa": 80.5450804947946,
+          "act_pos_std_kpa": 0.7941122638185827,
+          "act_neg_std_kpa": 0.12602786093424934,
+          "pos_reserve_mean_kpa": 55.99363152679553,
+          "neg_reserve_mean_kpa": 38.43246357776628
+        },
+        "absolute_30_to_40_seconds": {
+          "samples": 621,
+          "rmse_pos_kpa": 11.53505092625784,
+          "rmse_neg_kpa": 15.981149506017138,
+          "combined_rmse_kpa": 13.93654439603006,
+          "mae_pos_kpa": 10.736464962675184,
+          "mae_neg_kpa": 15.784737057156033,
+          "bias_ref_minus_obs_pos_kpa": -10.736464962675184,
+          "bias_ref_minus_obs_neg_kpa": -15.784737057156033,
+          "act_pos_mean_kpa": 125.31817996751475,
+          "act_neg_mean_kpa": 80.6144363845604,
+          "act_pos_std_kpa": 0.6801616922595735,
+          "act_neg_std_kpa": 0.09633304239854237,
+          "pos_reserve_mean_kpa": 56.23693831684893,
+          "neg_reserve_mean_kpa": 38.295907842172326
+        },
+        "absolute_first_40_96_seconds": {
+          "samples": 1697,
+          "rmse_pos_kpa": 10.389208966913206,
+          "rmse_neg_kpa": 14.721856753586783,
+          "combined_rmse_kpa": 12.741050373327125,
+          "mae_pos_kpa": 9.20169012983476,
+          "mae_neg_kpa": 14.484431939470676,
+          "bias_ref_minus_obs_pos_kpa": -9.193401037698361,
+          "bias_ref_minus_obs_neg_kpa": -14.376969494254855,
+          "act_pos_mean_kpa": 123.72365329991949,
+          "act_neg_mean_kpa": 80.74213754702261,
+          "act_pos_std_kpa": 3.23980034878617,
+          "act_neg_std_kpa": 1.668241263649908,
+          "pos_reserve_mean_kpa": 55.12009652024799,
+          "neg_reserve_mean_kpa": 38.66094230017946
+        }
+      },
+      "reference_clock_fit": {
+        "samples": 1664,
+        "absolute_logged_clock_best_offset_sec": 0.062,
+        "absolute_logged_clock_best_rmse_kpa": 0.009793006186051913,
+        "active_elapsed_clock_rmse_kpa": 7.599212866569782,
+        "scope": "Descriptive interpolation fit, not an estimate of physical actuator latency."
+      }
+    },
+    {
+      "run": "261015_19_18_42",
+      "policy": "H",
+      "csv": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real/261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real.csv",
+      "csv_sha256": "59ab41625908a0ea0440ec7c0cd4fa0f5bf77146ff62fe216a1556802bf5684e",
+      "cfg_sha256": "422fdf001237ec499d2f787ce9902e57dc4ae838b966f2de8803d1c76fe0b439",
+      "model_name": "260831_lib3_histreward2x2_r025_H_smooth_seed0",
+      "reference_mode": "model_bank_0_40s",
+      "runtime": {
+        "pid_enabled": false,
+        "pid_label": "Off",
+        "start_protocol": "manual_pump_off_atmospheric_then_pump_on_enter"
+      },
+      "configured_frequency_hz": 50,
+      "configured_init_pressure": {
+        "init_act_neg_press": 101.325,
+        "init_act_pos_press": 101.325,
+        "init_neg_press": 101.325,
+        "init_pos_press": 101.325
+      },
+      "samples": 1372,
+      "placeholder_rows": 1,
+      "first_logged_pressure_kpa": [
+        103.94605255126952,
+        96.99750518798828,
+        101.5760498046875,
+        101.33779907226562
+      ],
+      "first_non_placeholder_row": 1,
+      "first_non_placeholder_time_sec": 17.96954584121704,
+      "first_non_placeholder_pressure_kpa": [
+        105.67089080810548,
+        95.20903778076172,
+        101.54779815673828,
+        101.33779907226562
+      ],
+      "logged_end_sec": 40.00949144363403,
+      "non_placeholder_logged_span_sec": 22.039945602416992,
+      "first_timestamp_gap_sec": 17.96954584121704,
+      "large_timestamp_gaps_sec": [
+        17.96954584121704
+      ],
+      "regular_timestamp_dt_median_sec": 0.016076803207401014,
+      "regular_timestamp_dt_p95_sec": 0.016282737255101588,
+      "inverse_regular_timestamp_dt_hz": 62.20142071152842,
+      "logged_command_min": [
+        0.8381956219673157,
+        0.8184930086135864,
+        0.813826858997345,
+        0.8729345202445984,
+        0.8005233407020569,
+        0.8052200675010681
+      ],
+      "logged_command_max": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "metrics": {
+        "all_logged_including_placeholders": {
+          "samples": 1372,
+          "rmse_pos_kpa": 10.67908483422235,
+          "rmse_neg_kpa": 15.565311783670621,
+          "combined_rmse_kpa": 13.34769238144544,
+          "mae_pos_kpa": 9.239367293199367,
+          "mae_neg_kpa": 15.069929431548271,
+          "bias_ref_minus_obs_pos_kpa": -8.681955231869534,
+          "bias_ref_minus_obs_neg_kpa": -15.05700718348645,
+          "act_pos_mean_kpa": 123.38266183057958,
+          "act_neg_mean_kpa": 81.02394299187397,
+          "act_pos_std_kpa": 4.054641605232715,
+          "act_neg_std_kpa": 2.775744048482528,
+          "pos_reserve_mean_kpa": 55.24124670445745,
+          "neg_reserve_mean_kpa": 37.74780839247189
+        },
+        "non_placeholder_reference": {
+          "samples": 1371,
+          "rmse_pos_kpa": 10.324745270543154,
+          "rmse_neg_kpa": 15.328575920675926,
+          "combined_rmse_kpa": 13.068389431324906,
+          "mae_pos_kpa": 9.172017415364584,
+          "mae_neg_kpa": 15.00700611306489,
+          "bias_ref_minus_obs_pos_kpa": -8.614198780685859,
+          "bias_ref_minus_obs_neg_kpa": -14.994074439585079,
+          "act_pos_mean_kpa": 123.39856745568963,
+          "act_neg_mean_kpa": 81.00912617489337,
+          "act_pos_std_kpa": 4.013104670439316,
+          "act_neg_std_kpa": 2.7219788029362886,
+          "pos_reserve_mean_kpa": 55.27981070442673,
+          "neg_reserve_mean_kpa": 37.77217565323644
+        },
+        "first_5_active_seconds": {
+          "samples": 311,
+          "rmse_pos_kpa": 7.640808324770456,
+          "rmse_neg_kpa": 14.47368495094753,
+          "combined_rmse_kpa": 11.573018359856828,
+          "mae_pos_kpa": 5.965429766001809,
+          "mae_neg_kpa": 13.705578156989487,
+          "bias_ref_minus_obs_pos_kpa": -3.506364337884344,
+          "bias_ref_minus_obs_neg_kpa": -13.648570683224792,
+          "act_pos_mean_kpa": 117.903151975184,
+          "act_neg_mean_kpa": 82.82713462608804,
+          "act_pos_std_kpa": 5.555209140173229,
+          "act_neg_std_kpa": 5.3276014999739525,
+          "pos_reserve_mean_kpa": 50.22030801558418,
+          "neg_reserve_mean_kpa": 38.110719674653176
+        },
+        "after_5_active_seconds": {
+          "samples": 1060,
+          "rmse_pos_kpa": 10.988515155968177,
+          "rmse_neg_kpa": 15.570494404813148,
+          "combined_rmse_kpa": 13.47567737338758,
+          "mae_pos_kpa": 10.11281813135687,
+          "mae_neg_kpa": 15.38884016432852,
+          "bias_ref_minus_obs_pos_kpa": -10.11281813135687,
+          "bias_ref_minus_obs_neg_kpa": -15.38884016432852,
+          "act_pos_mean_kpa": 125.01090162025308,
+          "act_neg_mean_kpa": 80.47572935572211,
+          "act_pos_std_kpa": 0.5619435760279443,
+          "act_neg_std_kpa": 0.034560588773998605,
+          "pos_reserve_mean_kpa": 56.76424970087015,
+          "neg_reserve_mean_kpa": 37.672848114877375
+        },
+        "absolute_30_to_40_seconds": {
+          "samples": 622,
+          "rmse_pos_kpa": 11.466657707467144,
+          "rmse_neg_kpa": 15.865111717307801,
+          "combined_rmse_kpa": 13.841712480449683,
+          "mae_pos_kpa": 10.724059678350613,
+          "mae_neg_kpa": 15.671743650528395,
+          "bias_ref_minus_obs_pos_kpa": -10.724059678350613,
+          "bias_ref_minus_obs_neg_kpa": -15.671743650528395,
+          "act_pos_mean_kpa": 125.3080398216125,
+          "act_neg_mean_kpa": 80.49954751066839,
+          "act_pos_std_kpa": 0.3539163189931056,
+          "act_neg_std_kpa": 0.016630285132201803,
+          "pos_reserve_mean_kpa": 56.87415333346155,
+          "neg_reserve_mean_kpa": 37.61412110282677
+        },
+        "absolute_first_40_96_seconds": {
+          "samples": 1371,
+          "rmse_pos_kpa": 10.324745270543154,
+          "rmse_neg_kpa": 15.328575920675926,
+          "combined_rmse_kpa": 13.068389431324906,
+          "mae_pos_kpa": 9.172017415364584,
+          "mae_neg_kpa": 15.00700611306489,
+          "bias_ref_minus_obs_pos_kpa": -8.614198780685859,
+          "bias_ref_minus_obs_neg_kpa": -14.994074439585079,
+          "act_pos_mean_kpa": 123.39856745568963,
+          "act_neg_mean_kpa": 81.00912617489337,
+          "act_pos_std_kpa": 4.013104670439316,
+          "act_neg_std_kpa": 2.7219788029362886,
+          "pos_reserve_mean_kpa": 55.27981070442673,
+          "neg_reserve_mean_kpa": 37.77217565323644
+        }
+      },
+      "reference_clock_fit": {
+        "samples": 1338,
+        "absolute_logged_clock_best_offset_sec": 0.063,
+        "absolute_logged_clock_best_rmse_kpa": 0.0019740303183655946,
+        "active_elapsed_clock_rmse_kpa": 8.243962380723804,
+        "scope": "Descriptive interpolation fit, not an estimate of physical actuator latency."
+      }
+    }
+  ],
+  "metric_convention": "Sample-weighted metrics; bias = reference minus observation. Placeholder exclusion is dataset-specific.",
+  "limits": "No verified runtime commit/checkpoint hash, RT application times, physical valve opening, or actual initial policy state in source logs.",
+  "counterfactual": {
+    "source": "pneu_rl/exp/lib3_initial_pressure_counterfactual_261015/summary.json",
+    "source_sha256": "da8106713f46ecfa45bab8cfe800a9bc87278aa3c1bfca34263f6a89642e5c8b",
+    "simulation_only": true,
+    "results": [
+      {
+        "model": "H_smooth",
+        "case": "atmospheric",
+        "history_mode": "consistent_history",
+        "checkpoint": "pneu_rl/models/260831_lib3_histreward2x2_r025_H_smooth_seed0/model_epi_2000.pth",
+        "input_sha256": {
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_H_smooth_seed0/cfg.yaml": "1c46d2614ab4aeb78b1438fb0a7e74735ee591995629932b2d4b24dad3da1d29",
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_H_smooth_seed0/model_epi_2000.pth": "157cf44004d02b70816f9ad36499855d37a60ab6544dae916284625766fb0879"
+        },
+        "original_model_files_unchanged": true,
+        "initialization": {
+          "pressure_kpa": [
+            101.325,
+            101.325,
+            101.325,
+            101.325
+          ],
+          "source_csv": null,
+          "source_row_index": null,
+          "source_logged_time_sec": null
+        },
+        "hidden_reset_assumption": "Simulator set_init_env_act resets six valve states; pump phase is zero; two internal pump pressures use the simulator's initialization formulas from source pressures, so their values change when source pressure changes. The reset RULE is common; hidden state values are not held constant. These hidden states are not measured real states.",
+        "metrics": {
+          "whole": {
+            "samples": 2048,
+            "rmse_pos_kpa": 5.6095255355715015,
+            "rmse_neg_kpa": 5.343403813058285,
+            "combined_rmse_kpa": 5.478080915961106,
+            "bias_pos_obs_minus_ref_kpa": -4.072637128836872,
+            "bias_neg_obs_minus_ref_kpa": 4.490830713461884,
+            "positive_reserve_mean_kpa": 17.070512985734183,
+            "negative_reserve_mean_kpa": 49.353828891853084
+          },
+          "first_5_sec": {
+            "samples": 250,
+            "rmse_pos_kpa": 5.064848770658198,
+            "rmse_neg_kpa": 4.954142585560778,
+            "combined_rmse_kpa": 5.0098014844754415,
+            "bias_pos_obs_minus_ref_kpa": -3.5788715669494304,
+            "bias_neg_obs_minus_ref_kpa": 2.7963573162356288,
+            "positive_reserve_mean_kpa": 24.779739709166254,
+            "negative_reserve_mean_kpa": 50.879802629406974
+          },
+          "after_5_sec": {
+            "samples": 1798,
+            "rmse_pos_kpa": 5.681125468380459,
+            "rmse_neg_kpa": 5.395304508841856,
+            "combined_rmse_kpa": 5.540058543490779,
+            "bias_pos_obs_minus_ref_kpa": -4.1412919622472515,
+            "bias_neg_obs_minus_ref_kpa": 4.726436024533387,
+            "positive_reserve_mean_kpa": 15.9985960330879,
+            "negative_reserve_mean_kpa": 49.14165234324992
+          }
+        },
+        "scope": "The interventions are pressure initialization and optional synthetic initial current policy-pressure observation plus pressure history. Nominal simulator parameters, 50 Hz loop, a common hidden-state RESET RULE, and fresh member-0 reference are retained. Internal reset pump pressures vary with source pressure under that rule. Source CSV states are first valid-reference measurements, not verified pre-first-action states. These rollouts cannot establish that initialization explains observed real failures."
+      },
+      {
+        "model": "H_smooth",
+        "case": "261015_18_59_30",
+        "history_mode": "consistent_history",
+        "checkpoint": "pneu_rl/models/260831_lib3_histreward2x2_r025_H_smooth_seed0/model_epi_2000.pth",
+        "input_sha256": {
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_H_smooth_seed0/cfg.yaml": "1c46d2614ab4aeb78b1438fb0a7e74735ee591995629932b2d4b24dad3da1d29",
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_H_smooth_seed0/model_epi_2000.pth": "157cf44004d02b70816f9ad36499855d37a60ab6544dae916284625766fb0879"
+        },
+        "original_model_files_unchanged": true,
+        "initialization": {
+          "pressure_kpa": [
+            179.29824829101562,
+            44.15972137451172,
+            113.9733428955078,
+            91.13372039794922
+          ],
+          "source_csv": "pneu_rl/exp/drive_zeroshot_20261015/261015_18_59_30_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real/261015_18_59_30_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real.csv",
+          "source_csv_sha256": "2c2a1cb9b249c037162acc974d2e4e7569223961776d0c42ec605ecf642cad0a",
+          "source_row_index": 0,
+          "source_logged_time_sec": 0.0,
+          "source_measurement_caveat": "First logged measurement whose reference is valid; not verified as the physical state immediately before the first policy action."
+        },
+        "hidden_reset_assumption": "Simulator set_init_env_act resets six valve states; pump phase is zero; two internal pump pressures use the simulator's initialization formulas from source pressures, so their values change when source pressure changes. The reset RULE is common; hidden state values are not held constant. These hidden states are not measured real states.",
+        "metrics": {
+          "whole": {
+            "samples": 2048,
+            "rmse_pos_kpa": 15.508771382560782,
+            "rmse_neg_kpa": 4.405015101754227,
+            "combined_rmse_kpa": 11.40013482032601,
+            "bias_pos_obs_minus_ref_kpa": -14.676968288470768,
+            "bias_neg_obs_minus_ref_kpa": 0.46454661238034756,
+            "positive_reserve_mean_kpa": 86.67836291886327,
+            "negative_reserve_mean_kpa": 38.11089514975757
+          },
+          "first_5_sec": {
+            "samples": 250,
+            "rmse_pos_kpa": 15.335513371170542,
+            "rmse_neg_kpa": 7.573384969586322,
+            "combined_rmse_kpa": 12.094092158051932,
+            "bias_pos_obs_minus_ref_kpa": -12.917529481772988,
+            "bias_neg_obs_minus_ref_kpa": 2.1101312595306245,
+            "positive_reserve_mean_kpa": 83.63826998689109,
+            "negative_reserve_mean_kpa": 48.887826767368225
+          },
+          "after_5_sec": {
+            "samples": 1798,
+            "rmse_pos_kpa": 15.532708724828058,
+            "rmse_neg_kpa": 3.7586145550339864,
+            "combined_rmse_kpa": 11.300270432685737,
+            "bias_pos_obs_minus_ref_kpa": -14.921606609758003,
+            "bias_neg_obs_minus_ref_kpa": 0.23573895843842907,
+            "positive_reserve_mean_kpa": 87.10106772030545,
+            "negative_reserve_mean_kpa": 36.6124341350731
+          }
+        },
+        "scope": "The interventions are pressure initialization and optional synthetic initial current policy-pressure observation plus pressure history. Nominal simulator parameters, 50 Hz loop, a common hidden-state RESET RULE, and fresh member-0 reference are retained. Internal reset pump pressures vary with source pressure under that rule. Source CSV states are first valid-reference measurements, not verified pre-first-action states. These rollouts cannot establish that initialization explains observed real failures."
+      },
+      {
+        "model": "H_smooth",
+        "case": "261015_19_01_16",
+        "history_mode": "consistent_history",
+        "checkpoint": "pneu_rl/models/260831_lib3_histreward2x2_r025_H_smooth_seed0/model_epi_2000.pth",
+        "input_sha256": {
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_H_smooth_seed0/cfg.yaml": "1c46d2614ab4aeb78b1438fb0a7e74735ee591995629932b2d4b24dad3da1d29",
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_H_smooth_seed0/model_epi_2000.pth": "157cf44004d02b70816f9ad36499855d37a60ab6544dae916284625766fb0879"
+        },
+        "original_model_files_unchanged": true,
+        "initialization": {
+          "pressure_kpa": [
+            322.07745361328125,
+            28.227272033691406,
+            201.1446533203125,
+            101.22283935546876
+          ],
+          "source_csv": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_01_16_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real/261015_19_01_16_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real.csv",
+          "source_csv_sha256": "4f5d87132e37d6cc43fc2d2036f016811164bc38d8e894a9a65ef1627b1636b5",
+          "source_row_index": 0,
+          "source_logged_time_sec": 0.0,
+          "source_measurement_caveat": "First logged measurement whose reference is valid; not verified as the physical state immediately before the first policy action."
+        },
+        "hidden_reset_assumption": "Simulator set_init_env_act resets six valve states; pump phase is zero; two internal pump pressures use the simulator's initialization formulas from source pressures, so their values change when source pressure changes. The reset RULE is common; hidden state values are not held constant. These hidden states are not measured real states.",
+        "metrics": {
+          "whole": {
+            "samples": 2048,
+            "rmse_pos_kpa": 10.481473711082744,
+            "rmse_neg_kpa": 4.71248998032149,
+            "combined_rmse_kpa": 8.126156932115855,
+            "bias_pos_obs_minus_ref_kpa": -2.7761467667802204,
+            "bias_neg_obs_minus_ref_kpa": 2.8866864939406938,
+            "positive_reserve_mean_kpa": 26.02326671045005,
+            "negative_reserve_mean_kpa": 48.50692770766858
+          },
+          "first_5_sec": {
+            "samples": 250,
+            "rmse_pos_kpa": 26.270027787758632,
+            "rmse_neg_kpa": 8.566031494576087,
+            "combined_rmse_kpa": 19.538311794211904,
+            "bias_pos_obs_minus_ref_kpa": 1.867223901713307,
+            "bias_neg_obs_minus_ref_kpa": 3.160366792075867,
+            "positive_reserve_mean_kpa": 104.89851601299311,
+            "negative_reserve_mean_kpa": 56.464071104037984
+          },
+          "after_5_sec": {
+            "samples": 1798,
+            "rmse_pos_kpa": 5.401938755873408,
+            "rmse_neg_kpa": 3.8849458965261485,
+            "combined_rmse_kpa": 4.7049838969513225,
+            "bias_pos_obs_minus_ref_kpa": -3.4217767262481753,
+            "bias_neg_obs_minus_ref_kpa": 2.8486330598284617,
+            "positive_reserve_mean_kpa": 15.05618532800524,
+            "negative_reserve_mean_kpa": 47.40053958247818
+          }
+        },
+        "scope": "The interventions are pressure initialization and optional synthetic initial current policy-pressure observation plus pressure history. Nominal simulator parameters, 50 Hz loop, a common hidden-state RESET RULE, and fresh member-0 reference are retained. Internal reset pump pressures vary with source pressure under that rule. Source CSV states are first valid-reference measurements, not verified pre-first-action states. These rollouts cannot establish that initialization explains observed real failures."
+      },
+      {
+        "model": "H_smooth",
+        "case": "261015_19_17_19",
+        "history_mode": "consistent_history",
+        "checkpoint": "pneu_rl/models/260831_lib3_histreward2x2_r025_H_smooth_seed0/model_epi_2000.pth",
+        "input_sha256": {
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_H_smooth_seed0/cfg.yaml": "1c46d2614ab4aeb78b1438fb0a7e74735ee591995629932b2d4b24dad3da1d29",
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_H_smooth_seed0/model_epi_2000.pth": "157cf44004d02b70816f9ad36499855d37a60ab6544dae916284625766fb0879"
+        },
+        "original_model_files_unchanged": true,
+        "initialization": {
+          "pressure_kpa": [
+            139.41165161132812,
+            58.66733932495117,
+            104.78123474121094,
+            99.769775390625
+          ],
+          "source_csv": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real/261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real.csv",
+          "source_csv_sha256": "40fe3da3fce1d74a49968215c0f4acc55112bbf504fb46ee642c9783d306c47f",
+          "source_row_index": 1,
+          "source_logged_time_sec": 12.722250699996948,
+          "source_measurement_caveat": "First logged measurement whose reference is valid; not verified as the physical state immediately before the first policy action."
+        },
+        "hidden_reset_assumption": "Simulator set_init_env_act resets six valve states; pump phase is zero; two internal pump pressures use the simulator's initialization formulas from source pressures, so their values change when source pressure changes. The reset RULE is common; hidden state values are not held constant. These hidden states are not measured real states.",
+        "metrics": {
+          "whole": {
+            "samples": 2048,
+            "rmse_pos_kpa": 15.485566300522203,
+            "rmse_neg_kpa": 4.300672580766223,
+            "combined_rmse_kpa": 11.364386219563803,
+            "bias_pos_obs_minus_ref_kpa": -14.729018604749413,
+            "bias_neg_obs_minus_ref_kpa": 0.6333507854902604,
+            "positive_reserve_mean_kpa": 85.1444653255391,
+            "negative_reserve_mean_kpa": 38.07171358950626
+          },
+          "first_5_sec": {
+            "samples": 250,
+            "rmse_pos_kpa": 15.588802639929414,
+            "rmse_neg_kpa": 6.7131006760258,
+            "combined_rmse_kpa": 12.001593403234594,
+            "bias_pos_obs_minus_ref_kpa": -13.66429982288944,
+            "bias_neg_obs_minus_ref_kpa": 3.2014068545427965,
+            "positive_reserve_mean_kpa": 75.28630832102574,
+            "negative_reserve_mean_kpa": 48.030006823086296
+          },
+          "after_5_sec": {
+            "samples": 1798,
+            "rmse_pos_kpa": 15.471157419856903,
+            "rmse_neg_kpa": 3.847260180030995,
+            "combined_rmse_kpa": 11.272934906288722,
+            "bias_pos_obs_minus_ref_kpa": -14.877060704563094,
+            "bias_neg_obs_minus_ref_kpa": 0.27627958567761635,
+            "positive_reserve_mean_kpa": 86.51517681114997,
+            "negative_reserve_mean_kpa": 36.687078823991804
+          }
+        },
+        "scope": "The interventions are pressure initialization and optional synthetic initial current policy-pressure observation plus pressure history. Nominal simulator parameters, 50 Hz loop, a common hidden-state RESET RULE, and fresh member-0 reference are retained. Internal reset pump pressures vary with source pressure under that rule. Source CSV states are first valid-reference measurements, not verified pre-first-action states. These rollouts cannot establish that initialization explains observed real failures."
+      },
+      {
+        "model": "H_smooth",
+        "case": "261015_19_17_19",
+        "history_mode": "fake_atmosphere_history",
+        "checkpoint": "pneu_rl/models/260831_lib3_histreward2x2_r025_H_smooth_seed0/model_epi_2000.pth",
+        "input_sha256": {
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_H_smooth_seed0/cfg.yaml": "1c46d2614ab4aeb78b1438fb0a7e74735ee591995629932b2d4b24dad3da1d29",
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_H_smooth_seed0/model_epi_2000.pth": "157cf44004d02b70816f9ad36499855d37a60ab6544dae916284625766fb0879"
+        },
+        "original_model_files_unchanged": true,
+        "initialization": {
+          "pressure_kpa": [
+            139.41165161132812,
+            58.66733932495117,
+            104.78123474121094,
+            99.769775390625
+          ],
+          "source_csv": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real/261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real.csv",
+          "source_csv_sha256": "40fe3da3fce1d74a49968215c0f4acc55112bbf504fb46ee642c9783d306c47f",
+          "source_row_index": 1,
+          "source_logged_time_sec": 12.722250699996948,
+          "source_measurement_caveat": "First logged measurement whose reference is valid; not verified as the physical state immediately before the first policy action."
+        },
+        "hidden_reset_assumption": "Simulator set_init_env_act resets six valve states; pump phase is zero; two internal pump pressures use the simulator's initialization formulas from source pressures, so their values change when source pressure changes. The reset RULE is common; hidden state values are not held constant. These hidden states are not measured real states.",
+        "metrics": {
+          "whole": {
+            "samples": 2048,
+            "rmse_pos_kpa": 15.319615662654973,
+            "rmse_neg_kpa": 4.098585450675649,
+            "combined_rmse_kpa": 11.213586106771412,
+            "bias_pos_obs_minus_ref_kpa": -14.505154580508709,
+            "bias_neg_obs_minus_ref_kpa": 0.4308114498815992,
+            "positive_reserve_mean_kpa": 85.0453723930339,
+            "negative_reserve_mean_kpa": 37.8976803692949
+          },
+          "first_5_sec": {
+            "samples": 250,
+            "rmse_pos_kpa": 14.779280788078667,
+            "rmse_neg_kpa": 6.06973187697477,
+            "combined_rmse_kpa": 11.297539238064962,
+            "bias_pos_obs_minus_ref_kpa": -12.87772813352484,
+            "bias_neg_obs_minus_ref_kpa": 1.9723445254692082,
+            "positive_reserve_mean_kpa": 72.54273208941048,
+            "negative_reserve_mean_kpa": 47.14700544920302
+          },
+          "after_5_sec": {
+            "samples": 1798,
+            "rmse_pos_kpa": 15.393243770703581,
+            "rmse_neg_kpa": 3.7431968291246545,
+            "combined_rmse_kpa": 11.201863154981707,
+            "bias_pos_obs_minus_ref_kpa": -14.731437456896902,
+            "bias_neg_obs_minus_ref_kpa": 0.21647147830378927,
+            "positive_reserve_mean_kpa": 86.78378177896597,
+            "negative_reserve_mean_kpa": 36.61162293326763
+          }
+        },
+        "scope": "The interventions are pressure initialization and optional synthetic initial current policy-pressure observation plus pressure history. Nominal simulator parameters, 50 Hz loop, a common hidden-state RESET RULE, and fresh member-0 reference are retained. Internal reset pump pressures vary with source pressure under that rule. Source CSV states are first valid-reference measurements, not verified pre-first-action states. These rollouts cannot establish that initialization explains observed real failures."
+      },
+      {
+        "model": "H_smooth",
+        "case": "261015_19_18_42",
+        "history_mode": "consistent_history",
+        "checkpoint": "pneu_rl/models/260831_lib3_histreward2x2_r025_H_smooth_seed0/model_epi_2000.pth",
+        "input_sha256": {
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_H_smooth_seed0/cfg.yaml": "1c46d2614ab4aeb78b1438fb0a7e74735ee591995629932b2d4b24dad3da1d29",
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_H_smooth_seed0/model_epi_2000.pth": "157cf44004d02b70816f9ad36499855d37a60ab6544dae916284625766fb0879"
+        },
+        "original_model_files_unchanged": true,
+        "initialization": {
+          "pressure_kpa": [
+            105.67089080810548,
+            95.20903778076172,
+            101.54779815673828,
+            101.33779907226562
+          ],
+          "source_csv": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real/261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real.csv",
+          "source_csv_sha256": "59ab41625908a0ea0440ec7c0cd4fa0f5bf77146ff62fe216a1556802bf5684e",
+          "source_row_index": 1,
+          "source_logged_time_sec": 17.96954584121704,
+          "source_measurement_caveat": "First logged measurement whose reference is valid; not verified as the physical state immediately before the first policy action."
+        },
+        "hidden_reset_assumption": "Simulator set_init_env_act resets six valve states; pump phase is zero; two internal pump pressures use the simulator's initialization formulas from source pressures, so their values change when source pressure changes. The reset RULE is common; hidden state values are not held constant. These hidden states are not measured real states.",
+        "metrics": {
+          "whole": {
+            "samples": 2048,
+            "rmse_pos_kpa": 5.661569224094656,
+            "rmse_neg_kpa": 5.351341658409012,
+            "combined_rmse_kpa": 5.5086397424518285,
+            "bias_pos_obs_minus_ref_kpa": -4.158149391538897,
+            "bias_neg_obs_minus_ref_kpa": 4.539410163541353,
+            "positive_reserve_mean_kpa": 17.392626979032457,
+            "negative_reserve_mean_kpa": 49.48874566423416
+          },
+          "first_5_sec": {
+            "samples": 250,
+            "rmse_pos_kpa": 4.950578873346998,
+            "rmse_neg_kpa": 5.0359166455444795,
+            "combined_rmse_kpa": 4.9934300657014115,
+            "bias_pos_obs_minus_ref_kpa": -3.4973712166776125,
+            "bias_neg_obs_minus_ref_kpa": 2.868682154664777,
+            "positive_reserve_mean_kpa": 26.401299773754833,
+            "negative_reserve_mean_kpa": 51.13557485844263
+          },
+          "after_5_sec": {
+            "samples": 1798,
+            "rmse_pos_kpa": 5.753474354646049,
+            "rmse_neg_kpa": 5.393738910165123,
+            "combined_rmse_kpa": 5.576508162847026,
+            "bias_pos_obs_minus_ref_kpa": -4.250026223416161,
+            "bias_neg_obs_minus_ref_kpa": 4.7717138355208535,
+            "positive_reserve_mean_kpa": 16.140030650511548,
+            "negative_reserve_mean_kpa": 49.259764964260796
+          }
+        },
+        "scope": "The interventions are pressure initialization and optional synthetic initial current policy-pressure observation plus pressure history. Nominal simulator parameters, 50 Hz loop, a common hidden-state RESET RULE, and fresh member-0 reference are retained. Internal reset pump pressures vary with source pressure under that rule. Source CSV states are first valid-reference measurements, not verified pre-first-action states. These rollouts cannot establish that initialization explains observed real failures."
+      },
+      {
+        "model": "H_smooth",
+        "case": "261015_19_18_42",
+        "history_mode": "fake_atmosphere_history",
+        "checkpoint": "pneu_rl/models/260831_lib3_histreward2x2_r025_H_smooth_seed0/model_epi_2000.pth",
+        "input_sha256": {
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_H_smooth_seed0/cfg.yaml": "1c46d2614ab4aeb78b1438fb0a7e74735ee591995629932b2d4b24dad3da1d29",
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_H_smooth_seed0/model_epi_2000.pth": "157cf44004d02b70816f9ad36499855d37a60ab6544dae916284625766fb0879"
+        },
+        "original_model_files_unchanged": true,
+        "initialization": {
+          "pressure_kpa": [
+            105.67089080810548,
+            95.20903778076172,
+            101.54779815673828,
+            101.33779907226562
+          ],
+          "source_csv": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real/261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real.csv",
+          "source_csv_sha256": "59ab41625908a0ea0440ec7c0cd4fa0f5bf77146ff62fe216a1556802bf5684e",
+          "source_row_index": 1,
+          "source_logged_time_sec": 17.96954584121704,
+          "source_measurement_caveat": "First logged measurement whose reference is valid; not verified as the physical state immediately before the first policy action."
+        },
+        "hidden_reset_assumption": "Simulator set_init_env_act resets six valve states; pump phase is zero; two internal pump pressures use the simulator's initialization formulas from source pressures, so their values change when source pressure changes. The reset RULE is common; hidden state values are not held constant. These hidden states are not measured real states.",
+        "metrics": {
+          "whole": {
+            "samples": 2048,
+            "rmse_pos_kpa": 5.6594339946930345,
+            "rmse_neg_kpa": 5.321179579398548,
+            "combined_rmse_kpa": 5.492911125100026,
+            "bias_pos_obs_minus_ref_kpa": -4.125908246537035,
+            "bias_neg_obs_minus_ref_kpa": 4.466237596112744,
+            "positive_reserve_mean_kpa": 17.29082704180238,
+            "negative_reserve_mean_kpa": 49.43483862066078
+          },
+          "first_5_sec": {
+            "samples": 250,
+            "rmse_pos_kpa": 4.959248598489302,
+            "rmse_neg_kpa": 5.0589796683851445,
+            "combined_rmse_kpa": 5.009362332011549,
+            "bias_pos_obs_minus_ref_kpa": -3.443346468853646,
+            "bias_neg_obs_minus_ref_kpa": 2.776929874363259,
+            "positive_reserve_mean_kpa": 26.187044901093266,
+            "negative_reserve_mean_kpa": 51.14042676819211
+          },
+          "after_5_sec": {
+            "samples": 1798,
+            "rmse_pos_kpa": 5.750042360239748,
+            "rmse_neg_kpa": 5.356620507955196,
+            "combined_rmse_kpa": 5.556814303663461,
+            "bias_pos_obs_minus_ref_kpa": -4.2208139442127015,
+            "bias_neg_obs_minus_ref_kpa": 4.701124654198044,
+            "positive_reserve_mean_kpa": 16.053866827774172,
+            "negative_reserve_mean_kpa": 49.19768787712195
+          }
+        },
+        "scope": "The interventions are pressure initialization and optional synthetic initial current policy-pressure observation plus pressure history. Nominal simulator parameters, 50 Hz loop, a common hidden-state RESET RULE, and fresh member-0 reference are retained. Internal reset pump pressures vary with source pressure under that rule. Source CSV states are first valid-reference measurements, not verified pre-first-action states. These rollouts cannot establish that initialization explains observed real failures."
+      },
+      {
+        "model": "HR_smooth",
+        "case": "atmospheric",
+        "history_mode": "consistent_history",
+        "checkpoint": "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/model_epi_2000.pth",
+        "input_sha256": {
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/cfg.yaml": "f42b241bf2a214b7c4ef17da28ecf8b61dcd67e4c23828bb8f153e2568e5f71f",
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/model_epi_2000.pth": "1d966ad5d3e1efaa7c203ad207b9e0d7eab54d3b6f8f95d90d94584796b93dbc"
+        },
+        "original_model_files_unchanged": true,
+        "initialization": {
+          "pressure_kpa": [
+            101.325,
+            101.325,
+            101.325,
+            101.325
+          ],
+          "source_csv": null,
+          "source_row_index": null,
+          "source_logged_time_sec": null
+        },
+        "hidden_reset_assumption": "Simulator set_init_env_act resets six valve states; pump phase is zero; two internal pump pressures use the simulator's initialization formulas from source pressures, so their values change when source pressure changes. The reset RULE is common; hidden state values are not held constant. These hidden states are not measured real states.",
+        "metrics": {
+          "whole": {
+            "samples": 2048,
+            "rmse_pos_kpa": 0.704591824654031,
+            "rmse_neg_kpa": 1.0737037895905663,
+            "combined_rmse_kpa": 0.9080995174402529,
+            "bias_pos_obs_minus_ref_kpa": -0.3493129446401459,
+            "bias_neg_obs_minus_ref_kpa": 0.7756793581345245,
+            "positive_reserve_mean_kpa": 44.06839515980931,
+            "negative_reserve_mean_kpa": 38.83876895114527
+          },
+          "first_5_sec": {
+            "samples": 250,
+            "rmse_pos_kpa": 1.0737902763722549,
+            "rmse_neg_kpa": 2.233506521314707,
+            "combined_rmse_kpa": 1.7523665339173378,
+            "bias_pos_obs_minus_ref_kpa": -0.28918208276700397,
+            "bias_neg_obs_minus_ref_kpa": 1.5665582269001992,
+            "positive_reserve_mean_kpa": 37.935412944553015,
+            "negative_reserve_mean_kpa": 40.147108406457555
+          },
+          "after_5_sec": {
+            "samples": 1798,
+            "rmse_pos_kpa": 0.6365195232352518,
+            "rmse_neg_kpa": 0.7870892724860363,
+            "combined_rmse_kpa": 0.7157746245579786,
+            "bias_pos_obs_minus_ref_kpa": -0.3576737430096039,
+            "bias_neg_obs_minus_ref_kpa": 0.6657128858367388,
+            "positive_reserve_mean_kpa": 44.92114574591281,
+            "negative_reserve_mean_kpa": 38.65685300908294
+          }
+        },
+        "scope": "The interventions are pressure initialization and optional synthetic initial current policy-pressure observation plus pressure history. Nominal simulator parameters, 50 Hz loop, a common hidden-state RESET RULE, and fresh member-0 reference are retained. Internal reset pump pressures vary with source pressure under that rule. Source CSV states are first valid-reference measurements, not verified pre-first-action states. These rollouts cannot establish that initialization explains observed real failures."
+      },
+      {
+        "model": "HR_smooth",
+        "case": "261015_18_59_30",
+        "history_mode": "consistent_history",
+        "checkpoint": "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/model_epi_2000.pth",
+        "input_sha256": {
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/cfg.yaml": "f42b241bf2a214b7c4ef17da28ecf8b61dcd67e4c23828bb8f153e2568e5f71f",
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/model_epi_2000.pth": "1d966ad5d3e1efaa7c203ad207b9e0d7eab54d3b6f8f95d90d94584796b93dbc"
+        },
+        "original_model_files_unchanged": true,
+        "initialization": {
+          "pressure_kpa": [
+            179.29824829101562,
+            44.15972137451172,
+            113.9733428955078,
+            91.13372039794922
+          ],
+          "source_csv": "pneu_rl/exp/drive_zeroshot_20261015/261015_18_59_30_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real/261015_18_59_30_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real.csv",
+          "source_csv_sha256": "2c2a1cb9b249c037162acc974d2e4e7569223961776d0c42ec605ecf642cad0a",
+          "source_row_index": 0,
+          "source_logged_time_sec": 0.0,
+          "source_measurement_caveat": "First logged measurement whose reference is valid; not verified as the physical state immediately before the first policy action."
+        },
+        "hidden_reset_assumption": "Simulator set_init_env_act resets six valve states; pump phase is zero; two internal pump pressures use the simulator's initialization formulas from source pressures, so their values change when source pressure changes. The reset RULE is common; hidden state values are not held constant. These hidden states are not measured real states.",
+        "metrics": {
+          "whole": {
+            "samples": 2048,
+            "rmse_pos_kpa": 1.187861696699893,
+            "rmse_neg_kpa": 1.5613117926944806,
+            "combined_rmse_kpa": 1.3872112176041544,
+            "bias_pos_obs_minus_ref_kpa": -0.2190432702400566,
+            "bias_neg_obs_minus_ref_kpa": 0.7089392422931787,
+            "positive_reserve_mean_kpa": 45.68693337289241,
+            "negative_reserve_mean_kpa": 39.92823488248358
+          },
+          "first_5_sec": {
+            "samples": 250,
+            "rmse_pos_kpa": 2.9547757349532313,
+            "rmse_neg_kpa": 3.9259083013641294,
+            "combined_rmse_kpa": 3.4744392090370635,
+            "bias_pos_obs_minus_ref_kpa": 0.8343387366472103,
+            "bias_neg_obs_minus_ref_kpa": 1.0594776213976076,
+            "positive_reserve_mean_kpa": 50.47339334538846,
+            "negative_reserve_mean_kpa": 47.371622124235465
+          },
+          "after_5_sec": {
+            "samples": 1798,
+            "rmse_pos_kpa": 0.6271058626010871,
+            "rmse_neg_kpa": 0.7959887503348723,
+            "combined_rmse_kpa": 0.7165402478466667,
+            "bias_pos_obs_minus_ref_kpa": -0.36550906652582776,
+            "bias_neg_obs_minus_ref_kpa": 0.6601992007046875,
+            "positive_reserve_mean_kpa": 45.02140779273445,
+            "negative_reserve_mean_kpa": 38.89328115031563
+          }
+        },
+        "scope": "The interventions are pressure initialization and optional synthetic initial current policy-pressure observation plus pressure history. Nominal simulator parameters, 50 Hz loop, a common hidden-state RESET RULE, and fresh member-0 reference are retained. Internal reset pump pressures vary with source pressure under that rule. Source CSV states are first valid-reference measurements, not verified pre-first-action states. These rollouts cannot establish that initialization explains observed real failures."
+      },
+      {
+        "model": "HR_smooth",
+        "case": "261015_19_01_16",
+        "history_mode": "consistent_history",
+        "checkpoint": "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/model_epi_2000.pth",
+        "input_sha256": {
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/cfg.yaml": "f42b241bf2a214b7c4ef17da28ecf8b61dcd67e4c23828bb8f153e2568e5f71f",
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/model_epi_2000.pth": "1d966ad5d3e1efaa7c203ad207b9e0d7eab54d3b6f8f95d90d94584796b93dbc"
+        },
+        "original_model_files_unchanged": true,
+        "initialization": {
+          "pressure_kpa": [
+            322.07745361328125,
+            28.227272033691406,
+            201.1446533203125,
+            101.22283935546876
+          ],
+          "source_csv": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_01_16_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real/261015_19_01_16_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real.csv",
+          "source_csv_sha256": "4f5d87132e37d6cc43fc2d2036f016811164bc38d8e894a9a65ef1627b1636b5",
+          "source_row_index": 0,
+          "source_logged_time_sec": 0.0,
+          "source_measurement_caveat": "First logged measurement whose reference is valid; not verified as the physical state immediately before the first policy action."
+        },
+        "hidden_reset_assumption": "Simulator set_init_env_act resets six valve states; pump phase is zero; two internal pump pressures use the simulator's initialization formulas from source pressures, so their values change when source pressure changes. The reset RULE is common; hidden state values are not held constant. These hidden states are not measured real states.",
+        "metrics": {
+          "whole": {
+            "samples": 2048,
+            "rmse_pos_kpa": 362.01462633982834,
+            "rmse_neg_kpa": 40.603175882082354,
+            "combined_rmse_kpa": 257.5880505532786,
+            "bias_pos_obs_minus_ref_kpa": 359.16990884678944,
+            "bias_neg_obs_minus_ref_kpa": 39.954940694125696,
+            "positive_reserve_mean_kpa": 485.92113156150384,
+            "negative_reserve_mean_kpa": 65.96288055119076
+          },
+          "first_5_sec": {
+            "samples": 250,
+            "rmse_pos_kpa": 255.7950515096967,
+            "rmse_neg_kpa": 32.921360978617855,
+            "combined_rmse_kpa": 182.36628578979838,
+            "bias_pos_obs_minus_ref_kpa": 250.4691726937387,
+            "bias_neg_obs_minus_ref_kpa": 29.193197028480455,
+            "positive_reserve_mean_kpa": 13.86550773472021,
+            "negative_reserve_mean_kpa": 77.38354919293639
+          },
+          "after_5_sec": {
+            "samples": 1798,
+            "rmse_pos_kpa": 374.4049952030668,
+            "rmse_neg_kpa": 41.558992473647926,
+            "combined_rmse_kpa": 266.3702782673334,
+            "bias_pos_obs_minus_ref_kpa": 374.2840267768577,
+            "bias_neg_obs_minus_ref_kpa": 41.45128992461029,
+            "positive_reserve_mean_kpa": 551.557341771012,
+            "negative_reserve_mean_kpa": 64.37491216385128
+          }
+        },
+        "scope": "The interventions are pressure initialization and optional synthetic initial current policy-pressure observation plus pressure history. Nominal simulator parameters, 50 Hz loop, a common hidden-state RESET RULE, and fresh member-0 reference are retained. Internal reset pump pressures vary with source pressure under that rule. Source CSV states are first valid-reference measurements, not verified pre-first-action states. These rollouts cannot establish that initialization explains observed real failures."
+      },
+      {
+        "model": "HR_smooth",
+        "case": "261015_19_17_19",
+        "history_mode": "consistent_history",
+        "checkpoint": "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/model_epi_2000.pth",
+        "input_sha256": {
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/cfg.yaml": "f42b241bf2a214b7c4ef17da28ecf8b61dcd67e4c23828bb8f153e2568e5f71f",
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/model_epi_2000.pth": "1d966ad5d3e1efaa7c203ad207b9e0d7eab54d3b6f8f95d90d94584796b93dbc"
+        },
+        "original_model_files_unchanged": true,
+        "initialization": {
+          "pressure_kpa": [
+            139.41165161132812,
+            58.66733932495117,
+            104.78123474121094,
+            99.769775390625
+          ],
+          "source_csv": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real/261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real.csv",
+          "source_csv_sha256": "40fe3da3fce1d74a49968215c0f4acc55112bbf504fb46ee642c9783d306c47f",
+          "source_row_index": 1,
+          "source_logged_time_sec": 12.722250699996948,
+          "source_measurement_caveat": "First logged measurement whose reference is valid; not verified as the physical state immediately before the first policy action."
+        },
+        "hidden_reset_assumption": "Simulator set_init_env_act resets six valve states; pump phase is zero; two internal pump pressures use the simulator's initialization formulas from source pressures, so their values change when source pressure changes. The reset RULE is common; hidden state values are not held constant. These hidden states are not measured real states.",
+        "metrics": {
+          "whole": {
+            "samples": 2048,
+            "rmse_pos_kpa": 0.7952667089795309,
+            "rmse_neg_kpa": 1.2876396026199093,
+            "combined_rmse_kpa": 1.0701553356046711,
+            "bias_pos_obs_minus_ref_kpa": -0.371523304163188,
+            "bias_neg_obs_minus_ref_kpa": 0.7667631805291669,
+            "positive_reserve_mean_kpa": 45.12214907745632,
+            "negative_reserve_mean_kpa": 39.42538193307028
+          },
+          "first_5_sec": {
+            "samples": 250,
+            "rmse_pos_kpa": 1.2548758349571036,
+            "rmse_neg_kpa": 2.9729302618244837,
+            "combined_rmse_kpa": 2.2817786596020966,
+            "bias_pos_obs_minus_ref_kpa": -0.05186143228716247,
+            "bias_neg_obs_minus_ref_kpa": 1.4147252974439848,
+            "positive_reserve_mean_kpa": 43.24828151084434,
+            "negative_reserve_mean_kpa": 43.87622394149986
+          },
+          "after_5_sec": {
+            "samples": 1798,
+            "rmse_pos_kpa": 0.7081197176895624,
+            "rmse_neg_kpa": 0.8121839379687078,
+            "combined_rmse_kpa": 0.7619305360973214,
+            "bias_pos_obs_minus_ref_kpa": -0.41597017177665097,
+            "bias_neg_obs_minus_ref_kpa": 0.6766683366867283,
+            "positive_reserve_mean_kpa": 45.38269796046689,
+            "negative_reserve_mean_kpa": 38.806521809540016
+          }
+        },
+        "scope": "The interventions are pressure initialization and optional synthetic initial current policy-pressure observation plus pressure history. Nominal simulator parameters, 50 Hz loop, a common hidden-state RESET RULE, and fresh member-0 reference are retained. Internal reset pump pressures vary with source pressure under that rule. Source CSV states are first valid-reference measurements, not verified pre-first-action states. These rollouts cannot establish that initialization explains observed real failures."
+      },
+      {
+        "model": "HR_smooth",
+        "case": "261015_19_17_19",
+        "history_mode": "fake_atmosphere_history",
+        "checkpoint": "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/model_epi_2000.pth",
+        "input_sha256": {
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/cfg.yaml": "f42b241bf2a214b7c4ef17da28ecf8b61dcd67e4c23828bb8f153e2568e5f71f",
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/model_epi_2000.pth": "1d966ad5d3e1efaa7c203ad207b9e0d7eab54d3b6f8f95d90d94584796b93dbc"
+        },
+        "original_model_files_unchanged": true,
+        "initialization": {
+          "pressure_kpa": [
+            139.41165161132812,
+            58.66733932495117,
+            104.78123474121094,
+            99.769775390625
+          ],
+          "source_csv": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real/261015_19_17_19_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real.csv",
+          "source_csv_sha256": "40fe3da3fce1d74a49968215c0f4acc55112bbf504fb46ee642c9783d306c47f",
+          "source_row_index": 1,
+          "source_logged_time_sec": 12.722250699996948,
+          "source_measurement_caveat": "First logged measurement whose reference is valid; not verified as the physical state immediately before the first policy action."
+        },
+        "hidden_reset_assumption": "Simulator set_init_env_act resets six valve states; pump phase is zero; two internal pump pressures use the simulator's initialization formulas from source pressures, so their values change when source pressure changes. The reset RULE is common; hidden state values are not held constant. These hidden states are not measured real states.",
+        "metrics": {
+          "whole": {
+            "samples": 2048,
+            "rmse_pos_kpa": 0.7403620361672132,
+            "rmse_neg_kpa": 1.185205094997509,
+            "combined_rmse_kpa": 0.9881414528815489,
+            "bias_pos_obs_minus_ref_kpa": -0.3033468480384041,
+            "bias_neg_obs_minus_ref_kpa": 0.6901554360249329,
+            "positive_reserve_mean_kpa": 44.884254576547086,
+            "negative_reserve_mean_kpa": 39.50775917773897
+          },
+          "first_5_sec": {
+            "samples": 250,
+            "rmse_pos_kpa": 1.2908963878298618,
+            "rmse_neg_kpa": 2.6858828754019255,
+            "combined_rmse_kpa": 2.1071758712183355,
+            "bias_pos_obs_minus_ref_kpa": 0.209403717338512,
+            "bias_neg_obs_minus_ref_kpa": 0.9395081446747144,
+            "positive_reserve_mean_kpa": 42.564370557358835,
+            "negative_reserve_mean_kpa": 44.081430557312515
+          },
+          "after_5_sec": {
+            "samples": 1798,
+            "rmse_pos_kpa": 0.6266153956047359,
+            "rmse_neg_kpa": 0.7726399938119239,
+            "combined_rmse_kpa": 0.7034271156440337,
+            "bias_pos_obs_minus_ref_kpa": -0.37464142053241356,
+            "bias_neg_obs_minus_ref_kpa": 0.6554845922193457,
+            "positive_reserve_mean_kpa": 45.206819095344116,
+            "negative_reserve_mean_kpa": 38.871820443093036
+          }
+        },
+        "scope": "The interventions are pressure initialization and optional synthetic initial current policy-pressure observation plus pressure history. Nominal simulator parameters, 50 Hz loop, a common hidden-state RESET RULE, and fresh member-0 reference are retained. Internal reset pump pressures vary with source pressure under that rule. Source CSV states are first valid-reference measurements, not verified pre-first-action states. These rollouts cannot establish that initialization explains observed real failures."
+      },
+      {
+        "model": "HR_smooth",
+        "case": "261015_19_18_42",
+        "history_mode": "consistent_history",
+        "checkpoint": "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/model_epi_2000.pth",
+        "input_sha256": {
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/cfg.yaml": "f42b241bf2a214b7c4ef17da28ecf8b61dcd67e4c23828bb8f153e2568e5f71f",
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/model_epi_2000.pth": "1d966ad5d3e1efaa7c203ad207b9e0d7eab54d3b6f8f95d90d94584796b93dbc"
+        },
+        "original_model_files_unchanged": true,
+        "initialization": {
+          "pressure_kpa": [
+            105.67089080810548,
+            95.20903778076172,
+            101.54779815673828,
+            101.33779907226562
+          ],
+          "source_csv": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real/261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real.csv",
+          "source_csv_sha256": "59ab41625908a0ea0440ec7c0cd4fa0f5bf77146ff62fe216a1556802bf5684e",
+          "source_row_index": 1,
+          "source_logged_time_sec": 17.96954584121704,
+          "source_measurement_caveat": "First logged measurement whose reference is valid; not verified as the physical state immediately before the first policy action."
+        },
+        "hidden_reset_assumption": "Simulator set_init_env_act resets six valve states; pump phase is zero; two internal pump pressures use the simulator's initialization formulas from source pressures, so their values change when source pressure changes. The reset RULE is common; hidden state values are not held constant. These hidden states are not measured real states.",
+        "metrics": {
+          "whole": {
+            "samples": 2048,
+            "rmse_pos_kpa": 0.6685188984242109,
+            "rmse_neg_kpa": 1.0708750201779489,
+            "combined_rmse_kpa": 0.892661981488918,
+            "bias_pos_obs_minus_ref_kpa": -0.363508459689291,
+            "bias_neg_obs_minus_ref_kpa": 0.7845866313433743,
+            "positive_reserve_mean_kpa": 44.38638218557544,
+            "negative_reserve_mean_kpa": 38.99534147585506
+          },
+          "first_5_sec": {
+            "samples": 250,
+            "rmse_pos_kpa": 0.9167536409194399,
+            "rmse_neg_kpa": 2.1736321801002014,
+            "combined_rmse_kpa": 1.6680998310212436,
+            "bias_pos_obs_minus_ref_kpa": -0.21034828426462804,
+            "bias_neg_obs_minus_ref_kpa": 1.5338142290390773,
+            "positive_reserve_mean_kpa": 38.49746827092341,
+            "negative_reserve_mean_kpa": 40.58285894015897
+          },
+          "after_5_sec": {
+            "samples": 1798,
+            "rmse_pos_kpa": 0.6262596944550558,
+            "rmse_neg_kpa": 0.8057850216186558,
+            "combined_rmse_kpa": 0.721626879337209,
+            "bias_pos_obs_minus_ref_kpa": -0.38480436839683585,
+            "bias_neg_obs_minus_ref_kpa": 0.6804114926203899,
+            "positive_reserve_mean_kpa": 45.2051966898374,
+            "negative_reserve_mean_kpa": 38.77460767937231
+          }
+        },
+        "scope": "The interventions are pressure initialization and optional synthetic initial current policy-pressure observation plus pressure history. Nominal simulator parameters, 50 Hz loop, a common hidden-state RESET RULE, and fresh member-0 reference are retained. Internal reset pump pressures vary with source pressure under that rule. Source CSV states are first valid-reference measurements, not verified pre-first-action states. These rollouts cannot establish that initialization explains observed real failures."
+      },
+      {
+        "model": "HR_smooth",
+        "case": "261015_19_18_42",
+        "history_mode": "fake_atmosphere_history",
+        "checkpoint": "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/model_epi_2000.pth",
+        "input_sha256": {
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/cfg.yaml": "f42b241bf2a214b7c4ef17da28ecf8b61dcd67e4c23828bb8f153e2568e5f71f",
+          "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/model_epi_2000.pth": "1d966ad5d3e1efaa7c203ad207b9e0d7eab54d3b6f8f95d90d94584796b93dbc"
+        },
+        "original_model_files_unchanged": true,
+        "initialization": {
+          "pressure_kpa": [
+            105.67089080810548,
+            95.20903778076172,
+            101.54779815673828,
+            101.33779907226562
+          ],
+          "source_csv": "pneu_rl/exp/drive_zeroshot_20261015/261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real/261015_19_18_42_260831_lib3_histreward2x2_r025_H_smooth_seed0_Real.csv",
+          "source_csv_sha256": "59ab41625908a0ea0440ec7c0cd4fa0f5bf77146ff62fe216a1556802bf5684e",
+          "source_row_index": 1,
+          "source_logged_time_sec": 17.96954584121704,
+          "source_measurement_caveat": "First logged measurement whose reference is valid; not verified as the physical state immediately before the first policy action."
+        },
+        "hidden_reset_assumption": "Simulator set_init_env_act resets six valve states; pump phase is zero; two internal pump pressures use the simulator's initialization formulas from source pressures, so their values change when source pressure changes. The reset RULE is common; hidden state values are not held constant. These hidden states are not measured real states.",
+        "metrics": {
+          "whole": {
+            "samples": 2048,
+            "rmse_pos_kpa": 0.6615692843330913,
+            "rmse_neg_kpa": 0.9236215436825813,
+            "combined_rmse_kpa": 0.8033525608123725,
+            "bias_pos_obs_minus_ref_kpa": -0.3444322774567303,
+            "bias_neg_obs_minus_ref_kpa": 0.6963563242578411,
+            "positive_reserve_mean_kpa": 43.9800102073197,
+            "negative_reserve_mean_kpa": 39.06675613497871
+          },
+          "first_5_sec": {
+            "samples": 250,
+            "rmse_pos_kpa": 0.7971885710009172,
+            "rmse_neg_kpa": 1.7943656638656371,
+            "combined_rmse_kpa": 1.3883907507244588,
+            "bias_pos_obs_minus_ref_kpa": -0.10477324797339446,
+            "bias_neg_obs_minus_ref_kpa": 1.3217995120996642,
+            "positive_reserve_mean_kpa": 37.409583451757555,
+            "negative_reserve_mean_kpa": 40.815194975451206
+          },
+          "after_5_sec": {
+            "samples": 1798,
+            "rmse_pos_kpa": 0.6404421701370163,
+            "rmse_neg_kpa": 0.7238831151077936,
+            "combined_rmse_kpa": 0.6834372457029153,
+            "bias_pos_obs_minus_ref_kpa": -0.3777552793314989,
+            "bias_neg_obs_minus_ref_kpa": 0.6093925884622596,
+            "positive_reserve_mean_kpa": 44.893584561541346,
+            "negative_reserve_mean_kpa": 38.82364728619222
+          }
+        },
+        "scope": "The interventions are pressure initialization and optional synthetic initial current policy-pressure observation plus pressure history. Nominal simulator parameters, 50 Hz loop, a common hidden-state RESET RULE, and fresh member-0 reference are retained. Internal reset pump pressures vary with source pressure under that rule. Source CSV states are first valid-reference measurements, not verified pre-first-action states. These rollouts cannot establish that initialization explains observed real failures."
+      }
+    ]
+  }
+}

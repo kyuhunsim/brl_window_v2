@@ -1,0 +1,30 @@
+{
+  "H": {
+    "1000": {
+      "tensors": 93,
+      "all_finite": true
+    },
+    "1500": {
+      "tensors": 93,
+      "all_finite": true
+    },
+    "2000": {
+      "tensors": 93,
+      "all_finite": true
+    }
+  },
+  "HR": {
+    "1000": {
+      "tensors": 93,
+      "all_finite": true
+    },
+    "1500": {
+      "tensors": 93,
+      "all_finite": true
+    },
+    "2000": {
+      "tensors": 93,
+      "all_finite": true
+    }
+  }
+}

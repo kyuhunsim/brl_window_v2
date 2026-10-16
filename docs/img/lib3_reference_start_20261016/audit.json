@@ -1,0 +1,18 @@
+{
+  "old_HR2000": {
+    "checkpoint": "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/model_epi_2000.pth",
+    "sha256": "1d966ad5d3e1efaa7c203ad207b9e0d7eab54d3b6f8f95d90d94584796b93dbc"
+  },
+  "new_H2000": {
+    "checkpoint": "pneu_rl/models/261015_lib3_allopen30_H_smooth_seed0/model_epi_2000.pth",
+    "sha256": "6893d13443a6ad15c90350ef8f9603ba312c10ca7a7ffab356c24781343964c8"
+  },
+  "new_HR1500": {
+    "checkpoint": "pneu_rl/models/261015_lib3_allopen30_HR_smooth_seed0/model_epi_1500.pth",
+    "sha256": "1c0f1ba31bc5324c4ffecc05eccef30c66ef85279feb65e077743758f1c3ba49"
+  },
+  "new_HR2000": {
+    "checkpoint": "pneu_rl/models/261015_lib3_allopen30_HR_smooth_seed0/model_epi_2000.pth",
+    "sha256": "7b2407cd24855f3937dc32e25af6960bed1bdbca14fc94251f648c42a51e8800"
+  }
+}

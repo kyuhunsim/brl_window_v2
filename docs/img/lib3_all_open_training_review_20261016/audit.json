@@ -1,0 +1,78 @@
+{
+  "H": {
+    "wall_time": {
+      "started_unix": 1792063760.5924387,
+      "episodes_requested": 2000,
+      "completed": true,
+      "torch_threads": 2,
+      "initialization": {
+        "mode": "pump_on_all_open",
+        "precondition_seconds": 30,
+        "reference_clock": "policy_step/freq; preserved across carried blocks"
+      },
+      "finished_unix": 1792079151.745482,
+      "elapsed_seconds": 15391.153042876977,
+      "policy_steps": 1024000
+    },
+    "checkpoints": {
+      "1000": "c75d275f54f5c2870c72fd248fe4ade5ef571657201ca11da3bd0bb384502cc3",
+      "1500": "691e531984c891632ad85245f07f73fc3cc626be5e1a13eaa44bd94bb8092cf0",
+      "2000": "6893d13443a6ad15c90350ef8f9603ba312c10ca7a7ffab356c24781343964c8"
+    },
+    "training_windows": {
+      "901": {
+        "reward": -940.7367874702417,
+        "pos_rmse": 4.292602399448055,
+        "neg_rmse": 3.060366163411071
+      },
+      "1401": {
+        "reward": -1510.8848761740414,
+        "pos_rmse": 7.683532271803455,
+        "neg_rmse": 3.7963646264300106
+      },
+      "1901": {
+        "reward": -688.184660243664,
+        "pos_rmse": 2.9807648027818407,
+        "neg_rmse": 2.6477018687291913
+      }
+    }
+  },
+  "HR": {
+    "wall_time": {
+      "started_unix": 1792063765.6329093,
+      "episodes_requested": 2000,
+      "completed": true,
+      "torch_threads": 2,
+      "initialization": {
+        "mode": "pump_on_all_open",
+        "precondition_seconds": 30,
+        "reference_clock": "policy_step/freq; preserved across carried blocks"
+      },
+      "finished_unix": 1792079294.9132829,
+      "elapsed_seconds": 15529.280373562011,
+      "policy_steps": 1024000
+    },
+    "checkpoints": {
+      "1000": "1f7eb9985dba94802b480b454a4d01a444e0fc90e453ed9aaee0321a6750dd79",
+      "1500": "1c0f1ba31bc5324c4ffecc05eccef30c66ef85279feb65e077743758f1c3ba49",
+      "2000": "7b2407cd24855f3937dc32e25af6960bed1bdbca14fc94251f648c42a51e8800"
+    },
+    "training_windows": {
+      "901": {
+        "reward": -552.9484943788581,
+        "pos_rmse": 2.882427901254807,
+        "neg_rmse": 1.9463198757789337
+      },
+      "1401": {
+        "reward": -384.5141200820921,
+        "pos_rmse": 2.076156871082156,
+        "neg_rmse": 1.651914390724281
+      },
+      "1901": {
+        "reward": -260.3192415672698,
+        "pos_rmse": 1.348365470051896,
+        "neg_rmse": 1.5215202477148886
+      }
+    }
+  }
+}

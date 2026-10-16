@@ -1,0 +1,19 @@
+{
+  "source": {
+    "source_checkpoint": "pneu_rl/models/260831_lib3_histreward2x2_r025_HR_smooth_seed0/model_epi_2000.pth",
+    "source_sha256": "1d966ad5d3e1efaa7c203ad207b9e0d7eab54d3b6f8f95d90d94584796b93dbc",
+    "replay": "fresh; 2048 stochastic source-policy steps before updates",
+    "restored": "actor, critic, target critic, actor/critic optimizers, log_alpha",
+    "entropy_optimizer": "fresh; absent from source checkpoint",
+    "warmup_fixed_action": "disabled",
+    "additional_episodes": 20
+  },
+  "started_unix": 1792114278.149927,
+  "completed": true,
+  "finished_unix": 1792114405.1698341,
+  "updates": 10240,
+  "policy_steps": 12288,
+  "replay_size": 12288,
+  "actor_parameter_delta_l2": 3.6090789267158154,
+  "elapsed_seconds": 127.03057050704956
+}

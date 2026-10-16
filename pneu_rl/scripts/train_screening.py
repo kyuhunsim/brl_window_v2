@@ -592,7 +592,16 @@ def make_components(cfg: dict[str, Any]):
 
         obs = PneuSim(**cfg["obs"])
         pred = PneuPred(**cfg["pred"]) if cfg["pred"] is not None else None
-        env = PneuEnv3(obs=obs, ref=reference, pred=pred, **cfg["env"])
+        initialization = cfg.get("initialization") or {}
+        if initialization.get("mode") == "pump_on_all_open":
+            from pneu_env.env3_all_open import PneuEnv3AllOpen
+            env = PneuEnv3AllOpen(
+                obs=obs, ref=reference, pred=pred,
+                precondition_seconds=initialization["precondition_seconds"],
+                **cfg["env"],
+            )
+        else:
+            env = PneuEnv3(obs=obs, ref=reference, pred=pred, **cfg["env"])
 
     env.action_space.seed(cfg["train_seed"])
     if cfg["pid"] is not None:

@@ -70,7 +70,15 @@ def build_model_env(
     pred = PneuPred(**cfg["pred"]) if cfg.get("pred") is not None else None
     env_cfg = dict(cfg["env"])
     env_cfg["verbose"] = False
-    env = PneuEnv3(obs=obs, ref=reference, pred=pred, **env_cfg)
+    initialization = cfg.get("initialization") or {}
+    if initialization.get("mode") == "pump_on_all_open":
+        from pneu_env.env3_all_open import PneuEnv3AllOpen
+        env = PneuEnv3AllOpen(
+            obs=obs, ref=reference, pred=pred,
+            precondition_seconds=initialization["precondition_seconds"], **env_cfg,
+        )
+    else:
+        env = PneuEnv3(obs=obs, ref=reference, pred=pred, **env_cfg)
     if cfg.get("pid") is not None:
         env.set_pid(**cfg["pid"])
 

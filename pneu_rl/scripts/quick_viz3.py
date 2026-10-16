@@ -16,6 +16,7 @@ from pneu_ref.step_ref import StepCasesRef, StepRef
 from pneu_ref.sine_ref import SineRef, DynamicOscillatorRef, CenterStepOscillationRef
 from pneu_ref.traj_ref import TrajRef
 from pneu_env.env3 import PneuEnv3
+from pneu_env.env3_all_open import PneuEnv3AllOpen
 from pneu_env.sim3 import PneuSim
 from pneu_env.pred3 import PneuPred
 from pneu_env.real.real9 import PneuReal
@@ -165,6 +166,8 @@ viz_kwargs = dict(
 def infos_to_datas(infos: deque):
     datas = dict(
         curr_time = deque(),
+        sensor_time = deque(),
+        reference_time = deque(),
         press_pos = deque(),
         press_neg = deque(),
         act_pos_press = deque(),
@@ -186,7 +189,9 @@ def infos_to_datas(infos: deque):
     )
     for entry in infos:
         obs = entry["obs"] if "obs" in entry else entry
-        datas['curr_time'].append(obs['curr_time'])
+        datas['curr_time'].append(entry.get('policy_time', obs['curr_time']))
+        datas['sensor_time'].append(obs['curr_time'])
+        datas['reference_time'].append(entry.get('reference_time', np.nan))
         datas['press_pos'].append(obs['sen_pos'])
         datas['press_neg'].append(obs['sen_neg'])
         datas['act_pos_press'].append(obs['sen_act_pos'])
@@ -268,7 +273,23 @@ def model_bank_reference(config, trajectory_index=0):
                           trajectory_index=trajectory_index)
     ref = make_pressure_reference(spec)
     ref.max_time = 40.0
+    preview = (config['env']['num_pred'] + 1) / config['obs']['freq']
+    if ref.max_time + preview > float(ref.trajectories[trajectory_index]['duration']):
+        raise ValueError('Reference bank is too short for 40s evaluation plus policy preview')
     return ref, spec
+
+
+def build_viz_env(config, obs, ref, pred=None):
+    """Honor saved simulation initialization; never precondition real hardware here."""
+    initialization = config.get('initialization') or {}
+    mode = initialization.get('mode')
+    if mode not in (None, 'pump_on_all_open'):
+        raise ValueError(f'Unsupported initialization mode: {mode}')
+    if isinstance(obs, PneuSim) and mode == 'pump_on_all_open':
+        return PneuEnv3AllOpen(obs=obs, ref=ref, pred=pred,
+            precondition_seconds=initialization.get('precondition_seconds', 30),
+            **config['env'])
+    return PneuEnv3(obs=obs, ref=ref, pred=pred, **config['env'])
 
 
 def collect_rollout(env, model, ref):
@@ -279,9 +300,16 @@ def collect_rollout(env, model, ref):
         curr_time = 0.0
         duration = 100.0 if ref.max_time == float('inf') else ref.max_time
         while curr_time < duration:
+            reference_time = env.t if isinstance(env, PneuEnv3AllOpen) else None
             action = model.predict(state)
             state, _, _, _, info = env.step(action)
-            curr_time = info['obs']['curr_time']
+            if isinstance(env, PneuEnv3AllOpen):
+                curr_time = env.t
+                info = copy.deepcopy(info)
+                info['policy_time'] = curr_time
+                info['reference_time'] = reference_time
+            else:
+                curr_time = info['obs']['curr_time']
             infos.append(info)
     except KeyboardInterrupt:
         print('\n[ INFO] Interrupted; publishing shutdown command before saving.')
@@ -416,11 +444,16 @@ if __name__ == '__main__':
     viz_kwargs['env']['pred'] = pred_config
     pred = PneuPred(**pred_config) if pred_config is not None else None
 
-    env = PneuEnv3(
-        obs = obs,
-        ref = ref,
-        pred = pred if kwargs['pred'] is not None else None,
-        **kwargs['env']
+    env = build_viz_env(kwargs, obs, ref, pred)
+    viz_kwargs['initialization'] = copy.deepcopy(kwargs.get('initialization'))
+    viz_kwargs['policy_env'] = copy.deepcopy(kwargs['env'])
+    prepared = isinstance(env, PneuEnv3AllOpen)
+    viz_kwargs['runtime'] = dict(
+        start_protocol=('pump_on_all_open_sim' if prepared else
+                        'continuous_pump_on_no_start_wait' if obs_mode == '2' else 'standard_sim_reset'),
+        reference_clock='policy_step/freq' if prepared else 'sensor_time',
+        preparation_seconds=env.precondition_seconds if prepared else None,
+        history_initialization='prepared_sim_history' if prepared else 'standard_env_reset',
     )
     
     if pid_enabled:
@@ -434,8 +467,6 @@ if __name__ == '__main__':
     model.set_logger(model_name)
     model.load_model(path=model.logger.model_path, evaluate=True)
 
-    if obs_mode == '2':
-        viz_kwargs['runtime'] = dict(start_protocol='continuous_pump_on_no_start_wait')
     infos = collect_rollout(env, model, ref)
     if obs_mode == '2':
         print('[ END] All-open command published. The pump is not controlled by this script.')

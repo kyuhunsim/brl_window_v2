@@ -1,0 +1,22 @@
+{
+  "0": {
+    "tensors": 93,
+    "finite": true
+  },
+  "5": {
+    "tensors": 93,
+    "finite": true
+  },
+  "10": {
+    "tensors": 93,
+    "finite": true
+  },
+  "15": {
+    "tensors": 93,
+    "finite": true
+  },
+  "20": {
+    "tensors": 93,
+    "finite": true
+  }
+}
