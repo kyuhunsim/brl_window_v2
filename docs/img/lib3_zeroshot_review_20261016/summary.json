@@ -1,0 +1,25 @@
+{
+  "sources": {
+    "new_before": {
+      "path": "pneu_rl/exp/261015_lib3_allopen30_HR_smooth_seed0/261016_15_56_56_261015_lib3_allopen30_HR_smooth_seed0_Real/261016_15_56_56_261015_lib3_allopen30_HR_smooth_seed0_Real.csv",
+      "sha256": "3aead666853bd79c26c19652a5bad7f17a4d43012a8f35ac603eca9f1eee0bc0"
+    },
+    "old_before": {
+      "path": "pneu_rl/exp/260831_lib3_histreward2x2_r025_HR_smooth_seed0/261016_15_57_57_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real/261016_15_57_57_260831_lib3_histreward2x2_r025_HR_smooth_seed0_Real.csv",
+      "sha256": "1e23d8986b1cfa90cc559ecadc40e03796aef6d34600a89529e5779fd616e142"
+    },
+    "new_after": {
+      "path": "pneu_rl/exp/261015_lib3_allopen30_HR_smooth_seed0/261016_16_15_14_261015_lib3_allopen30_HR_smooth_seed0_Real/261016_16_15_14_261015_lib3_allopen30_HR_smooth_seed0_Real.csv",
+      "sha256": "3acd001e6675791adb1f3082af461b6e84734ec17b6cdc6af548b01a3d97bf6f"
+    }
+  },
+  "new_after_mean_hz": 49.78460431896638,
+  "new_after_max_interval_ms": 23.994271003175527,
+  "spectrum_method": "6<=t<38, interpolate to 50Hz, Welch nperseg=512; band RMS sqrt(sum(PSD)*df)",
+  "limitations": [
+    "Before-fix EXP timestamps are nominal, not physical time.",
+    "No physical sensor/application timestamps; spectrum may include aliasing.",
+    "Band RMS measures oscillatory energy, not total tracking error.",
+    "Replay CSVs reused, simulator not re-executed by this script."
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "sources": {
+    "/home/rise/test/pneu_tune/exp/260520_14_44_14_Flowrate_RND6_suite_joint_tuning.csv": "a6698abe6ce7f4d43fe64bce94599d58dc3f7c5c39095430152ac57bd3b2ffe2",
+    "/home/rise/test/pneu_tune/exp/260521_17_21_45_Flowrate_RND6_suite_joint_tuning.csv": "16e6e2c3a443703c73f51ca1997e7430d8a9b5c861a02d5575a9e4c4b92ca702",
+    "/home/rise/test/pneu_tune/exp/260527_17_01_38_Flowrate_RND6_suite_joint_tuning.csv": "57be1818b245151abf79c089cc0bf0e870b0b7e827f55ea085a29c97d4b5a27c",
+    "/home/rise/test/pneu_tune/exp/260615_16_26_26_Flowrate_RND6_suite_joint_id_10min.csv": "30a2eb796580d3d2964c9c6de3c1fd7e3cf597ff702392f133e85fe138f4585f",
+    "/home/rise/test/pneu_tune/exp/260615_19_30_25_Flowrate_RND6_suite_joint_id_10min.csv": "ec0ba21d97aaff34406bf90fcffec1120badcd8574e8702cc48aefb25c22ae12",
+    "/home/rise/test/pneu_tune/exp/260616_12_58_11_Flowrate_RND6_suite_joint_id_10min.csv": "0c02dab9cde95d9d150c294580537e1287c7d32cf19343e154813da47830a604",
+    "/home/rise/test/pneu_tune/exp/260617_13_14_20_Flowrate_RND6_suite_joint_tuning_fixed_vol_output12traj.csv": "814828e1280d4becd03bd80b2e03527ff533113f34c6d699eed3f444f2942919",
+    "/home/rise/test/pneu_tune/260520_14_44_14_Flowrate_RND6_suite_joint_tuning_sim3.csv": "ef1b579a9d74dd05f15eca1f3f9e891476980237dde7c9d9d26dce759a516f54",
+    "/home/rise/test/pneu_tune/260521_17_21_45_Flowrate_RND6_suite_joint_tuning_sim3.csv": "c8293016800be8decd1a1b26f45e78f3933c2fcb3026963143ae29cffc01f3b1",
+    "pneu_env/src/pneu_env/lib3/pneumatic_CT.cpp": "bfe135404217218a84ca30ac72f371b14e781f761c9465428945a5219a68e529",
+    "/home/rise/test/pneu_tune/tune_result/output_12.txt": "fd72f568f3d4a8e0fb157ba85be9f82f388eb1a8678e03fb15e7e202ea63da24"
+  },
+  "source_valves_match_output12": {
+    "CHAMBER_POS_PARAMS": true,
+    "CHAMBER_NEG_PARAMS": true,
+    "ACT_POS_IN_PARAMS": true,
+    "ACT_POS_OUT_PARAMS": true,
+    "ACT_NEG_IN_PARAMS": true,
+    "ACT_NEG_OUT_PARAMS": true
+  },
+  "limitations": [
+    "Source parameter equality does not prove historical .so equality.",
+    "Archived replay binary and parameters are not version-locked.",
+    "No fresh simulator execution; interpolation uses overlapping recorded timestamps.",
+    "Recorded duration is not independently verified wall-clock interaction time.",
+    "No held-out status is inferred from file names."
+  ]
+}
