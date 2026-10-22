@@ -3,12 +3,21 @@ import ctypes
 import json
 import math
 import os
+from pathlib import Path
+import sys
+
+# Support direct execution from a source checkout.
+if __package__ in (None, ""):
+    workspace_root = Path(__file__).resolve().parents[3]
+    for package in ("pneu_env", "pneu_utils"):
+        sys.path.insert(0, str(workspace_root / package / "src"))
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 from scipy.ndimage import uniform_filter1d
-from utils.utils import setup_plot_style
+from pneu_utils.utils import setup_plot_style
 
 setup_plot_style({"legend.fontsize": 18})
 
@@ -22,9 +31,7 @@ setup_plot_style({"legend.fontsize": 18})
 #   wn: rad/s, not Hz.  Hz = wn / (2*pi)
 #   zeta: damping ratio
 #
-# Current chirp-based default:
-#   wn 7~25 rad/s  ~= natural frequency 1.1~4.0 Hz
-#   zeta 0.3~1.2   avoids both too-ringing and over-damped slow solutions.
+# Current defaults: wn 11~25 rad/s, zeta 0.4~0.6.
 
 MANUAL_DYNAMIC_BOUNDS = dict(
     wn_min=11.0,
@@ -1090,6 +1097,7 @@ def main():
     parser.add_argument("--flow-window-size", type=int, default=None, help="실측 유량 Q에만 적용할 moving average window size")
     parser.add_argument("--output", default="output.txt", help="tune_result에 저장할 결과 파일 이름(.txt/.png는 같은 이름으로 저장)")
     parser.add_argument("--result-dir", default="tune_result", help="txt와 image 결과를 저장할 폴더")
+    parser.add_argument("--no-show", action="store_true", help="그림을 파일로 저장하고 GUI 창은 열지 않음")
     parser.add_argument("--plot3d-max-points", type=int, default=5000, help="3D 진단 그림에 밸브별로 표시할 최대 샘플 수")
     parser.add_argument("--plot3d-ctrl-min", type=float, default=0.7, help="3D 진단 그림의 ctrl 축 시작값")
     parser.add_argument("--valves", default="all", help="최적화할 밸브 인덱스. 예) all, 3-6, 3,4,5,6")
@@ -1501,7 +1509,10 @@ def main():
     if html_3d_output_paths:
         print(f"[INFO] interactive 3D HTML 저장 완료: {', '.join(html_3d_output_paths)}")
 
-    plt.show()
+    if args.no_show:
+        plt.close(fig)
+    else:
+        plt.show()
 
 
 if __name__ == "__main__":

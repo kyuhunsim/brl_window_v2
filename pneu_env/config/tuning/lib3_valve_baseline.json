@@ -1,0 +1,78 @@
+{
+  "name": "lib3_valve_baseline_20261022",
+  "status": "baseline; historical opening-shape penalty is not reproduced",
+  "historical_reference": {
+    "result": "/home/rise/test/pneu_tune/tune_result/output_12.txt",
+    "data": "260520_14_44_14_Flowrate_RND6_suite_joint_tuning.csv",
+    "evidence": "docs/lib3_sim2real_initialization_review.md#2026-10-18-과거-lib3-수집튜닝정확도밸브-feasibility-감사",
+    "confirmed": {
+      "valves": "1-6, 13 parameters per valve",
+      "time_range": "whole file",
+      "input_window_size": 1,
+      "flow_window_size": 1,
+      "flow_delay_samples": 0,
+      "wn_range_rad_s": [11.0, 25.0],
+      "zeta_range": [0.4, 0.6],
+      "full_open_weight": 1.0,
+      "full_open_min_ratio": 0.95,
+      "opening_shape_valves": [3, 4],
+      "opening_shape_weight": 5.0,
+      "opening_shape_ctrl_points": [0.85, 0.9, 0.95, 1.0],
+      "opening_shape_min_increase": 0.03
+    },
+    "unrecovered": [
+      "Exact opening-shape area-ratio intervals and original implementation; absent from this checkout.",
+      "Original search seed, samples, starting parameters, optimizer options and other penalty weights."
+    ]
+  },
+  "optimizer_options": {
+    "valves": "all",
+    "tune_mode": "all",
+    "start": 0.0,
+    "end": null,
+    "tail_cut": 0.0,
+    "drop_incomplete_last_command": false,
+    "settle_sec": 2.0,
+    "window_size": 1,
+    "input_window_size": 1,
+    "flow_window_size": 1,
+    "flow_delay_samples": 0,
+    "flow_delay_sec": null,
+    "wn_min": 11.0,
+    "wn_max": 25.0,
+    "zeta_min": 0.4,
+    "zeta_max": 0.6,
+    "full_open_weight": 1.0,
+    "full_open_min_ratio": 0.95,
+    "full_open_valves": "all",
+    "samples": 50,
+    "seed": 0,
+    "hf_weight": 0.0,
+    "hf_target": 1.0,
+    "hf_valves": "3-6",
+    "r2_floor": 0.0,
+    "r2_weight": 0.0,
+    "peak_weight": 0.0,
+    "peak_percentile": 100.0,
+    "peak_valves": "all"
+  },
+  "current_search_settings": {
+    "note": "Current optimizer implementation, not verified historical settings.",
+    "initial_parameters": "CONFIGS[].base in optimizer.py",
+    "initial_candidates": 50,
+    "optimized_starts": 3,
+    "method": "Nelder-Mead",
+    "maxiter": 5000,
+    "maxfev": 15000,
+    "xatol": 0.0001,
+    "fatol": 0.0001
+  },
+  "notes": [
+    "This preset combines confirmed historical conditions with explicitly chosen current search defaults; it is not an exact reproduction of output_12.",
+    "samples=50, seed=0, tune_mode=all and disabled HF/R2/peak penalties are current baseline choices, not recovered historical metadata.",
+    "The model uses observed ctrl1..6 echoes, never requested_ctrl or command_ctrl, and absolute pressure in kPa, flow in L/min.",
+    "Full-open and opening-shape terms are soft penalties, not proof that a fitted model meets their targets.",
+    "The local pneu_env/tune_result/output_12.txt is an unrelated April 30 two-valve fit.",
+    "Results are saved separately; this runner does not install parameters into lib3 or rebuild the simulator."
+  ]
+}

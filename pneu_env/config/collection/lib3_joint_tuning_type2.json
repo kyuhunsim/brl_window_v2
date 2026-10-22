@@ -1,0 +1,17 @@
+{
+  "collection_type": "type2",
+  "description": "657 s six-valve suite with phase-shifted ramps on idle channels",
+  "observation_timeout_sec": 0.5,
+  "config": {
+    "freq": 50.0,
+    "command_min": 0.8,
+    "command_max": 1.0,
+    "supply_low_threshold": 0.85,
+    "supply_low_max_sec": 0.2,
+    "seed": 20261022,
+    "idle_ramps": true,
+    "idle_ramp_period_sec": 20.0,
+    "idle_ramp_fade_sec": 0.5,
+    "solo_prefix_sec": 10.0
+  }
+}

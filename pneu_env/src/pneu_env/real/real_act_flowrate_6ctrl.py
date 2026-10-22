@@ -13,8 +13,14 @@ real_act_flowrate_6ctrl.py
   curr_time, ctrl_pos, ctrl_neg, press_pos, press_neg, flowrate1~flowrate6, ...
 """
 
+from __future__ import annotations
+
+import argparse
+import hashlib
 import os
 import json
+from pathlib import Path
+import sys
 import time
 from collections import deque
 from datetime import datetime
@@ -22,7 +28,13 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 
+# Support direct execution from the checkout as well as editable installs.
+_ROOT = Path(__file__).resolve().parents[4]
+for _package in ("pneu_env", "pneu_utils"):
+    sys.path.insert(0, str(_ROOT / _package / "src"))
+
 from pneu_env.real.flowrate_profiles import make_stair_levels, stair_value
+from pneu_env.real.joint_tuning_profiles import JointTuningSuite
 from pneu_utils.utils import get_pkg_path
 
 
@@ -35,19 +47,24 @@ ATM = 101.325
 # ==============================
 CTRL_MODE = "suite"    # "random" | "const" | "suite"
 CONST_CTRLS = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-RUN_MODE = "pump_tuning"        # "all" | "static" | "hysteresis" | "dynamic" | "hysteresis_combo" | "pump_tuning" | profile name
+RUN_MODE = "joint_tuning"  # six-channel 657 s suite; other names below select legacy 2-channel suites
 
-# Only the first two channels are actively excited by default:
+# Saved joint settings: pneu_env/config/collection/lib3_joint_tuning_type{1,2}.json
+# type1: primary suite; type2: additional ramps on idle channels.
+# Both bound scheduled supply u < 0.85 visits to 0.2 s (not a pressure interlock).
+COLLECTION_TYPE = "type2"
+
+# Legacy modes only (joint_tuning always generates all six channels):
 #   ctrl1: pos_ctrl
 #   ctrl2: neg_ctrl
 # The other actuator channels are held fixed unless you edit FIXED_TAIL_CTRLS.
 ACTIVE_CTRL_COUNT = 2
 FIXED_TAIL_CTRLS = [0.0, 0.0, 0.0, 0.0]
 
-# Random mode params
+# Legacy random mode params (joint_tuning reads the selected saved JSON preset).
 RAND_HOLD_MIN = 0.5      # sec (inclusive)
 RAND_HOLD_MAX = 3     # sec (inclusive)
-RAND_MIN = 0.85
+RAND_MIN = 0.8
 RAND_MAX = 1.0
 
 # Suite mode runs several profiles in one recording.
@@ -1077,7 +1094,7 @@ def _read_obs_state(
             time.sleep(min(0.001, 0.2 * sen_period))
 
 
-def main():
+def main(argv=None):
     # -----------------------------
     # 설정 (필요 시 여기만 수정)
     # -----------------------------
@@ -1085,13 +1102,23 @@ def main():
     duration = 300.0            # experiment duration [sec], ignored by suite mode
     tag = ""                    # filename tag suffix
 
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--run-mode", default=RUN_MODE, help="joint_tuning or a legacy suite name")
+    parser.add_argument("--type", dest="collection_type", choices=("type1", "type2"),
+                        default=COLLECTION_TYPE, help="saved joint suite preset (default: type2)")
+    parser.add_argument("--preview", type=Path, metavar="DIR",
+                        help="export the joint suite CSV/config/plot without bridge I/O")
+    args = parser.parse_args(argv)
+
     ctrl_mode = CTRL_MODE
-    run_mode = str(RUN_MODE).strip()
+    run_mode = str(args.run_mode).strip()
     rand_hold_min = float(RAND_HOLD_MIN)   # hold time range [sec] (inclusive)
     rand_hold_max = float(RAND_HOLD_MAX)
     rand_min = float(RAND_MIN)
     rand_max = float(RAND_MAX)
     suite_profiles = list(SUITE_PROFILES)
+    joint_suite = None
+    observation_timeout_sec = None
 
     if ctrl_mode not in ("random", "const", "suite"):
         raise ValueError(f"CTRL_MODE must be random|const|suite, got: {ctrl_mode}")
@@ -1103,9 +1130,32 @@ def main():
         raise ValueError("RAND_MIN must be <= RAND_MAX")
 
     if ctrl_mode == "suite":
-        suite_profiles = _select_suite_profiles(run_mode)
+        if run_mode == "joint_tuning":
+            joint_suite = JointTuningSuite.from_preset(args.collection_type)
+            config = joint_suite.config
+            freq, rand_min, rand_max = config.freq, config.command_min, config.command_max
+            observation_timeout_sec = joint_suite.observation_timeout_sec
+            suite_profiles = joint_suite.profiles
+            tag = (f"{joint_suite.collection_type}_" +
+                   (tag or f"u{rand_min:.2f}_supply{config.supply_low_max_sec:.2f}s"))
+            if config.idle_ramps:
+                tag += "_idle_ramps"
+        else:
+            suite_profiles = _select_suite_profiles(run_mode)
         duration = sum(float(profile["duration"]) for profile in suite_profiles)
         globals()["SUITE_PROFILES"] = suite_profiles
+
+    if args.preview:
+        if joint_suite is None:
+            parser.error("--preview requires CTRL_MODE='suite' and --run-mode joint_tuning")
+        output = joint_suite.write_preview(args.preview)
+        print(f"[PREVIEW] {joint_suite.collection_type}: {duration:.1f}s, "
+              f"{len(joint_suite.commands)} commands: {output}")
+        print(f"[PREVIEW] maximum continuous u < {joint_suite.config.supply_low_threshold}: "
+              f"{joint_suite.max_low_seconds()} seconds (valves 1..6)")
+        print("[PREVIEW] full-open percentage (valves 1..6): "
+              + str([round(r["full_open_percent"], 2) for r in joint_suite.coverage()]))
+        return
 
     tag = f"_{tag}" if tag else ""
     now = datetime.now()
@@ -1115,16 +1165,25 @@ def main():
 
     print(
         f"[INFO] mode={ctrl_mode}, duration={duration:.1f}s, "
-        f"active_ctrl_count={ACTIVE_CTRL_COUNT}, fixed_tail={FIXED_TAIL_CTRLS}, "
-        f"rand_hold=[{rand_hold_min},{rand_hold_max}]s, rand_range=[{rand_min},{rand_max}], "
+        f"active_ctrl_count={6 if joint_suite else ACTIVE_CTRL_COUNT}, "
+        f"fixed_tail={[] if joint_suite else FIXED_TAIL_CTRLS}, "
+        f"rand_hold={[1, 3] if joint_suite else [rand_hold_min, rand_hold_max]}s, "
+        f"rand_range=[{rand_min},{rand_max}], "
         f"run_mode={run_mode}"
     )
     if ctrl_mode == "suite":
         print("[INFO] selected suite profiles: " + ", ".join(profile["name"] for profile in suite_profiles))
     period = 1.0 / max(freq, 1e-9)
     print(f"[INFO] target control loop: {freq:.1f}Hz ({period * 1000.0:.3f}ms)")
+    if joint_suite:
+        print(f"[INFO] {joint_suite.collection_type}, preset={joint_suite.saved_preset['path']}")
+        print(f"[INFO] supply valves 1/2: u < {joint_suite.config.supply_low_threshold} command budget "
+              f"{joint_suite.config.supply_low_max_sec}s; not a pressure interlock")
 
-    unit_ctrls = np.zeros(6, dtype=np.float64)
+    unit_ctrls = np.ones(6, dtype=np.float64) if joint_suite else np.zeros(6, dtype=np.float64)
+    requested_ctrls = unit_ctrls.copy()
+    low_limited = np.zeros(2, dtype=bool)
+    idle_ramp_mask = np.zeros(6, dtype=bool)
     const_ctrls = np.asarray(CONST_CTRLS, dtype=np.float64)
     if const_ctrls.shape != (6,):
         raise ValueError(f"CONST_CTRLS must be shape (6,), got {const_ctrls.shape}")
@@ -1162,14 +1221,26 @@ def main():
         profile_mode=deque(),
         profile_time=deque(),
         profile_period=deque(),
+        suite_time=deque(),
+        command_time=deque(),
+        supply_low_limited1=deque(),
+        supply_low_limited2=deque(),
     )
+    for channel in range(1, 7):
+        data[f"command_ctrl{channel}"] = deque()
+        data[f"requested_ctrl{channel}"] = deque()
+        data[f"idle_ramp{channel}"] = deque()
 
     try:
         script_start_time = time.time()
+        script_start_tick = time.perf_counter()
         curr_time = float(obs_state["time"])
         prev_time = None
         started = False
         suite_start_time = 0.0
+        suite_start_tick = None
+        suite_elapsed = 0.0
+        last_fresh_tick = time.perf_counter()
         profile_idx = -1
         profile_mode = 0
         profile_time = 0.0
@@ -1208,7 +1279,18 @@ def main():
             last_tick = now_tick
 
             if started:
-                if ctrl_mode == "suite":
+                if joint_suite:
+                    # Do not stretch a low-command visit when sensor time stalls.
+                    suite_elapsed = max(0.0, time.perf_counter() - suite_start_tick)
+                    unit_ctrls, metadata = joint_suite.sample(suite_elapsed)
+                    requested_ctrls = metadata["requested"]
+                    low_limited = metadata["low_limited"]
+                    idle_ramp_mask = metadata["idle_ramp_mask"]
+                    profile_idx = metadata["profile_idx"]
+                    profile_mode = PROFILE_MODE_IDS[metadata["profile_mode"]]
+                    profile_time = metadata["profile_time"]
+                    profile_period = metadata["profile_period"]
+                elif ctrl_mode == "suite":
                     suite_time = max(0.0, curr_time - suite_start_time)
                     (
                         unit_ctrls,
@@ -1239,10 +1321,14 @@ def main():
                     profile_time = curr_time
                     profile_period = 0.0
             else:
-                unit_ctrls = np.zeros(6, dtype=np.float64)
+                unit_ctrls = np.ones(6, dtype=np.float64) if joint_suite else np.zeros(6, dtype=np.float64)
+
+            if joint_suite is None:
+                requested_ctrls = unit_ctrls.copy()
 
             ctrl_unit = np.asarray(unit_ctrls, dtype=np.float64)
             act_unit = ctrl_unit[2:]
+            command_tick = time.perf_counter()
             _write_json_atomic(
                 ctrl_json_path,
                 _build_ctrl_payload(
@@ -1267,6 +1353,12 @@ def main():
             info = {"Observation": obs}
             o = info["Observation"]
             obs_time = float(o["time"])
+            observation_fresh = (obs_time > prev_obs_time + 1e-9
+                                 or obs_time < prev_obs_time - 1e-3)
+            if observation_fresh:
+                last_fresh_tick = time.perf_counter()
+            if joint_suite and time.perf_counter() - last_fresh_tick > observation_timeout_sec:
+                raise TimeoutError("No fresh observation; ending collection and publishing all-open")
             if obs_time <= prev_obs_time + 1e-9:
                 stale_obs_count += 1
 
@@ -1276,7 +1368,7 @@ def main():
             # 2) reset 이벤트가 없더라도, fresh run(0~2s 구간의 증가 time) 감지 시 시작
             if prev_time is None:
                 prev_time = obs_time
-                if 0.0 <= obs_time <= 1.0:
+                if 0.0 <= obs_time <= 1.0 and (joint_suite is None or observation_fresh):
                     started = True
                     for k in data.keys():
                         data[k].clear()
@@ -1309,6 +1401,8 @@ def main():
                         )
 
             prev_time = obs_time
+            if started and suite_start_tick is None:
+                suite_start_tick = time.perf_counter()
 
             if started:
                 fr1 = float(o["flowrate1"])
@@ -1341,6 +1435,14 @@ def main():
                 data["profile_mode"].append(float(profile_mode))
                 data["profile_time"].append(float(profile_time))
                 data["profile_period"].append(float(profile_period))
+                data["suite_time"].append(suite_elapsed)
+                data["command_time"].append(command_tick - script_start_tick)
+                data["supply_low_limited1"].append(float(low_limited[0]))
+                data["supply_low_limited2"].append(float(low_limited[1]))
+                for channel in range(6):
+                    data[f"command_ctrl{channel + 1}"].append(float(ctrl_unit[channel]))
+                    data[f"requested_ctrl{channel + 1}"].append(float(requested_ctrls[channel]))
+                    data[f"idle_ramp{channel + 1}"].append(float(idle_ramp_mask[channel]))
 
                 if len(data["time"]) % int(freq) == 0:
                     loop_dt_ms = float(np.mean(loop_dt_ms_hist)) if loop_dt_ms_hist else float("nan")
@@ -1360,7 +1462,8 @@ def main():
                     )
                     stale_obs_count = 0
 
-                if obs_time >= float(duration):
+                finished = suite_elapsed >= duration if joint_suite else obs_time >= float(duration)
+                if finished:
                     break
             else:
                 now_wall = time.time()
@@ -1408,6 +1511,16 @@ def main():
         os.makedirs(exp_dir, exist_ok=True)
         out_path = os.path.join(exp_dir, f"{save_file_name}.csv")
         df.to_csv(out_path, index=False)
+        if joint_suite:
+            manifest = joint_suite.manifest()
+            manifest.update(csv_path=out_path, logged_rows=len(df),
+                clock="monotonic elapsed time since fresh-start detection",
+                ctrl_columns="ctrl1..6 are observation echoes; command_ctrl1..6 are published commands",
+                requested_columns="requested_ctrl1..6 are planned commands before the supply limiter",
+                observation_timeout_sec=observation_timeout_sec)
+            for source in (Path(__file__), Path(sys.modules[JointTuningSuite.__module__].__file__)):
+                manifest.setdefault("source_sha256", {})[source.name] = hashlib.sha256(source.read_bytes()).hexdigest()
+            Path(out_path).with_suffix(".json").write_text(json.dumps(manifest, indent=2) + "\n")
         print(f"[INFO] Saved experiment CSV: {out_path}")
 
 
