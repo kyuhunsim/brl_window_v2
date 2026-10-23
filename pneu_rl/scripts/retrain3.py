@@ -1,4 +1,8 @@
 import os
+import copy
+import shutil
+from pathlib import Path
+import torch
 
 from pneu_ref.factory import make_pressure_reference, reference_spec_from_model_config
 from pneu_env.env3 import PneuEnv3
@@ -6,6 +10,7 @@ from pneu_env.sim3 import PneuSim
 from pneu_env.pred3 import PneuPred
 from pneu_env.real.real9 import PneuReal
 from pneu_rl.sac_with_loss import SAC
+from pneu_rl.deployment import load_deployment_config, build_deployment_env, continuous_finetune_config
 from pneu_utils.utils import (
     delete_lines,
     color,
@@ -57,7 +62,11 @@ def main():
     obs_mode = input(color("\tOBS: ", "blue"))
     delete_lines(5)
 
-    kwargs = load_yaml(model_name)
+    kwargs = load_deployment_config(model_name)
+    if obs_mode not in ('1', '2'):
+        raise ValueError(f'Unknown observation mode: {obs_mode}')
+    kwargs = continuous_finetune_config(kwargs)
+    torch.set_num_threads(int(kwargs.get('torch_threads', 2)))
 
     kwargs["parent_model"] = model_name
     kwargs["retrain_epi"] = 200
@@ -71,6 +80,8 @@ def main():
         pid_mode = input(color("\tPID: ", "blue"))
         delete_lines(5)
         if pid_mode == "1":
+            if (kwargs.get('initialization') or {}).get('mode') == 'pump_on_all_open':
+                raise ValueError('Prepared H/HR fine-tuning requires PID OFF')
             kwargs["pid"] = REAL_RETRAIN_PID.copy()
             print("[ INFO] PID: enabled for this real retrain")
         elif pid_mode == "2":
@@ -79,8 +90,10 @@ def main():
         else:
             raise ValueError(color(f"[ERROR] Unknown PID mode: {pid_mode}", "red"))
 
-    # Preserve the selected model's reward, CAPS and reference configuration.
+    # Preserve reward/CAPS; concatenate the selected model's bank for continuous adaptation.
 
+    # Resolve and validate the reference before constructing any real backend.
+    ref = make_pressure_reference(reference_spec_from_model_config(kwargs))
     if obs_mode == "1":
         print("[ INFO] Observation Mode: Simulation")
         obs = PneuSim(**kwargs["obs"])
@@ -91,13 +104,7 @@ def main():
         raise ValueError(color(f"[ERROR] Unknown observation mode: {obs_mode}", "red"))
 
     pred = PneuPred(**kwargs["pred"]) if kwargs["pred"] is not None else None
-    ref = make_pressure_reference(reference_spec_from_model_config(kwargs))
-    env = PneuEnv3(
-        obs=obs,
-        ref=ref,
-        pred=pred,
-        **kwargs["env"],
-    )
+    env = build_deployment_env(kwargs, obs, ref, pred)
 
     if kwargs.get("pid") is not None:
         env.set_pid(**kwargs["pid"])
@@ -114,14 +121,30 @@ def main():
         model.set_temporal_weight_hardening(**kwargs["temporal_weight_hardening"])
     model.clear_buffer()
 
+    # Make the fine-tuned result self-contained for future quick-viz/transfer too.
+    saved_cfg = copy.deepcopy(kwargs)
+    ref_kwargs = saved_cfg.get('reference', {}).get('kwargs', {})
+    if 'trajectory_npz' in ref_kwargs:
+        target = Path(model.logger.folder_path) / 'reference.npz'
+        source = Path(ref_kwargs['trajectory_npz'])
+        if source.resolve() != target.resolve():
+            shutil.copy2(source, target)
+        ref_kwargs['trajectory_npz'] = 'reference.npz'
+    saved_cfg['finetuning_protocol'] = dict(episodes=200, fresh_replay=True,
+                                          preparation='session_start_only',
+                                          reference='continuous_with_rate_limited_bridges')
+
     if obs_mode == "2":
         from pneu_rl.async_training import train_async
 
         kwargs["async_training"] = dict(queue_capacity=4096, sync_every=5)
-        save_yaml(retrain_model_name, kwargs, "retrain_cfg.yaml")
+        saved_cfg['async_training'] = kwargs['async_training']
+        save_yaml(retrain_model_name, saved_cfg)
+        save_yaml(retrain_model_name, saved_cfg, "retrain_cfg.yaml")
         train_async(model, episode=kwargs["retrain_epi"], **kwargs["async_training"])
     else:
-        save_yaml(retrain_model_name, kwargs, "retrain_cfg.yaml")
+        save_yaml(retrain_model_name, saved_cfg)
+        save_yaml(retrain_model_name, saved_cfg, "retrain_cfg.yaml")
         try:
             model.train(episode=kwargs["retrain_epi"])
         finally:

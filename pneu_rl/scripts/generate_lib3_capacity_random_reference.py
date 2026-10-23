@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import itertools
 import json
 import math
@@ -94,7 +95,7 @@ def quintic(progress: np.ndarray) -> np.ndarray:
     return 10.0 * tau**3 - 15.0 * tau**4 + 6.0 * tau**5
 
 
-def make_sim(*, delay: float = 0.1) -> PneuSim:
+def make_sim(*, delay: float = 0.1, library_path: Path | None = None) -> PneuSim:
     return PneuSim(
         freq=50.0,
         delay=delay,
@@ -107,7 +108,16 @@ def make_sim(*, delay: float = 0.1) -> PneuSim:
         init_neg_press=ATM,
         init_act_pos_press=ATM,
         init_act_neg_press=ATM,
+        library_path=library_path,
     )
+
+
+def initialize_sim(sim: PneuSim, precondition_seconds: float = 0.0) -> np.ndarray:
+    """Preserve all-open physical state and delayed observations at handover."""
+    sim.set_init_press(ATM, ATM, ATM, ATM)
+    for _ in range(int(round(precondition_seconds * sim.freq))):
+        sim.observe(np.ones(6, dtype=np.float64))
+    return np.asarray(sim.obs, dtype=np.float64).copy()
 
 
 def operating_states(
@@ -136,9 +146,10 @@ def run_capacity_sweep(
     grid_points: int,
     warmup_sec: float,
     measure_sec: float,
+    library_path: Path | None = None,
 ) -> pd.DataFrame:
     """Measure local signed rates over a common [0.8, 1.0] valve domain."""
-    sim = make_sim(delay=0.1)
+    sim = make_sim(delay=0.1, library_path=library_path)
     action_grid = np.linspace(0.0, 1.0, grid_points, dtype=np.float64)
     actions = list(itertools.product(action_grid, repeat=6))
     warmup_steps = max(int(round(warmup_sec * 50.0)), 6)
@@ -198,7 +209,7 @@ def summarize_capacity(df: pd.DataFrame, quantile: float) -> dict[str, Any]:
             )
         per_state[str(int(state_id))] = item
 
-    # State 0 is the atmospheric startup transient.  Steady training limits
+    # State 0 is the configured startup observation.  Steady training limits
     # are derived from the other operating points; startup is reported and
     # handled separately.
     steady_ids = [key for key in per_state if key != "0"]
@@ -443,7 +454,7 @@ def make_pressure_candidate(
     time = np.arange(total_steps + 1, dtype=np.float64) / args.freq
     axis_specs = {
         "pos": {
-            "initial": ATM,
+            "initial": args.initial_pressure[2],
             "bounds": args.pos_bounds,
             "rates": rates["act_pos"],
             "startup_target": args.startup_pos,
@@ -452,7 +463,7 @@ def make_pressure_candidate(
             "max_delta": args.pos_delta[1],
         },
         "neg": {
-            "initial": ATM,
+            "initial": args.initial_pressure[3],
             "bounds": args.neg_bounds,
             "rates": rates["act_neg"],
             "startup_target": args.startup_neg,
@@ -568,9 +579,13 @@ def run_pid_certifier(
     pressure: np.ndarray,
     *,
     margin: float,
+    library_path: Path | None = None,
+    precondition_seconds: float = 0.0,
+    active_min_physical: float = CERTIFIER_ACTIVE_MIN_PHYSICAL,
+    neg_active_min_physical: float | None = None,
 ) -> dict[str, np.ndarray]:
-    sim = make_sim(delay=0.1)
-    sim.set_init_press(ATM, ATM, ATM, ATM)
+    sim = make_sim(delay=0.1, library_path=library_path)
+    initial_pressure = initialize_sim(sim, precondition_seconds)
     pid_config = copy.deepcopy(CERTIFIER_PID)
     previous_error = np.zeros(4, dtype=np.float64)
     integral_error = np.zeros(4, dtype=np.float64)
@@ -578,8 +593,8 @@ def run_pid_certifier(
     raw_action = np.empty((len(time), 6), dtype=np.float64)
     chamber_target = derive_chamber_reference(pressure, margin)
 
-    full_pressure[0] = np.array([ATM, ATM, ATM, ATM], dtype=np.float64)
-    raw_action[0] = np.zeros(6, dtype=np.float64)
+    full_pressure[0] = initial_pressure
+    raw_action[0] = 1.0 if precondition_seconds > 0.0 else 0.0
     for index in range(1, len(time)):
         goal = pressure[index]
         chamber_ctrl, _ = chamber_allocator(
@@ -606,13 +621,17 @@ def run_pid_certifier(
             pid_cfg=pid_config,
             chamber_ctrl=chamber_ctrl,
         )
-        # Common valve-aware minimum for the four directional actuator
-        # channels.  This belongs only to the offline PID certifier.  It does
+        # Valve-aware minimum for the directional actuator channels, with an
+        # optional separate NEG value. This belongs only to the offline PID
+        # certifier. It does
         # not project or mask the SAC action, whose physical domain remains
         # the complete [0.8, 1.0] interval for every valve.
-        active_min_raw = (CERTIFIER_ACTIVE_MIN_PHYSICAL - 0.8) / 0.2
         for directional_index in range(4):
             if previous_error[directional_index] > float(pid_config["deadband"]):
+                floor = active_min_physical
+                if directional_index >= 2 and neg_active_min_physical is not None:
+                    floor = neg_active_min_physical
+                active_min_raw = (floor - 0.8) / 0.2
                 action[directional_index + 2] = max(
                     action[directional_index + 2], active_min_raw
                 )
@@ -1078,13 +1097,30 @@ def save_profile(
         },
         "design": {
             "library": 3,
+            "simulator_library_path": str(args.library_path) if args.library_path else None,
+            "simulator_library_sha256": args.library_sha256,
+            "calibration_type": args.calibration_type,
+            "initialization": {
+                "mode": "pump_on_all_open" if args.precondition_seconds > 0.0 else "atmospheric",
+                "precondition_seconds": args.precondition_seconds,
+                "retains_internal_valve_state_and_delay_buffer": True,
+                "policy_start_observation_kpa": args.initial_pressure,
+                "reference_starts_at_policy_start_actuator_observation": True,
+            },
             "generator": "pressure-space independent POS/NEG minimum-jerk waypoints",
             "training_npz_keys": ["time", "pressure"],
+            "training_npz_sha256": hashlib.sha256(profile_npz.read_bytes()).hexdigest(),
             "teacher_or_oracle_action_stored_in_training_reference": False,
             "simulator_output_used_as_training_target": False,
             "simulator_and_pid_role": "offline capacity characterization and pass/fail certification only",
             "pid_certifier_gains": CERTIFIER_PID,
-            "pid_certifier_common_active_min_physical": CERTIFIER_ACTIVE_MIN_PHYSICAL,
+            "pid_certifier_common_active_min_physical": args.certifier_active_min_physical,
+            "pid_certifier_axis_active_min_physical": {
+                "pos": args.certifier_active_min_physical,
+                "neg": args.certifier_neg_active_min_physical
+                if args.certifier_neg_active_min_physical is not None
+                else args.certifier_active_min_physical,
+            },
             "pid_certifier_active_min_is_policy_constraint": False,
             "action_scale": [0.8, 1.0],
             "continuous_carry": True,
@@ -1130,6 +1166,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--blocks", type=int, default=4)
     parser.add_argument("--block-steps", type=int, default=512)
     parser.add_argument("--freq", type=float, default=50.0)
+    parser.add_argument("--library-path", type=Path)
+    parser.add_argument("--calibration-type", choices=("type1", "type2"))
+    parser.add_argument("--precondition-seconds", type=float, default=0.0)
+    parser.add_argument("--certifier-active-min-physical", type=float, default=CERTIFIER_ACTIVE_MIN_PHYSICAL)
+    parser.add_argument("--certifier-neg-active-min-physical", type=float)
     parser.add_argument("--pos-bounds", type=parse_float_pair, default=(110.0, 145.0))
     parser.add_argument("--neg-bounds", type=parse_float_pair, default=(58.0, 82.0))
     parser.add_argument("--startup-pos", type=parse_float_pair, default=(120.0, 130.0))
@@ -1178,11 +1219,27 @@ def parse_args() -> argparse.Namespace:
         parser.error("capacity quantile must lie in (0, 1)")
     if not 0.0 < args.capacity_utilization <= 1.0:
         parser.error("capacity utilization must lie in (0, 1]")
+    if args.freq != 50.0:
+        parser.error("the lib3 simulator and certifier use the original 50 Hz protocol")
+    if args.precondition_seconds < 0.0:
+        parser.error("precondition seconds must be nonnegative")
+    if not 0.8 <= args.certifier_active_min_physical <= 1.0:
+        parser.error("certifier active minimum must lie in [0.8, 1.0]")
+    if args.certifier_neg_active_min_physical is not None and not 0.8 <= args.certifier_neg_active_min_physical <= 1.0:
+        parser.error("NEG certifier active minimum must lie in [0.8, 1.0]")
+    if args.library_path is not None:
+        args.library_path = args.library_path.resolve()
+        if not args.library_path.is_file():
+            parser.error(f"missing simulator library: {args.library_path}")
     return args
 
 
 def main() -> None:
     args = parse_args()
+    initial_sim = make_sim(delay=0.1, library_path=args.library_path)
+    args.initial_pressure = initialize_sim(initial_sim, args.precondition_seconds).tolist()
+    args.library_path = initial_sim.library_path
+    args.library_sha256 = hashlib.sha256(args.library_path.read_bytes()).hexdigest()
     output_dir = args.output_root / args.name
     output_dir.mkdir(parents=True, exist_ok=True)
     profile_npz = ROOT / "pneu_rl" / "config" / "reference" / f"{args.name}.npz"
@@ -1192,8 +1249,19 @@ def main() -> None:
     image_path.parent.mkdir(parents=True, exist_ok=True)
 
     states = operating_states(args.pos_bounds, args.neg_bounds, args.reserve_margin)
+    states[0] = tuple(args.initial_pressure)
     capacity_path = output_dir / "capacity_sweep.csv"
+    capacity_identity = {
+        "simulator_library_sha256": args.library_sha256,
+        "states": [list(state) for state in states],
+        "grid_points": args.capacity_grid,
+        "warmup_seconds": args.capacity_warmup_sec,
+        "measure_seconds": args.capacity_measure_sec,
+    }
+    capacity_identity_path = output_dir / "capacity_identity.json"
     if args.reuse_capacity and capacity_path.is_file():
+        if not capacity_identity_path.is_file() or json.loads(capacity_identity_path.read_text()) != capacity_identity:
+            raise RuntimeError("capacity sweep identity does not match requested library/protocol")
         print(f"reusing capacity sweep: {capacity_path}")
         capacity = pd.read_csv(capacity_path)
     else:
@@ -1203,8 +1271,10 @@ def main() -> None:
             grid_points=args.capacity_grid,
             warmup_sec=args.capacity_warmup_sec,
             measure_sec=args.capacity_measure_sec,
+            library_path=args.library_path,
         )
         capacity.to_csv(capacity_path, index=False)
+        capacity_identity_path.write_text(json.dumps(capacity_identity, indent=2) + "\n")
     capacity_summary = summarize_capacity(capacity, args.capacity_quantile)
     caps = {
         "act_pos": {"up": args.pos_rate_up_cap, "down": args.pos_rate_down_cap},
@@ -1244,7 +1314,13 @@ def main() -> None:
                 capacity_states,
                 capacity_clouds,
             )
-            audit = run_pid_certifier(time, pressure, margin=args.reserve_margin)
+            audit = run_pid_certifier(
+                time, pressure, margin=args.reserve_margin,
+                library_path=args.library_path,
+                precondition_seconds=args.precondition_seconds,
+                active_min_physical=args.certifier_active_min_physical,
+                neg_active_min_physical=args.certifier_neg_active_min_physical,
+            )
             metrics = candidate_metrics(time, pressure, audit, support, args)
             row = {
                 "member": member,

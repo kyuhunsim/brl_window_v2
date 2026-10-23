@@ -21,6 +21,7 @@ from pneu_env.sim3 import PneuSim
 from pneu_env.pred3 import PneuPred
 from pneu_env.real.real9 import PneuReal
 from pneu_rl.sac_with_loss import SAC
+from pneu_rl.deployment import load_deployment_config, build_deployment_env
 from pneu_rl.exp_paths import ensure_model_exp_dir
 from pneu_rl.exp_paths import find_experiment_file
 from pneu_rl.plotting import plot_lib3_pressure_and_controls
@@ -267,6 +268,10 @@ def plot_datas(datas, model_name, save_name=None):
 
 def model_bank_reference(config, trajectory_index=0):
     spec = copy.deepcopy(reference_spec_from_model_config(config))
+    if spec.get('kind') == 'continuous_trajectory_bank':
+        spec['kind'] = 'optimized_trajectory_bank'
+        spec['kwargs'] = dict(trajectory_npz=spec['kwargs']['trajectory_npz'],
+                              seed=spec['kwargs'].get('seed', 61098))
     if spec.get("kind") not in ("optimized_trajectory_bank", "simulator_trajectory_bank", "trajectory_bank"):
         raise ValueError("Selected model does not contain a trajectory bank; choose another reference mode")
     spec["kwargs"].update(repeat_after_end=False, repeat_same=False,
@@ -280,16 +285,7 @@ def model_bank_reference(config, trajectory_index=0):
 
 
 def build_viz_env(config, obs, ref, pred=None):
-    """Honor saved simulation initialization; never precondition real hardware here."""
-    initialization = config.get('initialization') or {}
-    mode = initialization.get('mode')
-    if mode not in (None, 'pump_on_all_open'):
-        raise ValueError(f'Unsupported initialization mode: {mode}')
-    if isinstance(obs, PneuSim) and mode == 'pump_on_all_open':
-        return PneuEnv3AllOpen(obs=obs, ref=ref, pred=pred,
-            precondition_seconds=initialization.get('precondition_seconds', 30),
-            **config['env'])
-    return PneuEnv3(obs=obs, ref=ref, pred=pred, **config['env'])
+    return build_deployment_env(config, obs, ref, pred)
 
 
 def collect_rollout(env, model, ref):
@@ -331,7 +327,7 @@ if __name__ == '__main__':
     delete_lines(len(models) + 3)
     print(f'[ INFO] Control Model: {model_name}')
 
-    kwargs = load_yaml(model_name)
+    kwargs = load_deployment_config(model_name)
         
     print(color('[INPUT] Reference Mode:', 'blue'))
     print(color('\t1. Step case', 'yellow'))
@@ -415,6 +411,8 @@ if __name__ == '__main__':
     delete_lines(5)
 
     pid_enabled = pid_mode == '1'
+    if pid_enabled and (kwargs.get('initialization') or {}).get('mode') == 'pump_on_all_open':
+        raise ValueError('Prepared H/HR deployment requires PID OFF')
 
     if pid_enabled:
         print(f'[ INFO] PID: On')
@@ -449,11 +447,11 @@ if __name__ == '__main__':
     viz_kwargs['policy_env'] = copy.deepcopy(kwargs['env'])
     prepared = isinstance(env, PneuEnv3AllOpen)
     viz_kwargs['runtime'] = dict(
-        start_protocol=('pump_on_all_open_sim' if prepared else
+        start_protocol=(('pump_on_all_open_sim' if obs_mode == '1' else 'pump_on_all_open_real') if prepared else
                         'continuous_pump_on_no_start_wait' if obs_mode == '2' else 'standard_sim_reset'),
         reference_clock='policy_step/freq' if prepared else 'sensor_time',
         preparation_seconds=env.precondition_seconds if prepared else None,
-        history_initialization='prepared_sim_history' if prepared else 'standard_env_reset',
+        history_initialization='prepared_measured_history' if prepared else 'standard_env_reset',
     )
     
     if pid_enabled:

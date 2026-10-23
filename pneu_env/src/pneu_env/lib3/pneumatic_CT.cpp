@@ -2,6 +2,10 @@
 #include <algorithm>
 #include <cmath>
 
+#if defined(PNEU_OPENING_DYNAMICS) && !defined(PNEU_EXACT_VALVE_HYSTERESIS)
+#error Opening dynamics requires normalized exact hysteresis coefficients.
+#endif
+
 namespace
 {
 struct ValveModelParams
@@ -30,6 +34,9 @@ constexpr double FORCE_LIMIT = 500.0;
 constexpr double LOG_GUARD = 700.0;
 constexpr double Z_LIMIT = 1e6;
 
+#ifdef PNEU_VALVE_PARAMS_HEADER
+#include PNEU_VALVE_PARAMS_HEADER
+#else
 const ValveModelParams CHAMBER_POS_PARAMS = {
     0.19894303291, 31.7172181606, 0.194962266427, -5.68685026066e-06, 3.23578144865e-06,
     29027.0356546, 0.338844793172, 0.000826633684367, 9.41735107961,
@@ -70,6 +77,72 @@ const ValveModelParams ACT_NEG_OUT_PARAMS = {
     530.826123437, 2.23407111407, 4.40916708332, 7237.76861615,
     25, 0.6, 11, 0.6
 };
+#endif
+
+#ifdef PNEU_EXACT_VALVE_HYSTERESIS
+// Same normalized Bouc-Wen equation and exact increment as sim_core_feasible.
+// Candidate parameter sets use A_bw=beta+gamma, so z and normalized h coincide.
+double advance_valve_h(double h, double delta, double rate, double beta_fraction)
+{
+    if (delta == 0.0) return h;
+    const double sign = delta > 0.0 ? 1.0 : -1.0;
+    double remaining = std::abs(delta);
+    const double source = sign * rate;
+    if (h * sign < 0.0) {
+        const double b = rate * (2.0 * beta_fraction - 1.0);
+        const double crossing = std::abs(b) < 1e-12
+            ? -h / source : std::log1p(-b * h / source) / b;
+        if (crossing <= remaining) {
+            h = 0.0;
+            remaining -= crossing;
+        } else {
+            return std::abs(b) < 1e-12
+                ? h + source * remaining
+                : h * std::exp(-b * remaining)
+                    + source * (-std::expm1(-b * remaining)) / b;
+        }
+    }
+    return h * std::exp(-rate * remaining)
+        + sign * (-std::expm1(-rate * remaining));
+}
+#endif
+
+#ifdef PNEU_FAST_VALVE_FLOW
+// Precompute the affine map of the SAME 20 explicit Euler substeps.
+// This changes arithmetic grouping only, not the valve differential equation,
+// integration step, or number of substeps represented by the update.
+struct ValveFlowTransition {
+    double a00, a01, a10, a11, b0, b1;
+};
+
+ValveFlowTransition make_valve_flow_transition(double wn, double zeta, double dt, int steps)
+{
+    ValveFlowTransition r{1.0, 0.0, 0.0, 1.0, 0.0, 0.0};
+    for (int i = 0; i < steps; ++i) {
+        const double a00 = r.a00, a01 = r.a01, a10 = r.a10, a11 = r.a11;
+        const double b0 = r.b0, b1 = r.b1;
+        r.a00 = a00 + dt * a10;
+        r.a01 = a01 + dt * a11;
+        r.a10 = a10 + dt * (-wn * wn * a00 - 2.0 * zeta * wn * a10);
+        r.a11 = a11 + dt * (-wn * wn * a01 - 2.0 * zeta * wn * a11);
+        r.b0 = b0 + dt * b1;
+        r.b1 = b1 + dt * (wn * wn * (1.0 - b0) - 2.0 * zeta * wn * b1);
+    }
+    return r;
+}
+
+const ValveFlowTransition* default_valve_flow_transitions()
+{
+    static const ValveFlowTransition transitions[12] = {
+#define FLOW_PAIR(p) make_valve_flow_transition(p.wn_down, p.zeta_down, VALVE_DT / VALVE_SUB_STEPS, VALVE_SUB_STEPS), make_valve_flow_transition(p.wn_up, p.zeta_up, VALVE_DT / VALVE_SUB_STEPS, VALVE_SUB_STEPS)
+        FLOW_PAIR(CHAMBER_POS_PARAMS), FLOW_PAIR(CHAMBER_NEG_PARAMS),
+        FLOW_PAIR(ACT_POS_IN_PARAMS), FLOW_PAIR(ACT_POS_OUT_PARAMS),
+        FLOW_PAIR(ACT_NEG_IN_PARAMS), FLOW_PAIR(ACT_NEG_OUT_PARAMS)
+#undef FLOW_PAIR
+    };
+    return transitions;
+}
+#endif
 
 
 double clamp01(double value)
@@ -161,6 +234,46 @@ void PneumaticCT::reset_valve_states()
     reset_valve_state(&valve_state_act_neg_out);
 }
 
+void PneumaticCT::prepare_valve_openings(const double* x, const double* u, double dt)
+{
+#ifdef PNEU_OPENING_DYNAMICS
+    ValveRuntimeState* states[6] = {
+        &valve_state_ch_pos, &valve_state_ch_neg, &valve_state_act_pos_in,
+        &valve_state_act_pos_out, &valve_state_act_neg_in, &valve_state_act_neg_out
+    };
+    const ValveModelParams* parameters[6] = {
+        &CHAMBER_POS_PARAMS, &CHAMBER_NEG_PARAMS, &ACT_POS_IN_PARAMS,
+        &ACT_POS_OUT_PARAMS, &ACT_NEG_IN_PARAMS, &ACT_NEG_OUT_PARAMS
+    };
+    const double inlet[6] = {x[1], ATM, x[1], x[6], ATM, x[7]};
+    for (int i = 0; i < 6; ++i) {
+        auto& state = *states[i];
+        const auto& p = *parameters[i];
+        const double current = I_MAX * clamp01((clamp01(u[i]) - 0.5) * 2.0);
+        double direction = state.state_prev;
+        if (current > state.I_prev + STATE_EPS) direction = 1.0;
+        else if (current < state.I_prev - STATE_EPS) direction = 0.0;
+        const double rate = p.beta_bw + p.gamma_bw;
+        state.z = advance_valve_h(state.z, current - state.I_prev, rate, p.beta_bw / rate);
+        const double force = current + p.C_z * state.z + p.C_p * inlet[i] - p.C_k;
+        const double log_denom = p.alpha_shape * logaddexp_c(0.0, -p.k_shape * force);
+        const double target = std::exp(-log_denom);
+        const double wn = direction >= 0.5 ? p.wn_up : p.wn_down;
+        const double zeta = direction >= 0.5 ? p.zeta_up : p.zeta_down;
+        // Preserve the old transfer's low-frequency delay as an initial mapping.
+        // The new state is opening, not flow; these are not newly fitted times.
+        const double tau = 2.0 * zeta / wn;
+        const double decay = std::exp(-dt / tau);
+        state.x1 = decay * state.x1 + (-std::expm1(-dt / tau)) * target;
+        state.x2 = target;
+        state.I_prev = current;
+        state.state_prev = direction;
+    }
+#else
+    (void)x; (void)u; (void)dt;
+#endif
+}
+
 void PneumaticCT::get_valve_runtime_states(double* out) const
 {
     const ValveRuntimeState* states[VALVE_COUNT] = {
@@ -222,10 +335,10 @@ void PneumaticCT::set_discharge_coeff(
 
 void PneumaticCT::model(const double* x, const double* u, double* dxdt, int step_num)
 {
-    double* piston1 = new double[2];
-    double* piston2 = new double[2];
-    double* V1_dV1dt = new double[2];
-    double* V2_dV2dt = new double[2];
+    double piston1[2];
+    double piston2[2];
+    double V1_dV1dt[2];
+    double V2_dV2dt[2];
 
     double Ppos = x[1];
     double Pneg = x[2];
@@ -361,10 +474,6 @@ void PneumaticCT::model(const double* x, const double* u, double* dxdt, int step
         std::cout << "===== [LOG END] =====" << std::endl;
     }
 
-    delete[] piston1;
-    delete[] piston2;
-    delete[] V1_dV1dt;
-    delete[] V2_dV2dt;
 
     // Mass flowrate vector [kg/s] (lib6-compatible order)
     // 0: m_po1, 1: m_pi1, 2: m_po2, 3: m_pi2
@@ -431,7 +540,8 @@ double PneumaticCT::pressure(double P, double V, double dVdt, double dmdt)
     return dPdt;
 }
 
-double PneumaticCT::solenoid_valve(double P_inlet, double P_outlet, double signal, double type, double num)
+double PneumaticCT::solenoid_valve(double P_inlet, double P_outlet, double signal, double type,
+                                 double num, double flow_dt, int flow_sub_steps)
 {
     ValveRuntimeState* state = &valve_state_ch_pos;
     const ValveModelParams* params = &CHAMBER_POS_PARAMS;
@@ -476,6 +586,17 @@ double PneumaticCT::solenoid_valve(double P_inlet, double P_outlet, double signa
         state_curr = 0.0;
     }
 
+#ifdef PNEU_OPENING_DYNAMICS
+    // Pure pressure RHS: opening and hysteresis were advanced outside RK.
+    const double force_net = current + params->C_z * state->z
+                             + params->C_p * P_inlet - params->C_k;
+#elif defined(PNEU_EXACT_VALVE_HYSTERESIS)
+    const double rate = params->beta_bw + params->gamma_bw;
+    state->z = advance_valve_h(state->z, current - state->I_prev,
+                              rate, params->beta_bw / rate);
+    const double force_net = current + params->C_z * state->z
+                             + params->C_p * P_inlet - params->C_k;
+#else
     const double abs_dI = std::abs(current - state->I_prev);
     const double dI = abs_dI * (2.0 * state_curr - 1.0);
 
@@ -489,7 +610,12 @@ double PneumaticCT::solenoid_valve(double P_inlet, double P_outlet, double signa
 
     double force_net = current + params->C_z * state->z + params->C_p * P_inlet - params->C_k;
     force_net = std::min(FORCE_LIMIT, std::max(-FORCE_LIMIT, force_net));
+#endif
 
+#ifdef PNEU_OPENING_DYNAMICS
+    const double area_eff = params->A_max * state->x1;
+    const double target_area = params->A_max * state->x2;
+#else
     const double exp_arg = -params->k_shape * force_net;
     const double log_denom = params->alpha_shape * logaddexp_c(0.0, exp_arg);
 
@@ -497,25 +623,44 @@ double PneumaticCT::solenoid_valve(double P_inlet, double P_outlet, double signa
     if (log_denom <= LOG_GUARD) {
         area_eff = params->A_max * std::exp(-log_denom);
     }
+#endif
 
     const double phi = compressible_phi(P_inlet, P_outlet);
+#ifdef PNEU_OPENING_DYNAMICS
+    const double q_static_lpm = target_area * P_inlet * phi;
+    const double q_pred_lpm = area_eff * P_inlet * phi;
+#else
     const double q_static_lpm = area_eff * P_inlet * phi;
 
     const double wn = (state_curr >= 0.5) ? params->wn_up : params->wn_down;
     const double zeta = (state_curr >= 0.5) ? params->zeta_up : params->zeta_down;
-    const double dt_sub = VALVE_DT / static_cast<double>(VALVE_SUB_STEPS);
+    const double dt_sub = flow_dt / static_cast<double>(flow_sub_steps);
 
-    for (int i = 0; i < VALVE_SUB_STEPS; i++) {
+#ifdef PNEU_FAST_VALVE_FLOW
+    if (flow_dt == VALVE_DT && flow_sub_steps == VALVE_SUB_STEPS) {
+        const int index = (static_cast<int>(type) - 1) * 2 + (state_curr >= 0.5 ? 1 : 0);
+        const auto& transition = default_valve_flow_transitions()[index];
+        const double old_x1 = state->x1, old_x2 = state->x2;
+        state->x1 = transition.a00 * old_x1 + transition.a01 * old_x2
+                    + transition.b0 * q_static_lpm;
+        state->x2 = transition.a10 * old_x1 + transition.a11 * old_x2
+                    + transition.b1 * q_static_lpm;
+    } else
+#endif
+    {
+    for (int i = 0; i < flow_sub_steps; i++) {
         const double dx1 = state->x2;
         const double dx2 = wn * wn * (q_static_lpm - state->x1) - 2.0 * zeta * wn * state->x2;
         state->x1 += dt_sub * dx1;
         state->x2 += dt_sub * dx2;
+    }
     }
 
     state->I_prev = current;
     state->state_prev = state_curr;
 
     const double q_pred_lpm = std::max(state->x1, 0.0);
+#endif
     const double mdot = q_pred_lpm * STD_RHO / 60000.0;
     const int debug_base = (static_cast<int>(type) - 1) * 9;
     if (debug_base >= 0 && debug_base + 8 < VALVE_DEBUG_DIM) {

@@ -98,6 +98,9 @@ void PneumaticSimulator::set_discharge_coeff(
 
 void PneumaticSimulator::pneumaticDT(double* xk, double* uk, double Ts, double* xk1)
 {
+#ifdef PNEU_OPENING_DYNAMICS
+    pneumaticCT->prepare_valve_openings(xk, uk, Ts / 2.0);
+#endif
     pneumaticCT->model(xk, uk, k1, 1);
     for (int i = 0; i < X_DIM; i++) i2[i] = xk[i] + k1[i]*Ts/3;
 
@@ -113,11 +116,14 @@ void PneumaticSimulator::pneumaticDT(double* xk, double* uk, double Ts, double* 
         xk1[i] = xk[i] + Ts*k1[i]/8 + Ts*3*k2[i]/8 + Ts*3*k3[i]/8 + Ts*k4[i]/8;
 
     xk1[3]= fmod(xk1[3], 2*PI);
+#ifdef PNEU_OPENING_DYNAMICS
+    pneumaticCT->prepare_valve_openings(xk1, uk, Ts / 2.0);
+#endif
 }
 
 double* PneumaticSimulator::step(double* control, double time_step)
 {
-    double* xk1 = new double[X_DIM];
+    double xk1[X_DIM];
     int n = time_step/TS;
 
     for (int i = 0; i < n; i++)
@@ -126,13 +132,18 @@ double* PneumaticSimulator::step(double* control, double time_step)
         for (int j = 0; j < X_DIM; j++) xk0[j] = xk1[j];
     }
 
+#ifdef PNEU_OPENING_DYNAMICS
+    // Algebraic observations use accepted pressures and opening at the same time.
+    // model() is pure with respect to valve runtime in this branch.
+    double output_derivative[X_DIM];
+    pneumaticCT->model(xk0, control, output_derivative, 0);
+#endif
+
     observation[0] = xk0[0];
     observation[1] = xk0[1];
     observation[2] = xk0[2];
     observation[3] = xk0[6];
     observation[4] = xk0[7];
-
-    delete[] xk1;
 
     return observation;
 }
@@ -205,10 +216,38 @@ extern "C" {
     void time_reset_c() {return PneumaticSimulator::get_instance().time_reset();}
     void set_logging_c(bool enable) { return PneumaticSimulator::get_instance().set_logging(enable); }
     int get_augmented_state_dim_c() { return AUGMENTED_STATE_DIM; }
+    // Same vector length, different physical units: never restore flow states
+    // into the opening model merely because the dimensions agree.
+    int get_augmented_state_schema_c() {
+#ifdef PNEU_OPENING_DYNAMICS
+        return 2;
+#else
+        return 1;
+#endif
+    }
     void get_augmented_state_c(double* out) {
         PneumaticSimulator::get_instance().get_augmented_state(out);
     }
+    int set_augmented_state_checked_c(const double* in, int schema) {
+        if (!in || schema != get_augmented_state_schema_c()) return 1;
+        for (int i = 0; i < AUGMENTED_STATE_DIM; ++i)
+            if (!std::isfinite(in[i])) return 2;
+        const int pressure_indices[6] = {0, 1, 3, 4, 5, 6};
+        for (int i : pressure_indices) if (in[i] <= 0.0) return 3;
+#ifdef PNEU_OPENING_DYNAMICS
+        for (int valve = 0; valve < VALVE_COUNT; ++valve) {
+            const int base = 7 + valve * VALVE_RUNTIME_DIM;
+            if (std::abs(in[base]) > 1.0 + 1e-12 || in[base+1] < 0.0 || in[base+1] > 1.0
+                || in[base+2] < 0.0 || in[base+2] > 1.0 || in[base+3] < 0.0
+                || in[base+3] > 0.3 || (in[base+4] != 0.0 && in[base+4] != 1.0)) return 4;
+        }
+#endif
+        PneumaticSimulator::get_instance().set_augmented_state(in);
+        return 0;
+    }
+#ifndef PNEU_OPENING_DYNAMICS
     void set_augmented_state_c(const double* in) {
         PneumaticSimulator::get_instance().set_augmented_state(in);
     }
+#endif
 }

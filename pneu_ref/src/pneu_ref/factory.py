@@ -11,6 +11,7 @@ from pneu_ref.optimized_trajectory_ref import OptimizedTrajectoryBankRef
 from pneu_ref.trajectory_ref_nd import TrajectoryBankRefND
 from pneu_ref.random_ref import RandomRef
 from pneu_ref.constant_ref import ConstantPressureRef
+from pneu_ref.continuous_bank_ref import ContinuousTrajectoryBankRef
 
 
 def make_pressure_reference(spec: Mapping[str, Any] | None):
@@ -28,6 +29,8 @@ def make_pressure_reference(spec: Mapping[str, Any] | None):
 
     kind = str(config["kind"]).strip().lower().replace("-", "_")
     kwargs = dict(config.get("kwargs", {}))
+    if kind == 'continuous_trajectory_bank':
+        return ContinuousTrajectoryBankRef(**kwargs)
     if kind in {"random", "legacy_random"}:
         return RandomRef(**kwargs)
     if kind in {"feasible_random", "rate_limited_random"}:

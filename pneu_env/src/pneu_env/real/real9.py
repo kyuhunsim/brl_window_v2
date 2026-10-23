@@ -344,6 +344,11 @@ class PneuReal:
             dtype=np.float64,
         )
 
+    def begin_policy_clock(self) -> None:
+        """Rebase elapsed sensor time after preparation without clearing history."""
+        self._time_origin = self._raw_last_time
+        self._last_time = 0.0
+
     def set_offset(
         self,
         pos_offset: float,

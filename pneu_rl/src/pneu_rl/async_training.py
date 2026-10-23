@@ -52,6 +52,7 @@ def _learner(payload, experience, status, shared, lock, version, sync_every):
         losses = np.zeros(2)
         episode_updates = 0
         infos, diagnostics = [], []
+        last_completed_episode = None
         status.send(('ready', None))
         while True:
             message = experience.get()
@@ -77,6 +78,7 @@ def _learner(payload, experience, status, shared, lock, version, sync_every):
                 model.total_steps = step + 1
             elif kind == 'episode':
                 epi, reward, step = data
+                last_completed_episode = epi
                 if model.log:
                     model.save_model(model.logger.model_path)
                     if model.checkpoint_interval and epi % model.checkpoint_interval == 0:
@@ -111,6 +113,8 @@ def _learner(payload, experience, status, shared, lock, version, sync_every):
                 model.buffer.save_buffer(model.logger.buffer_path)
         if model.log:
             model.save_model(model.logger.model_path)
+            if last_completed_episode is not None:
+                model.save_model(f'{model.logger.folder_path}/model_epi_{last_completed_episode:04d}.pth')
             model.buffer.save_buffer(model.logger.buffer_path)
         _publish(model.policy, shared, lock, version)
         status.send(('done', dict(updates=updates, buffer_size=len(model.buffer), steps=model.total_steps)))
@@ -231,7 +235,8 @@ def train_async(model, episode, warmup_steps=0, warmup_deterministic=False,
     completed = False
     try:
         learner = AsyncLearner(model, queue_capacity, sync_every)
-        state, _ = model.env.reset()
+        if warmup_steps:
+            state, _ = model.env.reset()
         for step in range(warmup_steps):
             action = (model.evaluate_action(state) if warmup_deterministic
                       else model.select_action(state))
@@ -251,6 +256,7 @@ def train_async(model, episode, warmup_steps=0, warmup_deterministic=False,
                     and hasattr(model.env, 'request_hard_reset')):
                 model.env.request_hard_reset()
             state, _ = model.env.reset()
+            previous_step_start = None  # Exclude preparation/reset time from actor-period statistics.
             reward_sum = 0.0
             for _ in range(model.horizon):
                 step_start = time.monotonic()

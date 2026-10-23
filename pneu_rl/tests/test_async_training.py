@@ -24,11 +24,13 @@ class FakeEnv:
     def __init__(self):
         self.closed = False
         self.steps = 0
+        self.resets = 0
 
     def __getstate__(self):
         raise AssertionError('Hardware environment must never be pickled')
 
     def reset(self):
+        self.resets += 1
         return np.zeros(4, dtype=np.float32), {}
 
     def step(self, action):
@@ -61,6 +63,17 @@ def transition():
 
 
 class AsyncTrainingTest(unittest.TestCase):
+    def test_no_extra_reset_without_warmup_and_final_checkpoint(self):
+        model = make_model()
+        with tempfile.TemporaryDirectory() as folder:
+            logger = Logger.__new__(Logger)
+            logger.folder_path, logger.infos = folder, {}
+            model.logger, model.log = logger, True
+            train_async(model, episode=2, sync_every=1)
+            self.assertEqual(model.env.resets, 2)
+            self.assertEqual(model.env.steps, 12)
+            self.assertTrue(os.path.isfile(f'{folder}/model_epi_0002.pth'))
+
     def test_training_warmup_checkpoint_and_actor_isolation(self):
         model = make_model()
         original = {k: v.clone() for k, v in model.policy.state_dict().items()}

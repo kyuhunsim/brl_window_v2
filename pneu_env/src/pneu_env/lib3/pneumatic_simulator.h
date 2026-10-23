@@ -7,7 +7,9 @@
 #define V1P_ 0.1
 // #define V1N_ 0.077
 #define V1N_ 0.156
+#ifndef TS
 #define TS 0.0001
+#endif
 #define T_ 323.15
 #define T_OUT 293.15
 #define PI 3.14159265358979
@@ -37,8 +39,12 @@
 // #define CIN_ 3.4756947114013292
 // #define COUT_ 7.936024647066513
 
+#ifndef CIN_
 #define CIN_ 3.6198491
+#endif
+#ifndef COUT_
 #define COUT_ 7.49941545
+#endif
 
 #define M_DOT_DIM 10
 #define VALVE_DEBUG_DIM 54
@@ -93,8 +99,12 @@ public:
     PneumaticCT();
     ~PneumaticCT();
     void reset_valve_states();
+    // Opening dynamics branch: exact half-step update outside pressure RK.
+    void prepare_valve_openings(const double* x, const double* u, double dt);
     // Analysis-only snapshot hooks.  The runtime ordering for each valve is
-    // [z, x1, x2, I_prev, state_prev].  They do not alter the dynamics used
+    // [z, x1, x2, I_prev, state_prev]. Opening mode uses x1=opening fraction,
+    // x2=last target opening; legacy mode uses x1=flow and x2=flow derivative.
+    // They do not alter the dynamics used
     // by normal simulator calls.
     void get_valve_runtime_states(double* out) const;
     void set_valve_runtime_states(const double* in);
@@ -110,7 +120,8 @@ public:
     double* get_valve_debug();
     void set_logging(bool enable);
     
-    double solenoid_valve(double P_inlet, double P_outlet, double signal, double type, double num);
+    double solenoid_valve(double P_inlet, double P_outlet, double signal, double type, double num,
+                          double flow_dt = TS / 4.0, int flow_sub_steps = 20);
 };
 
 struct PneumaticSimulator

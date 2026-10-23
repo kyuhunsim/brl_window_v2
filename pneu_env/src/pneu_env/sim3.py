@@ -1,4 +1,6 @@
-from ctypes import CDLL, POINTER, c_bool, c_double
+from __future__ import annotations
+
+from ctypes import CDLL, POINTER, c_bool, c_double, c_int
 from pathlib import Path
 from collections import deque
 
@@ -28,13 +30,22 @@ class PneuSim:
         scale: bool = True,
         scale_low: float = 0.8,
         scale_high: float = 1.0,
+        library_path: str | Path | None = None,
     ):
-        env_pkg_path = Path(get_pkg_path("pneu_env"))
-        lib_path = env_pkg_path / "src/pneu_env/lib3/libpneumatic_simulator.so"
+        if library_path is None:
+            env_pkg_path = Path(get_pkg_path("pneu_env"))
+            lib_path = env_pkg_path / "src/pneu_env/lib3/libpneumatic_simulator.so"
+        else:
+            lib_path = Path(library_path).expanduser().resolve()
         if not lib_path.is_file():
             raise FileNotFoundError(f"Could not find lib3 simulator library: {lib_path}")
 
         self.lib = CDLL(str(lib_path))
+        self.library_path = lib_path
+        self.runtime_state_schema = 1
+        if hasattr(self.lib, "get_augmented_state_schema_c"):
+            self.lib.get_augmented_state_schema_c.restype = c_int
+            self.runtime_state_schema = int(self.lib.get_augmented_state_schema_c())
         print(f"[ INFO] Loaded pneumatic simulator library from: {lib_path}")
 
         self.lib.set_init_env_c.argtypes = [c_double, c_double]

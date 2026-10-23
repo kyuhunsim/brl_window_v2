@@ -703,3 +703,851 @@ v3는 .95에서 중앙값 4.47L/min이다. 즉 이 데이터에서는 **실물�
 `/home/rise/miniconda3/envs/env_1/bin/python pneu_rl/scripts/audit_lib3_calibration_archive.py`.
 산출물: `docs/img/lib3_calibration_archive_20261018/{durations.csv,archived_replay_metrics.csv,audit.json}`.
 현재 제어 코드·튜닝 계수·바이너리·학습 모델은 변경하지 않았다.
+
+## 2026-10-22 type1/type2 valve 튜닝: feasibility 우선 감사
+
+대상은 별도 `pneu_tune/tune_result/output_261022_type{1,2}_baseline.{txt,png}`와
+각 `_3d_fig{2,3}.png`다. 사용자는 두 데이터를 각각 독립적으로 튜닝하기로 했으며,
+이번 분석도 그 구분을 유지했다. 새 최적화나 펌프 튜닝은 실행하지 않았다.
+
+### 1. Fit 성능과 정적 개방 진단
+
+각 결과 txt의 계수를 원본 CSV와 기존 `sim_core.so`에 다시 넣어 계산했다.
+RMSE 단위는 L/min, R²는 비율이다. 마지막 열은 대표 upstream 압력, z=0에서
+계산한 A(명령=1)/Amax이며 실측 밸브 면적이 아니다.
+
+| 밸브 | type1 RMSE / R² | type2 RMSE / R² | type1 / type2 전체 개방 면적비 |
+|---|---:|---:|---:|
+| v1 공급 양압→ATM | 4.012 / .523 | 3.801 / .768 | 99.3% / 84.8% |
+| v2 ATM→공급 음압 | 4.319 / **−.840** | 4.367 / .266 | 100.0% / 97.5% |
+| v3 공급 양압→act 양압 | 2.846 / .609 | 3.281 / .642 | 97.8% / 81.0% |
+| v4 act 양압→ATM | 1.546 / .885 | 3.495 / .577 | 83.5% / 85.2% |
+| v5 ATM→act 음압 | .804 / .893 | 1.809 / .626 | 74.7% / **12.9%** |
+| v6 act 음압→공급 음압 | 1.110 / .849 | 2.028 / .627 | 77.5% / **40.3%** |
+
+type1 v2는 평균값을 예측하는 것보다 SSE가 크다(R²<0). type1 v5는 fit만 보면
+상대적으로 좋지만 full-open prior는 충족하지 않는다. RMSE/R²와 feasibility를
+각각 채택 조건으로 두어야 한다.
+
+![대표 압력에서의 정적 개방 진단](../../pneu_tune/exp/lib3_valve_feasibility_20261022/static_opening.png)
+
+### 2. 현재 soft penalty는 제약 충족을 보장하지 않는다
+
+설정은 full_open_weight=1, 목표 면적비 .95, v3/v4만 opening_shape_weight=5다.
+type2 v5의 full-open penalty는 약 22,125이고 SSE는 약 107,563이다. 충분히
+열리는 것을 포기해도 총 목적함수가 작아질 수 있다. type1 v4도 full-open/shape
+penalty는 약 431/686, SSE는 약 78,541이다. Weight를 넣었다는 이유로 통과라고
+취급하면 안 된다.
+
+다만 Amax도 함께 fit되고 z=0 면적은 실측량이 아니다. 모든 밸브가 실제로 반드시
+95% 열린다는 것을 입증한 것은 아니다. .95를 이 모델의 채택 조건으로 삼는다면
+hard constraint 또는 fit과 독립된 reject 조건으로 명시해야 한다. 실측이 뒷받침하는
+압력·이력 조건에서 Q(1)과 개방 문턱이 맞는지도 확인해야 한다. 현재 penalty는
+median Pin, z=0인 한 조건만 검사한다.
+
+### 3. 히스테리시스 내부 상태의 보상과 수치 clipping
+
+sim_core.cpp와 같은 식으로 z를 재구성하고, 처음 2step 유량도 독립 재계산해
+기존 코어와 오차 1e−9 이내로 일치함을 확인했다. 다음은 전체 기록의 비율이다.
+
+- type1 v3: force proxy가 수치 보호 범위 ±500을 넘는 샘플이 **70.49%**.
+- type2 v3/v4/v5: 같은 비율이 **32.97% / 63.21% / 13.55%**.
+- type2 v5: 이력을 포함한 면적비가 약 **97.67%**의 샘플에서 .001 미만 또는 .999 초과.
+  z=0에서는 전체 개방 12.9%인데, fit에서는 이력 항이 개방을 거의 양 끝으로 밀어낸다.
+- type1/type2 v2: z가 수치 보호 한계 ±1e6에 도달한 샘플이 **12.81% / 4.11%**.
+- type1 v3의 |Cz*z| 95 percentile은 약 858, 나머지 항 `I+Cp*Pin−Ck`는 약 .282.
+  type2 v5도 약 575 대 .186이다. 이는 보정된 물리적 힘이 아닌 코드 내부 proxy 값이다.
+
+![type2 v5의 이력 항과 수치 보호 한계](../../pneu_tune/exp/lib3_valve_feasibility_20261022/type2_v5_history.png)
+
+단순히 정적 면적이 작은 것뿐 아니라 이력 항과 수치 clipping에 의존한 fit이다.
+Peak penalty만 추가해서는 이 보상을 막지 못한다. 보호 한계 도달을 feasibility
+실패로 검출하고, 이력 효과의 폭을 실측 상승·하강 branch로 제한할 필요가 있다.
+
+v2에는 수치 업데이트 문제도 있다. z는 전류 변화 ΔI에 대해 한 번의 Euler 식으로
+갱신한다. `ΔI>0,z>=0`인 branch에서는 다음과 같다.
+
+`z_new = (1−(β+γ)ΔI)z_old + A_bw*ΔI`
+
+이 branch의 선형 부분 수렴 조건은 `0 < (β+γ)ΔI < 2`다. 이번 최대값은
+type1 v2에서 46.83, type2 v2에서 109.42다. 해당 branch에서는 갱신이 불안정해질
+수 있고 실제로 z가 수치 상한에 도달한다. 이것은 보편적인 물리 법칙이 아니라 현재
+이산 갱신식에 대한 진단이다. 파라미터 제한 또는 적절한 substep/구간별 적분으로
+입력 변화 폭에 따른 수치 문제를 다루어야 한다.
+
+### 4. 전체 기록 평균에 의존하는 불연속 초기 penalty
+
+코어에는 `Q_pred[1] > 2*mean(Q_real)`이면 **1e7**을 더하는 조건이 있다.
+초기 압력이나 물리 유량 상한이 아니라 저유량 구간이 몇 초 포함됐느냐에 따라 바뀌는
+문턱이다. type2 초기 실측 유량은 v3/v4/v5에서 9.670/9.598/6.794L/min인데,
+문턱은 8.898/8.645/4.872L/min이다. 정상적인 시작 유량에도 걸릴 수 있다.
+
+저장 txt로 재평가하면 v3/v4/v5의 두 번째 예측값은 문턱을 각각 약
+4e−13/1.4e−11/7e−12 넘는다. 그 결과 **저장된 best_error와 달리 1e7 penalty가 발생**한다.
+텍스트 계수의 약 12자리 반올림만으로 조건이 뒤집힐 정도로 경계에 붙은 해다.
+저장 자릿수만 늘려서는 초기 응답을 전체 기록 평균으로 제한하는 문제를 해결하지 못한다.
+물리적으로 근거 있는 초기 과도·유량 허용 범위에 기반한 연속 조건으로 바꾸어야 한다.
+
+또 12개 해 중 10개는 wn_up/zeta_up/wn_down/zeta_down 네 변수가 모두 지정
+경계에 붙어 있다. type1은 wn 하한, type2는 상한이 많다. 범위를 더 좁힐 근거로
+삼지 말고 위 불연속 penalty, 지연, 이력 보상부터 점검해야 한다.
+
+### 5. 3D 그림의 해석과 다음 채택 조건
+
+기존 3D의 점은 동적 실측/예측이고 파란 surface는 **z=0 정적 값**이다.
+v3/v6는 상류·하류 압력이 모두 변하지만 그림은 하나만 축으로 쓰고 다른 압력은
+median으로 고정한다. 모든 점이 surface에 놓여야 하는 것은 아니다. 한편 큰 정적
+면적 부족을 이력·수치 clipping으로 보상한다는 문제는 별도 계산으로 확인했다.
+
+다음 수정은 단순히 weight를 더하는 순서로 진행하지 않는다.
+
+1. 전체 기록 평균 기반 초기 penalty를 수정하고, 저장 계수의 목적함수 재현성을 확인한다.
+2. z/force 보호 clipping에 의존하는 해를 reject하고 현재 Euler 갱신의 안정성을 확보한다.
+   히스테리시스 효과도 실측 개방/폐쇄 branch의 폭으로 제한한다.
+3. 같은 압력에서 개방 문턱·낮은 명령의 유량·전체 개방 유량·단조성을 검증한다.
+   압력 grid와 여러 초기 이력을 쓰고 실측에 근거한 허용 범위를 둔다.
+   `.95 full-open` 등의 설계 prior를 채택 조건으로 삼으면 미충족 해를 제외한다.
+4. Fit loss는 대표 유량으로 정규화해 무차원 제약 항과 척도를 맞춘다.
+   같은 기록의 SSE와 R²는 `R²=1−SSE/SST` 관계라 R² penalty만 더해도 새로운
+   물리 정보는 생기지 않는다. R²도 채택 조건으로 보고하고 예측력 부족을 숨기지 않는다.
+5. Feasible 후보 안에서 RMSE/R²와 과도 응답을 비교하고 type1/type2를 독립 보존한다.
+   이후 lib3 전체/pump 튜닝으로 진행한다.
+
+명령 로그의 ctrl과 command_ctrl이 맞지 않는 샘플도 약 .3~2.3% 있다.
+실제 적용 명령·센서 시각 확인 대상이지만 어느 열이 정답인지는 이번에 확정하지
+않았고, 유리한 열로 바꾸지 않았다. 모델 제약으로 이 차이를 메우지 않는다.
+
+재현 코드: `pneu_rl/scripts/analyze_lib3_valve_feasibility_20261022.py`.
+산출 표·그림·소스 hash는 `../pneu_tune/exp/lib3_valve_feasibility_20261022/`에 있다.
+결과 파일·optimizer·실행 바이너리·기존 계수는 변경하지 않았다.
+
+## 2026-10-22 v2 하나로 feasibility 수정 시험
+
+사용자 승인에 따라 실패가 가장 컸던 type1 공급 음압 밸브 v2만 재튜닝했다.
+원본 `pneu_tune` 대신 이 저장소에 실험용 코어와 러너를 추가했다. 기존 계수,
+배포 lib3, 펌프 튜닝, RL은 갱신하지 않았다.
+
+### 실제 적용한 변경
+
+- 전체 기록 평균으로 두 번째 유량을 제한하던 1e7 penalty를 제거했다.
+  대신 실측 유량 상위 .999 quantile의 1.2배라는 별도 예측 상한을 사용했다.
+  이 계수는 이번 시험의 명시적 허용 기준이며 하드웨어 정격이 아니다.
+- 이력 상태를 `h=z*(beta+gamma)/A_bw`로 정규화하고 전류 변화 구간별 정확해로
+  갱신했다. `|h|<=1`을 유지하며 z/force clipping은 사용하지 않는다.
+  beta>=gamma>=0을 시험 prior로 채택하고 히스테리시스의 전류 상당 폭은 ±.06A
+  이내로 제한했다. 모든 히스테리시스 모델에 필요한 보편 조건이라고 주장하지 않는다.
+- 부분 개방 1.5초 이상 유지 구간의 마지막 .5초와, 전체 개방 1초 이상 유지한
+  하류 압력 구간들을 추출했다. 예측 평균을 실측 p05~p95에 기준 유량의 ±5%를
+  더한 범위에 넣도록 총 **38개 실측 유량 조건**을 적용했다. ±5%는 센서 정확도가
+  아닌 시험용 채택 여유다. 데이터가 부족한 명령 .8의 정적 차단은 강제하지 않았다.
+- 전체 개방 면적비 .95는 데이터에서 식별한 값이 아닌 모델 prior로 명시하고
+  h=-1/0/+1에서 검사했다. 이력이 달라도 충분히 열리는 보수적인 조건이다.
+- 전 구간 v2가 초크 영역이고 상류 압력이 일정해 Cp/Ck를 분리 식별할 수 없다.
+  따라서 Cp=0인 유효 문턱 표현을 사용했다. 원래 13개 상수를 그대로 자유 탐색한
+  비교가 아니며, 변경 요소별 효과를 분리한 ablation도 아니다.
+- 후보 탐색 후 제약 있는 SLSQP로 SSE를 줄이고, 모든 조건을 만족하는 후보만
+  accepted로 저장하도록 했다. 평균 RMSE/R² 개선만으로 통과시키지 않았다.
+
+### 결과: 수치 거동과 fit은 개선됐으나 채택 조건은 미통과
+
+아래는 같은 type1 v2 원본에 대한 in-sample 결과다. 다른 밸브·다른 데이터셋을
+튜닝하거나 검증한 결과가 아니다.
+
+| 실행 | RMSE L/min | R² | HF ratio | 실측 조건 통과 | 채택 |
+|---|---:|---:|---:|---:|---|
+| 기존 baseline | 4.319 | −.840 | 5.397 | 별도 기존 기준 | 보류 |
+| 첫 수정 시험 | 1.685 | .720 | 3.288 | 32/38 | **실패** |
+| 같은 동특성 범위에서 추가 탐색 | 1.891 | .647 | 3.507 | 31/38 | **실패** |
+| 느린 동특성도 허용한 대조 시험 | 1.389 | .810 | 1.728 | 32/38 | **실패** |
+
+첫 시험은 45세대 전역 탐색, 두 번째는 첫 후보 주변 180세대 탐색이다. 두 번째는
+feasibility 위반을 줄이는 탐색이므로 RMSE가 반드시 낮아지는 과정이 아니다.
+국소 최적화도 성공 종료하지 않았으며, 허용된 모델 범위 안에 feasible 해가 없다는
+증명은 아니다. **이번 탐색에서는 그런 해를 찾지 못했다**는 결론만 낸다.
+
+첫 두 시험은 기존 wn=11~25rad/s, zeta=.4~.6을 유지했다. 실측 유지 구간에서
+입력 변화 후 최종 변화량 90% 도달까지 대략 1.2~1.6초 걸리는 예가 여럿인 반면,
+첫 후보는 대체로 .1~.2초였다. 예를 들어 기록 529.62초부터의 전체 개방에서
+실측은 약1.58초, 첫 후보는 .16초였다. 이는 기록된 유량의 겉보기 응답 시간으로,
+밸브 지연과 유량 센서 필터·통신 지연을 분리 식별한 값은 아니다.
+
+이 근거로 세 번째 시험만 wn 하한을 2rad/s로 낮추고 zeta 상한을1.2로 넓혔다.
+나머지 38개 유량 조건과 개방·수치 조건은 완화하지 않았다. 느린 후보에서
+개방/폐쇄 wn은 약3.67/3.47rad/s로 선택됐지만 여전히 모든 실측 조건을 통과하지 못했다.
+
+느린 후보의 정적 전체 개방 면적비는 h=-1/0/+1에서 **98.93/99.18/99.37%**,
+`max|h|=.820`, force proxy 최대 절대값은 약.111이다. 보호 clipping은 없다.
+하지만 저유량/부분 개방 구간의 평균 유량 차이가 남아 있다. 예를 들어 명령
+.85267의 하강 유지에서 실측9.762/예측8.341L/min, 명령.90422 유지에서
+실측10.865/예측12.331L/min이다. 6개 유지 구간이 선언한 허용 범위를 벗어났다.
+
+![수정 시험과 기존 fit 비교](../../pneu_tune/exp/lib3_v2_feasible_retry_20261022_slow/comparison.png)
+
+![v2 동적 점과 정적 h=0 면](../../pneu_tune/exp/lib3_v2_feasible_retry_20261022_slow/surface.png)
+
+현재 판단은 **수치 폭주를 이용하는 기존 해를 막으면 상당한 개선이 가능하지만,
+그것만으로 실측 개방·이력·과도 응답이 함께 맞지는 않는다**는 것이다. 유량 센서의
+필터·지연과 밸브 자체의 응답, 부분 개방 유량 형상을 구분해서 보아야 한다.
+조건을 통과시키기 위해 허용 범위를 사후에 넓히거나 pump 계수로 보상하지 않는다.
+다음 점검은 불통과 유지 구간과 전환 파형이며, 이 결과를 그대로 펌프 튜닝에 넘기지 않는다.
+
+### 검증·재현과 파일
+
+정규화 이력의 구간 정확해를 독립 `solve_ivp`와 비교하고, 입력 분할 불변성,
+1000회 큰 역전 입력의 유계성, 뒤쪽 데이터 평균이 초기 예측을 바꾸지 않는지
+4개 unittest로 검사했다. 모두 통과했다. 저장 계수는 17자리 및 NPZ로 보존한다.
+
+- 코어: `pneu_env/src/pneu_env/tuner/sim_core_feasible.cpp`
+- 러너: `pneu_env/scripts/retry_lib3_valve_feasible.py`
+- 검사: `pneu_env/tests/test_feasible_valve_core.py`
+- 보고서·그림·채택 조건·계수:
+  `../pneu_tune/exp/lib3_v2_feasible_retry_20261022{,_refined,_slow}/`
+- 전체 replay는 큰 파일이므로 Git 제외 경로
+  `pneu_rl/exp/lib3_v2_feasible_retry_20261022/`에 저장하고 report.json에 경로를 남겼다.
+- 각 report.json의 `accepted=false`, parameters.txt의 `REJECTED`가 최종 상태다.
+
+실험용 코어의 이력 갱신은 기존 lib3와 다르다. **계수만 기존 Euler-z 구현으로
+복사하면 같은 응답이 나오지 않는다.** 채택 후 전체 simulator로 갱신식을 이식하고
+응답 일치를 검증하는 단계가 별도로 필요하다.
+
+```bash
+MPLCONFIGDIR=/tmp/brl_review_mpl OPENBLAS_NUM_THREADS=1 \
+/home/rise/miniconda3/envs/env_1/bin/python pneu_env/tests/test_feasible_valve_core.py
+
+# 기본 조건의 단일 밸브 시험
+MPLCONFIGDIR=/tmp/brl_review_mpl OPENBLAS_NUM_THREADS=1 \
+/home/rise/miniconda3/envs/env_1/bin/python pneu_env/scripts/retry_lib3_valve_feasible.py
+
+# 같은 v2에서 느린 응답 범위의 대조 시험
+MPLCONFIGDIR=/tmp/brl_review_mpl OPENBLAS_NUM_THREADS=1 \
+/home/rise/miniconda3/envs/env_1/bin/python pneu_env/scripts/retry_lib3_valve_feasible.py \
+  --de-iterations 100 \
+  --warm-start ../pneu_tune/exp/lib3_v2_feasible_retry_20261022/parameters.npz \
+  --wn-min 2 --wn-max 25 --zeta-min .4 --zeta-max 1.2 \
+  --output-dir ../pneu_tune/exp/lib3_v2_feasible_retry_20261022_slow
+```
+
+## 2026-10-22 type1/type2 × v1~v6 전체 실행
+
+사용자 요청에 따라 두 type을 각각 독립 튜닝했다. 12개 모두 완료했고 실행 오류는
+없었다. 3개 프로세스로 실행한 배치 시간은 **약102.4초**, 각 case는 약16~33초다.
+기존 optimizer와 탐색 방법·파라미터화가 달라 속도 비교 benchmark로 해석하지 않는다.
+
+### 공통 조건과 밸브별 적용
+
+- 동일 seed0, DE100세대, population=8×변수 수, 최대3개 시작점의 SLSQP250회.
+- wn=2~25rad/s, zeta=.4~1.2, exact normalized hysteresis, clipping 의존 후보 제외.
+- 명령을1.5초 이상 유지한 마지막 .5초와, 전체 개방1초 이상 유지한 샘플의
+  **상류·하류 압력을 각각5kPa bin**으로 나누어 실측 유량 조건을 구성했다.
+- 허용 범위는 해당 구간 실측 p05~p95에 채널 기준 유량의 ±5%를 추가했다.
+  이번 배치 기준 유량은 실측 양의 유량 p95이며, 이전 v2의 전체 개방 중앙값 기준과
+  수치는 조금 다르지만 같은 비율 원칙이다. 센서 정격 정확도를 뜻하지 않는다.
+- 정적 전체 개방 면적비 .95는 Pin 최소/중앙/최대와 h=-1/0/+1에서 평가했다.
+  실제 면적 측정이 아닌 모델 prior다. 전체 기록에서 센서의 작은 음수 값도 유지했다.
+- Pin이 고정인 v2/v5만 Cp=0, 나머지4개 밸브는 Cp도 추정했다. 상류 압력 범위에서
+  전류 상당 변화 폭을 .12A 이내로 두고, 이력 기여도 ±.06A로 제한했다.
+- Amax 탐색 범위는 양의 차압·전체 개방 기록의 `Q/(Pin*Phi)` 중앙값의 .85~1.25배.
+  역차압/유량 용량이0에 가까운 샘플은 이 기준 추정에서 제외했다. 이 범위도 시험
+  prior이므로 미통과가 모델의 근본적 불가능성을 증명하지는 않는다.
+- 먼저 모든 조건을 통과하는 후보를 찾고 그 안에서 SSE로 선택했다. 통과 후보가
+  없으면 최대 정규화 조건 위반이 가장 작은 후보를 진단용으로 보존했다. 따라서
+  미통과 후보는 RMSE가 이전보다 커질 수도 있다. 결과를 global 후보로 무조건
+  되돌리던 단일 시험의 저장 방식도 이번 배치에서 개선했다.
+
+### 결과
+
+RMSE 단위 L/min. '유량 조건'은 위 실측 anchor의 통과 개수이며, 전체 개방 prior 등
+다른 조건도 모두 만족해야 최종 통과다.
+
+| type | 밸브 | 기존→후보 RMSE | 후보 R² | 유량 조건 | 전체 개방 최소 면적비 | 최종 |
+|---|---|---:|---:|---:|---:|---|
+| 1 | v1 공급 양압→ATM | 4.012→.852 | .978 | 54/54 | 95.0% | 통과 |
+| 1 | v2 ATM→공급 음압 | 4.319→1.329 | .826 | 32/38 | 94.63% | 미통과 |
+| 1 | v3 공급 양압→act 양압 | 2.846→1.418 | .903 | 119/152 | 78.77% | 미통과 |
+| 1 | v4 act 양압→ATM | 1.546→.805 | .969 | 56/58 | 95.0% | 수치 경계 미통과 |
+| 1 | v5 ATM→act 음압 | .804→.770 | .902 | 37/48 | 89.51% | 미통과 |
+| 1 | v6 act 음압→공급 음압 | 1.110→1.212 | .820 | 30/60 | 79.53% | 미통과 |
+| 2 | v1 공급 양압→ATM | 3.801→.925 | .986 | 71/71 | 95.0% | 통과 |
+| 2 | v2 ATM→공급 음압 | 4.367→2.146 | .823 | 51/55 | 94.9951% | 미통과 |
+| 2 | v3 공급 양압→act 양압 | 3.281→2.126 | .850 | 58/106 | 74.77% | 미통과 |
+| 2 | v4 act 양압→ATM | 3.495→.812 | .977 | 66/71 | 94.18% | 미통과 |
+| 2 | v5 ATM→act 음압 | 1.809→.505 | .971 | 50/60 | 97.19% | 미통과 |
+| 2 | v6 act 음압→공급 음압 | 2.028→1.435 | .813 | 31/68 | 78.03% | 미통과 |
+
+type2 v2의 실제 최솟값은94.9951%로95%에 조금 못 미친다. type1 v4의 두 anchor는
+허용 경계에서 최대 **1.52e−6L/min**만 벗어났다(정규화 위반 약1.01e−7).
+실질적인 유량 형상 오차가 큰 경우와 구분하되, 저장된 accepted=false는 바꾸지 않았다.
+통과 수치 허용오차는1e−8로 모든 case에 동일하게 적용했다.
+
+**이번 배치의 복합 조건 통과는2/12개로, 두 type 모두 v1이다.** 이는 실측 유량
+anchor와 면적비 .95 prior까지 합친 판정이며, 나머지10개가 물리적으로 불가능하다는
+뜻은 아니다. 나머지도 재생 기록의 수치 상태는 유계이고 보호 clipping이 없지만,
+실측 유량 또는 전체 개방 prior와 차이가 남아 있다.
+type1 v6는 fit RMSE도 조금 악화됐으므로 일괄 개선이라고 표현하지 않는다.
+
+![전체 비교](../../pneu_tune/exp/lib3_all_valves_feasible_20261022/overview.png)
+
+### 실패 위치에서 얻은 근거
+
+- 두 type의 v1은 높은 R²와 실측/개방 조건을 함께 충족한다. 기존 튜닝의 비정상적인
+  보상을 막아도 유량을 잘 재현할 수 있는 채널이 있다는 근거다.
+- v3/v6는 두 type에서 공통으로 어려움이 크다. type2 v3의 한 유지 구간은
+  Pin≈235.4, Pout≈230.6kPa, 명령1에서 실측 평균−.059L/min(영점 부근)인데
+  후보는4.567L/min이다. type2 v6도 Pin≈42.5, Pout≈36.3kPa에서 실측.537,
+  후보2.495L/min인 구간이 있다. **작은 양의 차압에서 실측은 거의 흐르지 않는데
+  모델은 유량을 예측하는 구간**이 남는다. 추가 압력 문턱·밸브 특성·센서/로그 문제
+  중 무엇인지는 확인 전이며, 임의의 누설/차압 문턱을 이번 실행에 추가하지 않았다.
+- type2 v5는 RMSE.505/R².971이지만 실측 조건10개가 미통과다. 전체 RMSE와
+  R²만으로 물리 조건 통과를 판단할 수 없음을 직접 보여준다.
+
+단일 데이터 내 조건 충족 결과이며 독립 검증이나 실물 제어 성공은 아니다.
+현재 실험용 계수만 기존 lib3의 Euler-z 구현에 복사하면 같은 응답이 나오지 않는다.
+전체 이력 갱신식 이식·재생 일치 확인 전에는 계수만 기존 lib3에 복사하지 않는다.
+실측 anchor 미통과와 면적비 prior 미충족은 아래의 feasibility 우선 방침에 따라
+분리해서 판단한다.
+
+### 파일·검증·재실행
+
+- 상세 표·밸브별 링크: [전체 요약](../../pneu_tune/exp/lib3_all_valves_feasible_20261022/summary.md)
+- 개별 cfg 성격의 settings, 소스 hash, 결과, 계수, anchor, 2D/3D 그림:
+  `../pneu_tune/exp/lib3_all_valves_feasible_20261022/type{1,2}/v{1..6}/`
+- 원시 replay: `pneu_rl/exp/lib3_all_valves_feasible_20261022/` (Git 제외).
+- 최종12개 replay의 유한성·상태 범위·보호 한계 비의존, 통과 플래그/anchor 정합성,
+  17자리 txt/NPZ 계수 일치, 원본과 코드 hash 불변을 확인했다.
+- 기존 코어 수치 검사4개에 더해, 2차원 압력 bin, sparse 평균, Cp 식별 구분과
+  파라미터 역변환, 무차압 용량 추정 제외에 대한 검사4개도 통과했다.
+
+```bash
+# 두 type × 밸브1~6을 각각 독립 튜닝
+MPLCONFIGDIR=/tmp/brl_review_mpl OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+/home/rise/miniconda3/envs/env_1/bin/python -u pneu_env/scripts/retry_lib3_all_valves_feasible.py \
+  --type all --valves 1,2,3,4,5,6 --workers 3
+
+# 결과 비교 표·그림 재생성
+MPLCONFIGDIR=/tmp/brl_review_mpl OPENBLAS_NUM_THREADS=1 \
+/home/rise/miniconda3/envs/env_1/bin/python pneu_rl/scripts/summarize_lib3_all_valves_feasible.py
+```
+
+## 2026-10-22 펌프 튜닝 전: 오차 보상 경로와 실측 유량 수지
+
+사용자가 우려한 '펌프 계수가 밸브 오차를 보상하는 현상'은 현재 구조에서 가능하다.
+기존 tuner3 목적함수는 공급 압력2개와 flow1/2만 사용하고 actuator 압력과 flow3~6은
+직접 평가하지 않는다. 공급 양압의 질량수지는 `pump_out−m1−m3`, 공급 음압은
+`−pump_in+m2+m6`이다. 잘못 예측한 밸브 유량을 펌프 유량으로 상쇄하면 공급 압력은
+맞아도 actuator 응답과 다른 입력 조건까지 맞는다는 보장은 없다.
+
+따라서 추가 작업을 더 많은 penalty 탐색으로 늘리기 전에, 펌프가 직접 들어가지 않는
+**실측 actuator 순유량과 압력 변화의 정합성**을 검사했다. 외부 `pneu_tune`의 부피
+양압 .156L/음압 .1L, T=323.15K, R=.287, STD_RHO=1.20411831637462를 사용하고
+flow3−4 및 flow5−6을 시간 적분했다. 이는 모든 센서가 같은 표준 L/min을 기록하고,
+누설·기타 유량 경로가 없다는 가정을 검사하는 진단이다. 센서 사양 검증은 하지 않았다.
+
+기록5초 이후 겹치지 않는1초 구간의 ΔP 비교:
+
+| 데이터 | 양압 ΔP 오차 RMSE | 음압 ΔP 오차 RMSE | 음압 평균 오차 |
+|---|---:|---:|---:|
+| type1 | 12.34kPa | 22.78kPa | −20.47kPa |
+| type2 | 17.53kPa | 19.65kPa | −12.73kPa |
+
+예를 들어 type1 기록10~15초에는 음압 in/out 명령이 모두1이고 실측 평균 유량이
+Q5=5.228, Q6=6.718L/min이다. 현재 변환에서는 계속 빠져나가는 순유량인데,
+actuator 압력은69.758→70.212kPa로 거의 유지된다. type2의 같은 구간도
+Q5=6.747/Q6=8.049, 압력79.853→80.192kPa다.
+
+이 차이는 **밸브 예측값 없이 실측 유량만 써도 나타난다.** 물리적 질량보존 위반이나
+센서 고장의 증명은 아니다. 표준/실제 부피유량 기준, 진공측 밀도 환산, 채널 매핑,
+센서 시각·필터, 체적·온도, 측정되지 않은 누설 경로 중 무엇이 빠졌는지 확인해야 한다.
+검사 전에 실측 Q를 무조건 정답으로 주입하는 펌프 튜너를 만드는 것도 적절하지 않다.
+
+v3의 전체 개방 후1초 이상 유지한 샘플 중 |Q|<=.15L/min인 구간도 확인했다.
+그때 기록상 차압 중앙값은 type1 약4.57kPa, type2 약4.37kPa다.
+실제 개방 문턱/배관 현상인지 압력 센서 offset·측정 위치 영향인지 아직 구분되지 않는다.
+이 값을 그대로 cracking pressure로 추가하지 않는다.
+
+이 진단의 잔차를 모두 설명하는 것을 펌프 튜닝의 선행 조건으로 삼지 않는다.
+사용자는 펌프 OFF에서도 0.0X L/min 수준의 영점 흔들림을 경험했다고 설명했다.
+기록의 L/min 단위를 유지하고 작은 센서 잔차를 물리 모델에 맞추기 위한 보정항을
+추가하지 않는다. 더 큰 유량 수지 잔차도 현재 가정 아래의 진단 결과로 보존하며,
+그 원인이 특정 센서나 하드웨어 요소라고 단정하지 않는다.
+
+기존 펌프 튜너의 SIM_DELAY=.1에서 지연된 압력/시간과 현재 상태 유량을 함께
+비교하는 경로도 점검 대상이다. 이를 정리하기 전 계수를 순수 물리 파라미터 추정값으로
+해석하지 않는다. 이번에는 펌프 튜닝이나 simulator 변경을 실행하지 않았다.
+
+재현: `pneu_rl/scripts/check_lib3_measured_flow_balance.py`.
+산출물은 전체 밸브 결과 폴더의 `measured_flow_balance_{diagnostic.csv,examples.csv,audit.json}`와
+`near_zero_flow_pressure_diagnostic.csv`다. 가정과 원본 hash를 audit.json에 남겼다.
+
+## 2026-10-22 진행 방침: 추가 보정항보다 RL용 feasibility 우선
+
+사용자는 밸브 노후, 결합 상태, 펌프와 튜브 유로 등 회차마다 달라질 수 있는 실물
+요인을 모두 재현하는 것보다, RL 학습에 사용할 모델의 타당성을 우선한다고 정리했다.
+따라서 오차를 줄이기 위한 새 차압 문턱·센서 offset·배관 보정항은 이번에 추가하지 않는다.
+
+- **구조·수치 타당성:** 이력 상태가 유계이고 보호 clipping에 의존하지 않아야 한다.
+  고정 압력·이력에서 정적 개구율은 명령 증가에 따라 감소하지 않고 0~1 범위여야 하며,
+  유량·동특성이 발산하지 않아야 한다. 의도한 유로 방향과 정상 상태의 차압–유량 관계도
+  확인한다. 현재12개 재생의 유계성 확인을 전체 운전 범위 검증으로 확대 해석하지 않는다.
+- **제어에 필요한 응답:** 사용할 압력·명령·개폐 이력 범위에서, 닫힘에도 큰 유량이
+  지속되거나 충분한 차압에서 명령을 바꿔도 유량 반응이 사라지는 등 RL이 잘못된
+  제어 관계를 배울 수 있는 구간을 검사한다. 차압이 거의 없을 때 유량이 작은 것
+  자체는 실패가 아니다. 개방 문턱은 실측 근거 없이 특정 숫자로 고정하지 않는다.
+- **실측 적합도와 prior 분리:** RMSE·R²와 유지 구간 유량 잔차는 계속 보고한다.
+  다만 모든 anchor 일치나 전체 개방 면적비 .95를 물리 법칙으로 취급하지 않는다.
+  기존 결과의 accepted 플래그는 당시 복합 조건의 기록으로 유지한다.
+
+다음 순서는 기존 밸브 식의 위 조건 확인 → 동일한 이력 갱신을 전체 lib3에서 재현 →
+밸브 고정 후 펌프 튜닝 → 압력4개·유량6개와 교차 trajectory 평가다.
+type1/type2는 계속 각각 튜닝하고, 상대 type 재생은 추가 진단으로 사용한다.
+튜닝 코어와 전체 모델의 계산 일치, 펌프 replay 시간축 정렬 및 최적점 result.x 저장은
+새 물리 현상을 추가하는 작업이 아니라 구현 정합성 수정으로 처리한다.
+
+feasible한 모델에서도 실물 오차는 남을 수 있으므로 이후 RL의 강건성·적응 실험과
+구분해 평가한다. RL이 모든 오차를 자동으로 해결한다고 전제하지는 않는다.
+이번 방침 반영에서는 문서만 수정했고, 추가 보정 모델·새 튜닝은 실행하지 않았다.
+
+## 2026-10-22 밸브 계산 이식과 type별 펌프 튜닝 실행
+
+밸브 재튜닝 없이, 이번 type1/type2의 각6개 계수를 별도 lib3 빌드에 연결했다.
+기존 lib3 바이너리는 덮어쓰지 않았다. `PNEU_EXACT_VALVE_HYSTERESIS` 빌드는
+튜닝 코어와 같은 normalized Bouc-Wen 정확 적분을 사용하며 이력·힘 clipping을
+사용하지 않는다. 기존 소스의 기본 빌드는 원래 계수·Euler 경로를 유지한다.
+
+### 계산 일치와 남은 수치 특성
+
+- 두 type의 전체 실측 압력·명령으로 밸브12개를 재생했을 때 튜닝 코어와 일치했다.
+  20ms 튜닝 간격과25μs lib3 내부 간격, 초기 상태를 달리한 재생도 구분해서 검사했다.
+- 빠른 계산에서도 실측 입력/초기화36개 case가 모두 일치했다.
+  최대 유량 차이2.68e−11L/min, 이력·힘 차이0, 면적비 차이 약1.11e−16이다.
+- 추가 합성 입력에서는 v1의 기존2차 유량 동특성에 작은 음수 undershoot가 남는다.
+  실제25μs 갱신에서 type1 최소−.001545, type2 최소−.010339L/min이며,
+  기존 출력의 음수 방지 처리가 사용된다. 이력 폭주나 이식 불일치는 아니다.
+  엄격한 전체 판정은72개 중70개 통과로 그대로 남기고, 전부 통과했다고 표현하지 않는다.
+  새 보정항이나 재튜닝은 추가하지 않았다.
+
+검사: `pneu_env/scripts/validate_lib3_feasible_parity.py`.
+결과: `../pneu_tune/exp/lib3_feasible_integration_20261022/{parity.json,parity_fast.json}`.
+
+### 펌프 평가 속도와 시간축 수정
+
+반복적인 작은 배열의 heap 할당을 stack 배열로 바꾸고 `-O3`로 빌드했다.
+추가로 매번 수행하던20회 Euler 유량 갱신을 같은 affine map으로 미리 합성했다.
+물리식·시간 간격·표현되는 적분 횟수·전체 데이터 길이는 그대로다.
+기본 내부 시간 간격 외의 검증 호출에서는 원래20회 반복을 사용한다.
+
+| 전체 약657초 재생 | O3·stack·20회 반복 | 같은 계산의 사전 합성 | 속도 |
+|---|---:|---:|---:|
+| type1 | 13.228초 | 6.783초 | 1.95배 |
+| type2 | 13.018초 | 6.505초 | 2.00배 |
+
+전체 입력 재생에서 반올림 누적에 따른 최대 압력 차이는 type1 1.06e−5kPa,
+type2 1.23e−8kPa, 최대 유량 차이는 각각4.30e−8/9.95e−10L/min이다.
+이력 상태는 동일하고 두 계산 모두 유한하다. 실행 시 부하에 따른 시간 차이는 가능하다.
+근거: `../pneu_tune/exp/lib3_feasible_integration_20261022/flow_transition_full_benchmark.json`.
+
+별도30초 입력·3회 교대 실행으로 컴파일 최적화만 분리 비교한 결과 O0 중앙값1.584초,
+O3 .619초로2.56배 빨랐다. 최대 차이는 압력1.43e−13kPa/유량2.14e−14L/min이었다.
+이 수치와 위 전체 입력의 약2배 개선은 서로 다른 비교이므로, 합쳐서 전체 튜닝이
+정확히5배 빨라졌다고 단정하지 않는다. 컴파일 benchmark와 전체 입력 benchmark를
+각각 보존했다. 재현 도구는 `pneu_env/scripts/benchmark_lib3_feasible.py`다.
+
+새 `pneu_env/scripts/tune_lib3_pump.py`는 ROS/정책 관측 지연을 사용하지 않고
+독립된 실제 재생 시간으로 명령을 선택한다. 압력·유량은 같은 native step의 시점에서
+비교한다. `ctrl1..6` echo를 물리 명령 그대로 사용하고 추가 scaling은 하지 않는다.
+중복 timestamp는 그 시점의 마지막 행을 사용하며 원본은 바꾸지 않는다.
+type1은1행, type2는4행이 중복으로 제거된다. 원본 파일 hash와 정책을 cfg에 기록했다.
+최적 계수는 마지막 평가점이 아니라 `result.x`를 저장한다.
+
+펌프 목적함수는 기존 `1.5 MAE(Pch+) + MAE(Pch−) + .1 MAE(Q1) + .1 MAE(Q2)`를
+유지하고, 정확도 보고는 actuator를 포함한 압력4개·유량6개 전부에서 한다.
+두 type은 각각 자기 밸브 계수를 고정하고 전체 약657초 기록에서 독립 튜닝한다.
+최신 펌프 계수 `[3.619849097136743, 7.4994154472272525]`를 시작점으로,
+각 축10% 초기 simplex와 Nelder-Mead를 사용한다. xatol/fatol은 각.01이다.
+반복200회 상한에 걸리면 수렴 완료로 처리하지 않는다.
+
+부피는 현재 저장소 lib3의 actuator 양압.100L/음압.156L를 유지했다.
+외부 `pneu_tune`은 양압.156L/음압.100L로 반대이며, 앞 절의 실측 수지 진단은
+외부 설정을 사용했다. 그 진단 수치를 현재 저장소 부피에서 얻은 결과로 해석하면 안 된다.
+2026-10-23 사용자가 **현재 실물도 양압.100L/음압.156L가 맞다**고 확인했다.
+이번 튜닝의 부피 설정은 맞으며, 이 이유로 재실행할 필요는 없다. 부피는 튜닝하지 않았다.
+
+튜닝 출력은 `../pneu_tune/exp/lib3_pump_feasible_20261022/type{1,2}/`에 기록했다.
+
+## 2026-10-23 펌프 최종 결과: 최적화 수렴과 전체 모델 feasibility 구분
+
+요청한 type1/type2 독립 펌프 튜닝과 압력4개·유량6개의 정확도 측정을 완료했다.
+둘 다 Nelder-Mead 수렴 조건을 만족했고 상한에 걸린 중단 결과가 아니다.
+그러나 **전체 모델에서 음수 절대압이 나타나므로 현재 결과는 RL 환경으로 채택하지 않는다.**
+밸브 단독 계산 일치·이력 유계성 통과가 전체 압력–유량 결합 모델의 타당성을
+보장하지 않는다는 것이 이번 전체 재생에서 확인됐다.
+
+### 계수와 실행 시간
+
+계수는 각각 native API에1e−6을 곱해 전달하는 값이다. 시간은 최적화와 최종1회 검증·
+그림 생성을 포함한 각 프로세스 wall time이다. 두 type은 별도 프로세스로 병렬 실행했다.
+
+| type | inlet | outlet | 목적함수 초기→최종 | 감소율 | 반복/평가 | 시간 | 최적화 |
+|---|---:|---:|---:|---:|---:|---:|---|
+| 1 | 3.793925845648696 | 7.431251524179555 | 15.629194→15.155698 | 3.03% | 22/42 | 291.96초(4분52초) | 수렴 |
+| 2 | 3.453412148594378 | 23.289086625728256 | 28.254055→28.213800 | .142% | 51/95 | 634.55초(10분35초) | 수렴 |
+
+type2 outlet은 초기7.4994에서23.2891로 바뀌어도 목적함수 개선은 약.142%에
+그쳤다. 이 결과만으로 실제 펌프 배출 특성이3배 변했다고 해석할 수 없다.
+현재 목적함수에서 그 계수 변화에 대한 민감도가 작거나 다른 모델 오차를 함께
+반영할 가능성이 남는다. 수렴 그래프와 각 평가값을 함께 보존했다.
+
+### 전체 정확도
+
+자기 type의 튜닝 기록 전체에 대한 in-sample 결과다. 독립 실험·zero-shot 검증이 아니다.
+
+| type | 공급 양압 RMSE | 공급 음압 RMSE | act 양압 RMSE | act 음압 RMSE |
+|---|---:|---:|---:|---:|
+| 1 | 13.487kPa | 2.360kPa | 39.491kPa | 8.061kPa |
+| 2 | 21.264kPa | 3.589kPa | 46.814kPa | 13.344kPa |
+
+act 양압 R²는 type1 −.561/type2 −.235로 좋지 않다. 유량6개는 type1 RMSE
+.784~1.830L/min·R².804~.914, type2 RMSE.716~2.228L/min·R².819~.941이다.
+펌프 튜닝으로 type1 공급 음압 RMSE는2.890→2.360kPa로 줄었지만 다른 채널이
+모두 좋아지지는 않았다. 특히 큰 act 양압 오차는 펌프 계수 조정으로 해결되지 않았다.
+
+- [모든 채널의 초기/최종 RMSE·R²·MAE와 계수](../../pneu_tune/exp/lib3_pump_feasible_20261022/summary.md)
+- [모든 채널 수치 CSV](../../pneu_tune/exp/lib3_pump_feasible_20261022/before_after_metrics.csv)
+- [type1 전체 시계열](../../pneu_tune/exp/lib3_pump_feasible_20261022/type1/comparison_1.png)
+- [type2 전체 시계열](../../pneu_tune/exp/lib3_pump_feasible_20261022/type2/comparison_1.png)
+
+![초기/최종 정확도](../../pneu_tune/exp/lib3_pump_feasible_20261022/overview.png)
+![최적화 수렴](../../pneu_tune/exp/lib3_pump_feasible_20261022/convergence.png)
+
+### 전체 모델에서 발견한 비물리적 압력과 원인
+
+| type | act 양압 최솟값(절대압) | 0kPa 미만 샘플 | 50Hz 샘플 기준 누적 시간 |
+|---|---:|---:|---:|
+| 1 | −46.394kPa | 1512 | 30.24초 |
+| 2 | −78.200kPa | 1121 | 22.42초 |
+
+이는 작은 센서 offset이나 게이지압 표기 문제가 아니다. lib3는 절대압을 상태로
+사용하며, 순유량 적분에 의해 그 압력이 실제로0 아래로 내려간다.
+현재 모델은 **정적 유량을2차 동특성으로 필터링한 값을 질량수지에 적용**한다.
+차압이0 이하가 되어 정적 유량 목표가0이 되어도 필터 내부의 이전 유량은 남는다.
+그 유량을 계속 같은 방향으로 적용해 압력이 더 내려가거나 올라갈 수 있다.
+
+type1 106.10초에서 act 양압은95.808kPa로 이미 대기압101.325보다 낮지만,
+배출 Q4=12.685L/min·유입 Q3=2.375L/min이 적용돼 계속 압력이 내려간다.
+106.06~112.96초의 순유출 적분으로 계산한 압력 하강도 약149.91kPa이며,
+최솟값−46.394kPa와 일치한다. 유량–압력 수지 자체의 구현 오류라기보다,
+적용 유량의 동특성과 그 순간의 압력 관계가 맞지 않는 문제다.
+
+기존 펌프 목적함수에는 actuator 압력과 압력 영역 검사가 없어 이 상황에서도
+최적화 성공이 나온다. 목적함수 수렴과 전체 모델 feasibility를 분리해 보고한다.
+근거: [전체 압력 영역과 역차압 유량 진단](../../pneu_tune/exp/lib3_pump_feasible_20261022/whole_model_feasibility.json).
+
+### 추가 항 없이 유로 방향만 제한한 별도 진단
+
+원인 확인을 위해 임시 소스 사본에서만 `Pin<=Pout`일 때 적용 유량을0으로 하는
+조건을6개 밸브에 공통 적용했다. 압력을 clipping하지 않았고, 새 계수·offset·
+차압 문턱을 맞추거나 밸브/펌프를 재튜닝하지 않았다. 기존 결과는 그대로 보존했다.
+
+| type | act 양압 최솟값: 기존→방향 제한 | act 양압 RMSE: 기존→방향 제한 | act 음압 RMSE: 기존→방향 제한 |
+|---|---:|---:|---:|
+| 1 | −46.394→101.319kPa | 39.491→13.834kPa | 8.061→6.235kPa |
+| 2 | −78.200→101.317kPa | 46.814→29.763kPa | 13.344→11.295kPa |
+
+두 type 모두 음수 절대압 샘플이 사라졌다. 다만 경계에서 유량을 바로 켜고 끄는
+방식이라 RK 내부 단계에서 수치 switching이 많이 발생했다. 예를 들어 v4는20ms
+한 구간에서 최대797/800회 바뀌었다. 경계 압력 오차는 약.008kPa 이내지만, 이
+프로토타입을 검증된 최종 구현으로 채택하지 않았다. 이 switching은 실물10Hz
+진동을 재현했다는 뜻도 아니다. 적용 전에는 유로 방향과 유량 동특성의 일관성을
+확보하고 그 경계의 수치 동작을 확인해야 한다. 단순 압력 clipping으로 숨기지 않는다.
+
+이 진단은 작은 유량 오차를 없애려는 모듈 추가와 구분한다. 이미 모델에 있는
+압력–유량 관계가 동특성 적용 뒤에도 지켜지는지 확인한 것이다.
+이번 요청의 두 펌프 튜닝과 정확도 측정은 완료했으며, 이 프로토타입으로 다시
+튜닝하거나 기본 lib3에 방향 제한을 적용하지는 않았다.
+
+- 재현: `pneu_env/scripts/diagnose_lib3_pressure_direction.py --type all`.
+- 진단 결과: `../pneu_tune/exp/lib3_pump_feasible_20261022/pressure_direction_diagnostic/`.
+- 원시 진단 CSV: `pneu_rl/exp/lib3_pressure_direction_diagnostic_20261022/`(Git 제외).
+
+### 적용 파일과 검증 상태
+
+type별 밸브 계수와 최종 펌프 계수를 포함한 실험용 라이브러리도 별도로 빌드했다.
+`pneu_rl/exp/lib3_feasible_integration_20261022/libpneumatic_simulator_type{1,2}_O3_fast_pumpfit.so`.
+두 라이브러리 모두 기본 펌프 계수 내장 결과가 runtime setter 사용 결과와30초
+입력에서 정확히 일치했다. 위 물리 영역 실패가 남으므로 채택한 RL 모델은 아니다.
+
+기존 기본 빌드 경로는30초 입력에서 HEAD 소스 빌드와 출력이 완전히 같았고,
+기존 `.so`2개와 실측 CSV2개도 원본 hash와 일치한다. 수치 코어·anchor 구성·
+펌프 재생/최적점 저장 회귀 검사12개는 통과했다. 이 검사 통과가 위 전체 모델의
+음수 압력 문제를 없애는 것은 아니다. 추가로 하던 교차 trajectory 평가는 이 물리
+영역 문제를 확인한 뒤 이번 실행에서는 진행하지 않았다.
+
+재실행 도구:
+
+```bash
+# type별 밸브 계수로 빠른 lib3 빌드
+/home/rise/miniconda3/envs/env_1/bin/python pneu_env/scripts/build_lib3_feasible.py --type all --fast-flow
+
+# type1 펌프 독립 튜닝; 기존 결과를 덮어쓰지 않는 새 출력 폴더 사용
+MPLCONFIGDIR=/tmp/brl_review_mpl OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
+/home/rise/miniconda3/envs/env_1/bin/python pneu_env/scripts/tune_lib3_pump.py \
+  --library-path pneu_rl/exp/lib3_feasible_integration_20261022/libpneumatic_simulator_type1_O3_fast.so \
+  --data-path /home/rise/test/pneu_tune/exp/261022_16_29_47_Flowrate_RND6_suite_joint_tuning_type1_u0.80_supply0.20s.csv \
+  --initial-coeff 3.619849097136743 7.4994154472272525 --maxiter 200 \
+  --output-dir pneu_rl/exp/lib3_pump_reproduction/type1
+
+# type2 펌프 독립 튜닝
+MPLCONFIGDIR=/tmp/brl_review_mpl OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
+/home/rise/miniconda3/envs/env_1/bin/python pneu_env/scripts/tune_lib3_pump.py \
+  --library-path pneu_rl/exp/lib3_feasible_integration_20261022/libpneumatic_simulator_type2_O3_fast.so \
+  --data-path /home/rise/test/pneu_tune/exp/261022_16_41_04_Flowrate_RND6_suite_joint_tuning_type2_u0.80_supply0.20s_idle_ramps.csv \
+  --initial-coeff 3.619849097136743 7.4994154472272525 --maxiter 200 \
+  --output-dir pneu_rl/exp/lib3_pump_reproduction/type2
+```
+
+## 2026-10-23 물리 구조 수정: 유량 지연을 개구율 지연으로 교체
+
+사용자는 정확도 보정 모듈을 더하기보다 물리적으로 가능한 시뮬레이터를 요구했다.
+이에 따라 센서 offset·추가 누설·맞춤형 차압 문턱을 넣지 않고, 기존 밸브 동특성의
+상태가 무엇인지와 압력 적분에서 그 상태를 사용하는 위치를 수정했다.
+앞 절의 펌프 결과와 FAIL 판정은 수정 전 모델의 기록으로 보존한다.
+
+### 왜 음수 압력과 큰 진동이 생겼나
+
+기존 모델은 정상 유량 `Q*=A(I,h,Pin) Pin Phi(Pout/Pin)`을 계산한 뒤,
+`Qddot + 2*zeta*wn*Qdot + wn²*Q = wn²*Q*`로 필터링한 Q를 압력 수지에 넣었다.
+차압이 사라져 Q*가0이 되어도 이전 Q가 남아 가스를 계속 배출하거나 주입했다.
+이는 순간 압력으로 흐르는 준정상 orifice와, 별도 운동량 방정식이 없는 유량
+필터를 일관되지 않게 결합한 것이다. 실제 배관 관성에 대한 검증된 모델도 아니다.
+
+현재 act 양압 배출 v4의 저주파 지연 `2*zeta/wn`은 type1 약.80초,
+type2 약1.12초다. 부피.100L에서1L/min 순배출은 약18.61kPa/s의 하강에
+해당하므로,10L/min이.8초 남으면 약149kPa를 더 빼낼 규모다.
+따라서 이번 −46/−78kPa 절대압은 0.0X L/min 센서 영점 흔들림과 구분해야 한다.
+
+큰 흔들림이 단순히 zeta<1 때문도 아니다. type1 v3/v4는 모두 zeta>1이다.
+예를 들어 고정 부피의 압력–유량 피드백을 선형화해 `Pdot=-c Q`,
+`Q*=k P`로 놓으면 기존 모델의 특성식은
+`s³+2*zeta*wn*s²+wn²*s+c*k*wn²=0`이다. 이 단순화에서는 안정 조건이
+`c*k<2*zeta*wn`이며, 차압이 작은 orifice의 큰 기울기 때문에 overdamped
+필터라도 압력과 결합하면 과응답을 만들 수 있다. 실제 전체 시스템의 모든 진동을
+이 특성식 하나로 식별했다는 주장은 하지 않는다.
+
+수치 구현에도 별도 문제가 있었다. 압력 RK의4개 중간 평가가 밸브 상태를 각각
+TS/4씩 순차 갱신했다. 같은 시작 상태에서 미분값을 평가하는 일관된 RK 호출이
+아니었으므로, 이번에는 밸브 상태 갱신을 압력 RK 밖으로 분리했다.
+
+### 최소 수정과 물리적 성질
+
+새 branch `PNEU_OPENING_DYNAMICS`에서는 정규화된 유효 개구율 a를 상태로 둔다.
+
+```text
+a_target = sigmoid(k*(I + Cz*h + Cp*Pin - Ck))**alpha
+da/dt = (a_target-a)/tau
+a_next = exp(-dt/tau)*a + (1-exp(-dt/tau))*a_target
+Q = Amax*a*Pin*Phi(Pout/Pin)   # 현재 압력 사용, 이후 유량 필터 없음
+```
+
+tau>0이고 a/a_target이0~1이면 정확한 갱신이 양의 가중 평균이라 개구율이
+clipping 없이 그 범위에 남는다. 정적 밸브식·hysteresis·compressible orifice와
+체적·온도는 유지했고,2차 유량 상태를1차 개구율 상태로 단순화했다.
+초기 tau는 기존 계수의 `2*zeta/wn`을 사용했다. 새 구조로 다시 식별한 시간상수가
+아니므로, 기존 유량 fit이 그대로 유지된다고 해석하지 않는다.
+
+현재 코드의 단방향 유로 가정을 유지하면 차압0에서 Q=0, 역차압에서 그 방향의
+Q=0이며, `Q*(Pin-Pout)>=0`이다. 고정 부피의 고립된 두 챔버라면 압력차의
+제곱에 대한 미분은 `-(c1+c2)*(Pin-Pout)*mdot<=0`라서, 밸브가 이전 유량을
+유지하며 압력 평형을 지나쳐 가스를 계속 빼내는 모순이 없다.
+이는 실제 모든 solenoid가 역류 차단 밸브라는 확인은 아니다. 양방향/체크밸브 여부는
+현행 가정의 한계로 남기고 임의로 새 역류 모델을 추가하지 않았다.
+
+밸브 개구와 압력 의존 유량을 분리하는 구성은 [MathWorks gas valve 설명](https://www.mathworks.com/help/hydro/ref/2waydirectionalvalveg.html)과도 부합한다.
+1차 개구/변위 지연의 예는 [pilot actuator 모델](https://www.mathworks.com/help/hydro/ref/pilotvalveactuatoril.html)에 있지만,
+이는 액체용 pilot actuator 자료이며 우리 하드웨어의 시간상수를 입증하는 근거는 아니다.
+
+적분 순서는 **개구율 정확 반 스텝 → 개구율을 고정한 압력 RK → 개구율 반 스텝**이다.
+압력 미분 함수는 밸브 상태를 바꾸지 않는다. 최종 압력·개구율에서 관측 유량을
+다시 계산해 출력 시점도 맞췄다. 압력 clipping이나 이전 단계의 on/off 차압 gate는
+적용하지 않았다. 단순 gate에서 보인 경계 switching을 그대로 가져오지 않은 것이다.
+
+### 같은 계수를 유지한 전체 재생 결과
+
+밸브 계수·펌프 계수는 그대로다. parameter 최적화 없이 구조 수정의 효과를 비교했다.
+둘 다 기존과 동일한 전체 약657초 기록과 동일한 시작 압력을 사용했다.
+
+| type | act 양압 최소 절대압: 기존→수정 | act 양압 RMSE: 기존→수정 | act 음압 RMSE: 기존→수정 |
+|---|---:|---:|---:|
+| 1 | −46.394→101.325kPa | 39.491→11.456kPa | 8.061→5.507kPa |
+| 2 | −78.200→101.357kPa | 46.814→25.385kPa | 13.344→10.262kPa |
+
+act 양압 R²는 type1 −.561→.869, type2 −.235→.637이다.
+공급 양압 RMSE는13.487→12.987/21.264→20.862kPa,
+공급 음압은2.360→1.960/3.589→3.088kPa다.
+유량은 대부분 개선됐지만 type1 Q5 RMSE는.784→.795L/min로 조금 증가했다.
+모든 항목이 좋아졌다고 표현하지 않는다. 같은 기록에서의 결과이며 zero-shot
+실물 제어나 독립 검증 성공은 아니다.
+
+- [수정 결과 요약·20개 채널 수치](../../pneu_tune/exp/lib3_physical_model_20261023/summary.md)
+- [수치 CSV](../../pneu_tune/exp/lib3_physical_model_20261023/comparison_metrics.csv)
+
+![동일 계수 구조 비교](../../pneu_tune/exp/lib3_physical_model_20261023/comparison_pressure.png)
+
+### 진동을 같은 입력 구간에서 분리한 결과
+
+type1 99~129초는 고정 명령이 아니라 u3가10초 주기로.8↔1을 오가는 삼각파다.
+이 구간에서 act 양압 범위는 real99.79~136.83, 기존sim−46.39~200.12,
+수정sim101.325~128.22kPa다. 입력에 대한 과도한 증폭이 줄었지만 peak timing과
+높이의 오차는 남는다. type2 186~196초 u4 램프는 real106.02~244.65,
+기존sim89.42~399.27, 수정sim107.16~263.70kPa다.
+
+전체6개 명령이 구간 내1e−6 이내로 일정한 실제 hold만 따로 검사했다.
+type1의5개 hold 후반부 act 양압 .05~20Hz 변동 RMS 중앙값은 real.434,
+기존sim2.036, 수정sim.398kPa다.3~20Hz 성분은 real.277,
+기존sim.119, 수정sim.035kPa로, 수정 모델이 실물 센서 잡음/빠른 성분까지
+재현했다고 주장할 수는 없다. Type2에는 초기 과도응답을 포함한 짧은 hold1개만
+있어 지속적인 고정 입력 불안정성을 판정하기에 충분하지 않다.
+
+이번 큰 sim 흔들림은 주로 .1~.4Hz 대역의 느린 과응답이다. 앞서 real 정책 실행에서
+본 약10Hz 진동과 같은 원인이라고 단정하지 않는다. 코드의 펌프3000RPM은
+50Hz 회전·두 piston의100Hz 주기를 만들지만,50Hz 기록으로 Nyquist 이상의
+실물 주파수 성분을 구분할 수 없다. 이 분석은 RL이 실행되지 않은 명령 재생이다.
+
+진동 자료는 `oscillation_{baseline,opening}_{audit.json,holds.csv,holds.png,spectra.png}`,
+재현 도구는 `pneu_rl/scripts/analyze_lib3_replay_oscillations.py`다.
+
+### 물리 검사와 시간 간격 검증
+
+`pneu_env/tests/test_physical_valve.py`의9개 검사가 통과했다.
+이미 열린 밸브에서 차압을0/역방향으로 바꾸는 검사,4개 고정 체적 노드 질량수지,
+반복 RK 호출의 상태 불변, 개구율 시간 분할 일치/무 overshoot,
+1000회 무작위 명령 전환의 h/a 범위, 단방향 압력–유량 관계와 snapshot schema를 검사했다.
+
+전체 모델에서는 두 기록을 내부 간격 .1/.05/.025ms로 각각 재생하고,
+각 간격에서30초짜리5개 상수 명령 시험도 수행했다. 모든 시험에서:
+
+- 출력4개와 piston 내부2개를 포함한6개 기체 압력이 양수였다.
+- h는−1~1, 개구율은0~1에 남았고, 관측 역차압에서 유량이 나오지 않았다.
+- 대기압 경계의 수치 초과는 최대 약1e−6kPa 수준으로, 기존 수십~수백 kPa 모순과 구분된다.
+
+| type | .1→.05ms 최대 압력 차이 | .05→.025ms 최대 압력 차이 | 후자의 최대 압력 RMSE 차이 |
+|---|---:|---:|---:|
+| 1 | .01166kPa | .00374kPa | .00117kPa |
+| 2 | .02653kPa | .00799kPa | .00208kPa |
+
+인접 간격의 차이가 줄어드는 것을 확인했으며, 남은 실측 RMSE가 단순 시간 간격
+오차로 설명될 크기는 아니다. 이는 시험한 초기 상태·입력 범위의 결과이지, 모든
+입력에서 명시적 RK의 양압을 보장한다는 증명은 아니다.
+
+상수 명령 .8은 **완전 폐쇄/압력 유지가 아니다.** 기존 정적 밸브식과 이력에 따라
+type2 act 양압이150→192.6kPa로 변하는 경우가 남는다. 모든 밸브를.8에 둔
+펌프 ON 시험에서는 공급 압력이 약568kPa까지 올라 실측 튜닝 범위를 벗어난다.
+이를 새로운 동특성의 물리 불가능이나 완전 폐쇄 누설의 실물 증거로 해석하지 않는다.
+정적 개방 특성·운전 범위의 추가 평가와 새 동특성의 계수 식별은 구분해 남긴다.
+
+검증 근거: [validation.json](../../pneu_tune/exp/lib3_physical_model_20261023/validation.json).
+
+### 사용 가능한 빌드와 상태 호환성
+
+수정한 두 라이브러리는 기존 비교용 `.so`와 별도로 다음 위치에 만들었다.
+
+```text
+pneu_rl/exp/lib3_physical_model_20261023/final/libpneumatic_simulator_type1_O3_opening_pumpfit.so
+pneu_rl/exp/lib3_physical_model_20261023/final/libpneumatic_simulator_type2_O3_opening_pumpfit.so
+```
+
+기존 펌프 계수를 내장했고, 별도 sensor correction이나 추가 물리 항은 없다.
+`PneuSim`에 `library_path=`를 추가해 원하는 수정 모델을 명시해서 사용할 수 있다.
+기본 기존 라이브러리 경로는 바꾸지 않았으므로, 새 실험은 이 경로를 명시해야 한다.
+
+이전 runtime의 x1/x2는 유량/유량 미분이지만 새 모델은 개구율/최근 목표 개구율이다.
+벡터 길이가37로 같아도 snapshot은 호환되지 않는다. 새 라이브러리는 schema2를
+노출하고, `set_augmented_state_checked_c(state, schema)`로만 C ABI 복원을 허용한다.
+기존 schema1·범위 밖 개구율·비양수 압력·비유한 상태는 거부하고 원래 상태를 보존한다.
+기존 무버전 C setter는 수정 모델에서 내보내지 않아 이전 캐시의 조용한 혼용을 막았다.
+
+```bash
+# 기존 계수로 물리 구조 빌드(새 출력 폴더를 지정해 비교 자료 보존)
+/home/rise/miniconda3/envs/env_1/bin/python pneu_env/scripts/build_lib3_feasible.py \
+  --type all --opening-dynamics \
+  --output-dir ../pneu_tune/exp/lib3_physical_model_20261023 \
+  --library-dir pneu_rl/exp/lib3_physical_model_20261023
+
+# 물리 단위 검사
+MPLCONFIGDIR=/tmp/brl_review_mpl OPENBLAS_NUM_THREADS=1 \
+/home/rise/miniconda3/envs/env_1/bin/python pneu_env/tests/test_physical_valve.py
+
+# 두 전체 기록·3개 적분 간격·상수 입력 검사
+MPLCONFIGDIR=/tmp/brl_review_mpl OPENBLAS_NUM_THREADS=1 \
+/home/rise/miniconda3/envs/env_1/bin/python pneu_env/scripts/validate_lib3_physical_model.py \
+  --build-root ../pneu_tune/exp/lib3_physical_model_20261023
+```
+
+## 2026-10-23 type1·type2 ref 재설계 및 H·HR 2000episode 시작
+
+두 수정 모델을 물리 검사 범위를 통과한 RL 베이스라인 후보로 채택하고,
+기존 압력 공간 minimum-jerk waypoint 생성 방식을 각 type의 수정 라이브러리로 다시 실행했다.
+각 bank는 기존처럼16개×4블록×512step이며, 펌프 ON·전체 개방30초 뒤의
+실제 actuator 압력(type1 123.241/73.875kPa, type2 122.996/79.265kPa)에서 시작한다.
+각각16/16개가 기존 PID 인증 기준을 통과했다. 인증기의 음압 활성 최소 명령만
+type1 .94/type2 .925로 조정했으며, 학습 SAC의 명령 범위 .8–1.0은 유지했다.
+
+네 조합의 시작 상태·history·reference 일치와4블록 carry/이후 hard reset을 확인했다.
+type별 HR 12episode 검사에서는 기존10episode warmup 이후 실제 SAC 업데이트와
+유한한 loss·가중치를 확인했다. 이전 reference와 모델은 보존했다.
+
+**2026-10-23 02:15:57 KST**, type1 H·HR을 각2000episode·threads2로 시작했다.
+끝나면 type2 H·HR이 자동으로 이어지며, 메모리를 고려해 동시에 두 개만 실행한다.
+기존 네트워크·reward·history·50Hz/0.1초 지연·전체 개방 초기화·seed0를 유지한다.
+학습 폴더는 `261023_lib3_opening_type{1,2}_{H,HR}_smooth_seed0`다.
+과거 기록 기준 두 묶음 전체 예상은 약8시간40분이며 실제 속도는 달라질 수 있다.
+
+설정·초기 검증·ref 그래프·상태 조회 명령은
+[이번 ref와 야간 학습 기록](../pneu_rl/exp/lib3_physical_training_20261023/summary.md)에 정리했다.
+진행 상태는 `pneu_rl/exp/lib3_physical_overnight_20261023/status.json`에서 확인한다.
+인증 통과는 정확한 추종이나 실물 zero-shot 성공을 보장하지 않으므로 학습 결과와 구분해 평가한다.
+
+## 2026-10-23 학습 완료·quick viz·closed-loop feasibility와 oscillation 검토
+
+네 모델 모두2000episode(각1,024,000step)를 완료했다. 감독 프로세스 기준 전체 실행은
+02:15:57–10:06:47 KST로 약7시간51분이었다. Reward·loss·alpha·carry block·공급 압력
+그래프를 확인했고, 동일 type 안에서는 HR이 더 좋은 최종 tracking과 return을 보였다.
+
+각각16개 ref 전체를 deterministic policy mean으로 실행한 결과, 양/음압 RMSE는
+type1 H 2.913/2.323kPa, type1 HR .820/.350kPa,
+type2 H 1.441/1.192kPa, type2 HR .498/.303kPa였다.
+기존 quick viz(member0,40초)도 별도로 실행하고 새 library·checkpoint·history를 확인했다.
+
+16-member bank와3개 고정 목표 시험의152,072개 state에서 physical/algebraic
+22개 검사 항목 위반은 없었다. 하지만 운전 상한은 별도다. 최종 bank 평가에서
+type1 H chamber 양압 최대223.725kPa(>220kPa 3.210%),
+type2 HR 최대221.297kPa(0.153%)였다. Type2 H는 양압 공급 여유가
+최소.190kPa였고,15kPa 미만인 샘플이34.662%였다.
+
+고정 목표에서도 type1 HR에는 느린 양압 oscillation, type2 HR에는 약4.15Hz의
+작은 양압 ripple이 남았다. Command chattering도 있어 낮은 RMSE를 smooth control과
+동일시할 수 없다. Native step .1→.05ms 비교에서도 oscillation 수준은 비슷했고,
+큰 numerical instability가 원인이라는 증거는 보이지 않았다.
+
+따라서 HR을 후속 baseline 후보로 남기되, operating constraint·offset·pressure
+oscillation·command chattering은 미해결 항목으로 기록한다. 학습 중 chamber bound는
+soft penalty였으며, type1 HR 초기 탐색에서502.50kPa까지 올라간 사실도 함께 남긴다.
+이 결과는 matched nominal simulation 평가이며 real zero-shot 성공을 보장하지 않는다.
+
+전체 표·그래프·raw data·재현 도구는
+[2026-10-23 종합 분석](../pneu_rl/exp/lib3_physical_training_review_20261023/summary.md)에 정리했다.
+
+### 같은 날 후속 검토: CAPS·reward와 남은 oscillation — 학습 없음
+
+기존 CAPS 및 reward2×2 기록을 다시 확인했다. 가장 가까운 과거 mean-action CAPS(.01)
+통제 비교에서는 tracking과 command variation이 모두 악화됐으며, legacy 구현 문제만으로
+과거 실패를 설명할 수 없었다. 현재 정책에는 이미 rate-mismatch reward(.025)가 들어 있다.
+저장된 rollout의 reward 재구성은 최대4.44e−16 오차로 일치했다.
+
+Type1 HR의 고정 목표에서 rate cost는 tracking cost의 양압2.74%, 음압5.12%였다.
+Type2 HR의 양압은13.23%였다. 계수 증가가 tracking을 유지하며 진동을 없앤다는
+증거는 아니므로 CAPS/reward를 자동 재채택하지 않았다.
+
+추가로 저장된1500episode HR을 inference했다. Type1의 고정 목표 양압 변동은
+1500에서.26–.52kPa,2000에서2.35–3.05kPa였지만, 전체 ref 음압 RMSE는
+.918/.350kPa로 trade-off가 있었다. Type2 양압 ripple은1500에도 남았다.
+학습·fine-tuning·모델/설정 변경은 하지 않았다. 상세한 과거 대조·reward scale·
+checkpoint 그림과 원자료는 종합 분석 문서의 후속 검토에 추가했다.
