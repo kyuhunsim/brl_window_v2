@@ -1,16 +1,22 @@
 """Hardware-free integration tests, including real SAC updates in spawn workers."""
 import os
+import io
+import json
+import pickle
 import queue
 import tempfile
 import time
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 import numpy as np
 import torch
 from gymnasium.spaces import Box
 
-from pneu_rl.async_training import AsyncLearner, train_async
+from pneu_rl.async_training import AsyncLearner, train_async, _save_model
+from pneu_rl.buffer import ReplayBuffer
 from pneu_rl.logger import Logger
 from pneu_rl.sac_with_loss import SAC
 
@@ -120,6 +126,101 @@ class AsyncTrainingTest(unittest.TestCase):
         worker.submit('transition', None)
         with self.assertRaisesRegex(RuntimeError, 'queue full'):
             worker.submit('transition', None)
+        self.assertEqual(worker.pending_message, ('transition', None))
+
+    def test_error_drain_saves_overflow_transition_without_training_backlog(self):
+        model = make_model(SlowSAC)
+        model.update_every = 1
+        with tempfile.TemporaryDirectory() as folder:
+            logger = Logger.__new__(Logger)
+            logger.folder_path, logger.infos = folder, {}
+            model.logger, model.log = logger, True
+            worker = AsyncLearner(model, queue_capacity=1)
+            try:
+                failed_step = None
+                for step in range(50):
+                    try:
+                        worker.submit('transition', (transition(), step, True, None, None))
+                    except RuntimeError as exc:
+                        self.assertIn('queue full', str(exc))
+                        failed_step = step
+                        break
+                self.assertIsNotNone(failed_step)
+                result = worker.finish(timeout=10, train_pending=False)
+                self.assertEqual(result['buffer_size'], failed_step + 1)
+                self.assertEqual(result['steps'], failed_step + 1)
+                with open(logger.buffer_path, 'rb') as stream:
+                    self.assertEqual(len(pickle.load(stream)), failed_step + 1)
+                state = json.loads(Path(folder, 'async_state.json').read_text())
+                self.assertEqual(state['steps'], failed_step + 1)
+                self.assertTrue(Path(folder, f'model_step_{failed_step + 1}.pth').is_file())
+            finally:
+                worker.abort()
+
+    def test_error_drain_skips_queued_gradient_updates(self):
+        model = make_model(SlowSAC)
+        model.update_every = 1
+        with tempfile.TemporaryDirectory() as folder:
+            logger = Logger.__new__(Logger)
+            logger.folder_path, logger.infos = folder, {}
+            model.logger, model.log = logger, True
+            worker = AsyncLearner(model, queue_capacity=100)
+            try:
+                for step in range(30):
+                    worker.submit('transition', (transition(), step, True, None, None))
+                start = time.monotonic()
+                result = worker.finish(timeout=10, train_pending=False)
+                self.assertLess(time.monotonic() - start, 5)
+                self.assertEqual(result['buffer_size'], 30)
+                self.assertLess(result['updates'], 3)
+                state = json.loads(Path(folder, 'async_state.json').read_text())
+                self.assertGreater(state['skipped_pending_updates'], 20)
+            finally:
+                worker.abort()
+
+    def test_cleanup_failure_preserves_original_error_after_closing_control(self):
+        model = make_model()
+        worker = Mock()
+        worker.submit.side_effect = RuntimeError('original queue full')
+        def fail_finish(**kwargs):
+            self.assertTrue(model.env.closed)
+            raise TimeoutError('secondary shutdown timeout')
+        worker.finish.side_effect = fail_finish
+        stderr = io.StringIO()
+        with patch('pneu_rl.async_training.AsyncLearner', return_value=worker), \
+                patch('sys.stderr', stderr), \
+                self.assertRaisesRegex(RuntimeError, 'original queue full'):
+            train_async(model, episode=1)
+        worker.finish.assert_called_once_with(timeout=180, train_pending=False)
+        worker.abort.assert_called_once()
+        self.assertIn('secondary shutdown timeout', stderr.getvalue())
+
+    def test_failed_checkpoint_and_replay_save_preserve_previous_files(self):
+        with tempfile.TemporaryDirectory() as folder:
+            model = make_model()
+            path = Path(folder, 'model.pth')
+            _save_model(model, str(path))
+            original = path.read_bytes()
+            def fail_checkpoint(temporary):
+                Path(temporary).write_bytes(b'incomplete')
+                raise OSError('disk error')
+            with patch.object(model, 'save_model', side_effect=fail_checkpoint), \
+                    self.assertRaisesRegex(OSError, 'disk error'):
+                _save_model(model, str(path))
+            self.assertEqual(path.read_bytes(), original)
+            replay = ReplayBuffer(capacity=100, dim_goal=1)
+            replay.add(*transition())
+            buffer_path = Path(folder, 'buffer.pkl')
+            replay.save_buffer(buffer_path)
+            original = buffer_path.read_bytes()
+            def fail_replay(value, stream):
+                stream.write(b'incomplete')
+                raise OSError('disk error')
+            with patch('pneu_rl.buffer.pickle.dump', side_effect=fail_replay), \
+                    self.assertRaisesRegex(OSError, 'disk error'):
+                replay.save_buffer(buffer_path)
+            self.assertEqual(buffer_path.read_bytes(), original)
+            self.assertEqual(Path(folder, 'buffer_backup.pkl').read_bytes(), original)
 
     def test_worker_error_closes_environment(self):
         model = make_model(BrokenSAC)

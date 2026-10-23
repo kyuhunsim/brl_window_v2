@@ -25,8 +25,8 @@ there is no unlimited background update loop. Experience order is preserved.
 Defaults recorded in `retrain_cfg.yaml`:
 
 - `queue_capacity: 4096`: bounded pending messages (transitions and episode markers).
-  A full queue raises an error and closes control; it does not silently discard
-  transitions or wait inside the control loop.
+  A full queue raises an error and closes control. The rejected message is retained
+  by the actor and submitted after control closes, before the remaining queue drains.
 - `sync_every: 5`: publish when the completed update count reaches a multiple of
   five at an update-group boundary. The actor checks for a new snapshot before
   inference. If the snapshot lock is busy, it keeps its previous policy.
@@ -34,13 +34,20 @@ Defaults recorded in `retrain_cfg.yaml`:
 Replay sampling, gradient computation, episode diagnostics, model checkpoints,
 and buffer serialization run in the learner. Episode output may therefore lag
 physical execution. `async_timing.csv` records actor step-start intervals, including
-reset overhead between episodes (the first sample uses that step's elapsed time).
+the first step's elapsed time. Preparation/reset time is excluded between episodes.
 These are host-loop intervals, not FPGA application timestamps or TCP RTTs.
 
 On completion or interruption, the existing `env.close()` runs before waiting
-for queued work and final checkpoint/buffer saving (60-second timeout). Worker
-failures propagate to the caller. A timeout/forced termination can leave pending
+for queued work and final checkpoint/buffer saving (180-second default timeout).
+On interruption/error, queued transitions enter replay without further gradient
+updates, so shutdown does not spend its save budget training on the backlog.
+The original control error is preserved if cleanup also fails. Worker failures
+propagate to the caller. A timeout/forced termination can still leave pending
 experience unsaved; do not treat the last checkpoint as containing every step.
+Checkpoints, info files and replay snapshots replace their previous versions only
+after the new file has been written. `async_state.json` records the final processed
+step, completed episode and skipped pending updates. A partial episode checkpoint
+uses `model_step_<step>.pth` rather than a completed-episode filename.
 The parent model's replay buffer and critic are not synchronized back; saved
 learner checkpoints are the authoritative trained state. Its policy receives the
 final snapshot after a successful drain.
@@ -96,3 +103,35 @@ PID and policy scaling, with no sensor wait. Quick-viz closes once in the rollou
 finally block before saving/plotting, including Ctrl+C and runtime errors. This is
 one JSON command publication; the separately running TCP bridge continues to send
 the latest values. Publication does not establish FPGA receipt or valve position.
+
+## Lib3 queue overflow recovery — 2026-10-23
+
+The interrupted `261023_type2_HR_smooth_retrain` run retained a readable model and
+info record through episode 2107 (1,078,784 steps), and both replay files through
+episode 2100 (51,200 real transitions). The actor's recent mean period was about
+20.08 ms; an offline benchmark of the saved model with that replay took a median
+21.5 ms per gradient update, excluding episode logging and saving. One update per
+transition could not keep up over the long run. The earlier 512-step checks did
+not exercise this accumulated backlog.
+
+Real `retrain3.py` now defaults to one update per five transitions, while retaining
+50 Hz control. `--update-every` overrides that choice. This changes the update/data
+ratio; the learning rate and reward are preserved. Each async episode log includes
+`pending=...`, and `async_backlog.csv` records pending messages and the update ratio.
+
+To continue the saved weights and replay in a **new folder** for the remaining
+93 episodes (2108–2200), run the following from the project environment:
+
+```bash
+python pneu_rl/scripts/retrain3.py \
+  --model 261023_type2_HR_smooth_retrain \
+  --name 261023_type2_HR_smooth_retrain_recovered \
+  --obs real --pid off --episodes 93 --update-every 5 --load-buffer
+```
+
+This starts a new 30-second measured preparation and restarts the continuous bank
+reference. It restores the latest saved weights/optimizer and available replay;
+it does not recreate the unsaved post-2107 interactions or the original physical
+state. If `async_state.json` is present after a newer interrupted run, its final
+processed step count is restored along with the replay. Without `--load-buffer`,
+fine-tuning continues to start a fresh replay.

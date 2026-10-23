@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import copy
 import csv
+import json
 import os
 import multiprocessing as mp
 import pickle
 import queue
+import sys
 import time
 import traceback
 from types import SimpleNamespace
@@ -44,15 +46,30 @@ def _publish(policy, shared, lock, version):
             lock.release()
 
 
-def _learner(payload, experience, status, shared, lock, version, sync_every):
+def _save_model(model, path):
+    temporary = f'{path}.tmp'
+    model.save_model(temporary)
+    os.replace(temporary, path)
+
+
+def _queue_depth(experience):
+    try:
+        return experience.qsize()
+    except (NotImplementedError, OSError):
+        return -1
+
+
+def _learner(payload, experience, status, shared, lock, version, sync_every, drain_only):
     try:
         torch.set_num_threads(1)
         model = pickle.loads(payload)
         updates = 0
         losses = np.zeros(2)
         episode_updates = 0
+        skipped_pending_updates = 0
         infos, diagnostics = [], []
         last_completed_episode = None
+        last_completed_step = None
         status.send(('ready', None))
         while True:
             message = experience.get()
@@ -66,9 +83,15 @@ def _learner(payload, experience, status, shared, lock, version, sync_every):
                 if info is not None:
                     infos.append(info)
                     diagnostics.append(diag)
-                if (can_update and len(model.buffer) > model.batch_size
-                        and step % model.update_every == 0):
+                eligible = (can_update and len(model.buffer) > model.batch_size
+                            and step % model.update_every == 0)
+                if eligible and drain_only.is_set():
+                    skipped_pending_updates += model.epoch
+                elif eligible:
                     for _ in range(model.epoch):
+                        if drain_only.is_set():
+                            skipped_pending_updates += 1
+                            continue
                         model.update_parameters()
                         updates += 1
                         episode_updates += 1
@@ -79,10 +102,13 @@ def _learner(payload, experience, status, shared, lock, version, sync_every):
             elif kind == 'episode':
                 epi, reward, step = data
                 last_completed_episode = epi
+                last_completed_step = step
                 if model.log:
-                    model.save_model(model.logger.model_path)
-                    if model.checkpoint_interval and epi % model.checkpoint_interval == 0:
-                        model.save_model(f'{model.logger.folder_path}/model_epi_{epi:04d}.pth')
+                    if not drain_only.is_set():
+                        _save_model(model, model.logger.model_path)
+                    if (not drain_only.is_set() and model.checkpoint_interval
+                            and epi % model.checkpoint_interval == 0):
+                        _save_model(model, f'{model.logger.folder_path}/model_epi_{epi:04d}.pth')
                     model.logger.save_infos(
                         epi=epi, reward=reward, step=step, alpha=model.alpha,
                         temporal_weight=model.temporal_weight,
@@ -103,19 +129,38 @@ def _learner(payload, experience, status, shared, lock, version, sync_every):
                                                  'learner_updates'])
                             writer.writerow([epi, step, timing.mean(), np.percentile(timing, 95),
                                              timing.max(), updates])
-                    if (epi - model.last_epi) % 100 == 0:
+                    path = f'{model.logger.folder_path}/async_backlog.csv'
+                    exists = os.path.exists(path)
+                    with open(path, 'a', newline='') as stream:
+                        writer = csv.writer(stream)
+                        if not exists:
+                            writer.writerow(['episode', 'steps', 'pending_messages',
+                                             'update_every', 'drain_only'])
+                        writer.writerow([epi, step, _queue_depth(experience),
+                                         model.update_every, drain_only.is_set()])
+                    if not drain_only.is_set() and (epi - model.last_epi) % 100 == 0:
                         model.buffer.save_buffer(model.logger.buffer_path)
-                print(f'[ ASYNC] episode={epi} steps={step} reward={reward:.4f} updates={updates}', flush=True)
+                print(f'[ ASYNC] episode={epi} steps={step} reward={reward:.4f} '
+                      f'updates={updates} pending={_queue_depth(experience)}', flush=True)
                 infos, diagnostics = [], []
                 losses[:] = 0
                 episode_updates = 0
             elif kind == 'warmup_end' and model.log:
                 model.buffer.save_buffer(model.logger.buffer_path)
         if model.log:
-            model.save_model(model.logger.model_path)
-            if last_completed_episode is not None:
-                model.save_model(f'{model.logger.folder_path}/model_epi_{last_completed_episode:04d}.pth')
+            _save_model(model, model.logger.model_path)
+            if last_completed_episode is not None and model.total_steps == last_completed_step:
+                _save_model(model, f'{model.logger.folder_path}/model_epi_{last_completed_episode:04d}.pth')
+            else:
+                _save_model(model, f'{model.logger.folder_path}/model_step_{model.total_steps}.pth')
             model.buffer.save_buffer(model.logger.buffer_path)
+            state_path = f'{model.logger.folder_path}/async_state.json'
+            with open(f'{state_path}.tmp', 'w') as stream:
+                json.dump(dict(steps=model.total_steps,
+                               last_completed_episode=last_completed_episode,
+                               updates=updates, buffer_size=len(model.buffer),
+                               skipped_pending_updates=skipped_pending_updates), stream)
+            os.replace(f'{state_path}.tmp', state_path)
         _publish(model.policy, shared, lock, version)
         status.send(('done', dict(updates=updates, buffer_size=len(model.buffer), steps=model.total_steps)))
     except BaseException:
@@ -141,13 +186,15 @@ class AsyncLearner:
         self.shared = ctx.RawArray('f', len(values))
         np.frombuffer(self.shared, dtype=np.float32)[:] = values
         self.lock = ctx.Lock()
+        self.drain_only = ctx.Event()
         self.version = ctx.RawValue('q', 0)
         self.applied_version = 0
         self.result = None
         self.failure = None
+        self.pending_message = None
         self.process = ctx.Process(target=_learner, args=(
             payload, self.experience, child_status, self.shared, self.lock,
-            self.version, sync_every), name='sac-learner')
+            self.version, sync_every, self.drain_only), name='sac-learner')
         self.process.start()
         child_status.close()
         if not self.status.poll(60):
@@ -176,10 +223,13 @@ class AsyncLearner:
 
     def submit(self, kind, data=None):
         self.check()
+        if getattr(self, 'pending_message', None) is not None:
+            raise RuntimeError('Learner queue overflow already pending; close control before draining')
         try:
             self.experience.put_nowait((kind, data))
         except queue.Full:
-            raise RuntimeError('Learner queue full; stopping control without dropping experience') from None
+            self.pending_message = (kind, data)
+            raise RuntimeError('Learner queue full; stopping control to save pending experience') from None
 
     def sync(self, policy):
         if not self.lock.acquire(False):
@@ -195,17 +245,23 @@ class AsyncLearner:
         self.applied_version = version
         return True
 
-    def finish(self, timeout=60):
+    def finish(self, timeout=180, train_pending=True):
         # Call only after hardware control has been closed.
+        if not train_pending:
+            self.drain_only.set()
         deadline = time.monotonic() + timeout
-        while True:
-            self.check()
-            try:
-                self.experience.put(None, timeout=0.1)
-                break
-            except queue.Full:
+        messages = [self.pending_message, None] if self.pending_message is not None else [None]
+        for message in messages:
+            while True:
+                self.check()
                 if time.monotonic() >= deadline:
                     raise TimeoutError('Learner drain timed out')
+                try:
+                    self.experience.put(message, timeout=max(0, min(0.1, deadline-time.monotonic())))
+                    break
+                except queue.Full:
+                    continue
+        self.pending_message = None
         while self.result is None:
             self.check()
             if time.monotonic() >= deadline:
@@ -229,10 +285,11 @@ class AsyncLearner:
 
 
 def train_async(model, episode, warmup_steps=0, warmup_deterministic=False,
-                queue_capacity=4096, sync_every=5):
+                queue_capacity=4096, sync_every=5, shutdown_timeout=180):
     """Own the hardware lifetime; close it BEFORE waiting for learner saving."""
     learner = None
     completed = False
+    primary_error = None
     try:
         learner = AsyncLearner(model, queue_capacity, sync_every)
         if warmup_steps:
@@ -280,15 +337,31 @@ def train_async(model, episode, warmup_steps=0, warmup_deterministic=False,
                     break
             learner.submit('episode', (episode_index + 1, reward_sum, model.total_steps))
         completed = True
+    except BaseException as exc:
+        primary_error = exc
+        raise
     finally:
+        cleanup_error = None
         try:
             model.env.close()
-        finally:
-            if learner is not None:
-                try:
-                    result = learner.finish()
-                    learner.sync(model.policy)
-                finally:
-                    learner.abort()
+        except BaseException as exc:
+            cleanup_error = exc
+        if learner is not None:
+            try:
+                result = learner.finish(timeout=shutdown_timeout,
+                                        train_pending=completed and cleanup_error is None)
+                learner.sync(model.policy)
+            except BaseException as exc:
+                if cleanup_error is None:
+                    cleanup_error = exc
+                else:
+                    print(f'[ ASYNC] Learner cleanup also failed: {exc}', file=sys.stderr)
+            finally:
+                learner.abort()
+        if cleanup_error is not None:
+            if primary_error is None:
+                raise cleanup_error
+            print(f'[ ASYNC] Cleanup failed after {type(primary_error).__name__}: '
+                  f'{cleanup_error}', file=sys.stderr)
     if completed:
         return result

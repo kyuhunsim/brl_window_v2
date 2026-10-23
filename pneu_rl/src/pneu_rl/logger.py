@@ -82,8 +82,9 @@ class Logger():
         if policy_loss is not None:
             self.infos[epi]['policy_loss'] = policy_loss
             
-        with open(self.info_path,'wb') as f:
+        with open(f'{self.info_path}.tmp','wb') as f:
             pickle.dump(self.infos, f)
+        os.replace(f'{self.info_path}.tmp', self.info_path)
     
     def set_retrain_model(
         self,

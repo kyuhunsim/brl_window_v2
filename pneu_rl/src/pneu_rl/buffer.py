@@ -6,6 +6,8 @@ import numpy as np
 import torch
 
 import pickle
+import os
+import shutil
 
 class ReplayBuffer():
     def __init__(
@@ -61,12 +63,14 @@ class ReplayBuffer():
         self,
         path: str = 'buffer_sac.pkl'
     ) -> None:
-        with open(path, 'wb') as f:
+        path = os.fspath(path)
+        with open(f'{path}.tmp', 'wb') as f:
             pickle.dump(self.buffer, f)
+        os.replace(f'{path}.tmp', path)
+        backup = f'{path[0:-4]}_backup.pkl'
+        shutil.copyfile(path, f'{backup}.tmp')
+        os.replace(f'{backup}.tmp', backup)
 
-        with open(f'{path[0:-4]}_backup.pkl', 'wb') as f:
-            pickle.dump(self.buffer, f)
-    
     def load_buffer(
         self,
         path: str
@@ -80,5 +84,3 @@ class ReplayBuffer():
     
     def clear_buffer(self):
         self.buffer.clear()
-            
-        
