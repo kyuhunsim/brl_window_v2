@@ -1,0 +1,57 @@
+{
+  "created_date": "2026-10-26",
+  "source_git_commit": "de9c829fabde6f15a6d1e8cc9bd0bb64cdad4ebb",
+  "source_worktree_note": "Existing local train_lib3_all_open.py CAPS CLI changes preserved; no production code changed for packaging.",
+  "purpose": "deterministic_zero_shot_and_fresh_replay_finetuning",
+  "checkpoint_episode": 2000,
+  "models": [
+    {
+      "name": "261024_lib3_type2_HR_meanCAPS_t006_seed0",
+      "type": "type2",
+      "temporal_weight": 0.06,
+      "checkpoint_episode": 2000,
+      "files_sha256": {
+        "model.pth": "1746754ae5d8c8188899fa87e70e695c3f6785812a39068933fb33db7eb5038e",
+        "infos.pkl": "c4433a1e72563e7d9b288c4514f46f15d705a7fe9d05736d5e3ab9428c0f69a2",
+        "reference.npz": "f0e1d9fc8855d06af04c19f3a1e5186ce2de8e2a820857cd8baf344b0d2018ff",
+        "simulator.so": "6c5a14883d4bf6644853e8cd5fc7ae361cafda9951f339150b4055e4d0b9c6d5",
+        "cfg.training.yaml": "9cea5817c0b99a1d80bec5c79d380fcbb5c00fc17540bb66cd3f5cdc57f2647e",
+        "reference_profile.yaml": "339d3fe82edc97ef1c1d922c7ad11720d313c36dc659d0e497feab3b06585711",
+        "cfg.yaml": "a89a3a381873aefbfd1eec92147faec291ada644ac04d710eb1d08fb3ca872e9"
+      },
+      "source_checkpoint": "pneu_rl/models/261024_lib3_type2_HR_meanCAPS_t006_seed0/model_epi_2000.pth"
+    },
+    {
+      "name": "261024_lib3_type2_HR_meanCAPS_t020_seed0",
+      "type": "type2",
+      "temporal_weight": 0.2,
+      "checkpoint_episode": 2000,
+      "files_sha256": {
+        "model.pth": "34d09fe7f2c86ffaaa53fd1d7b86d2402cc9e8921a97f9a5d2cc4bfc2d772f87",
+        "infos.pkl": "639c10e74889cbd879b2f6e3c32aca9b0ffe5abd200d10127a5f3782ca15d3ee",
+        "reference.npz": "f0e1d9fc8855d06af04c19f3a1e5186ce2de8e2a820857cd8baf344b0d2018ff",
+        "simulator.so": "6c5a14883d4bf6644853e8cd5fc7ae361cafda9951f339150b4055e4d0b9c6d5",
+        "cfg.training.yaml": "6d08338328414c2e60eb5cc53aa0e48f016a25497a51f07b137f89e5a2d7cbb5",
+        "reference_profile.yaml": "339d3fe82edc97ef1c1d922c7ad11720d313c36dc659d0e497feab3b06585711",
+        "cfg.yaml": "94756a8df328036cf1b5ef1db2ed12de28c5691246fb8219663840c191223a52"
+      },
+      "source_checkpoint": "pneu_rl/models/261024_lib3_type2_HR_meanCAPS_t020_seed0/model_epi_2000.pth"
+    },
+    {
+      "name": "261026_lib3_pressurecal_type1_HR_smooth_seed0",
+      "type": "type1",
+      "temporal_weight": 0.0,
+      "checkpoint_episode": 2000,
+      "files_sha256": {
+        "model.pth": "b7cd42482f010b1dddebb54e8538ac98c6e4930d93205cfe11edfc778261d649",
+        "infos.pkl": "c81ba80037fa3c65965c1fde9c77ac3f8bf336e295c5853a8ee4ee348bb79967",
+        "reference.npz": "02f9e222106b1c07112e4050e01b2ce881985113074fd7be8906741c4f7ae075",
+        "simulator.so": "5c4235e763a8b583482225e53000e20895160aada382fcce461e2bb74c710796",
+        "cfg.training.yaml": "68df972b5ebf873a05446eafd2a8b4008aebea7b2f7236058b74765e67b8501c",
+        "reference_profile.yaml": "3bcb81be87861cdcabd552c13be0382a17be0ae883e2264290551304e671b798",
+        "cfg.yaml": "f84cb00fa979caaf7d4b84902098d17ef078fa9e0c954ed914c21d2b6dcdfb85"
+      },
+      "source_checkpoint": "pneu_rl/models/261026_lib3_pressurecal_type1_HR_smooth_seed0/model_epi_2000.pth"
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "status": "passed",
+  "hardware_io_performed": false,
+  "models": [
+    {
+      "model": "261024_lib3_type2_HR_meanCAPS_t006_seed0",
+      "checkpoint_episode": 2000,
+      "checkpoint_sha256": "1746754ae5d8c8188899fa87e70e695c3f6785812a39068933fb33db7eb5038e",
+      "reference_sha256": "f0e1d9fc8855d06af04c19f3a1e5186ce2de8e2a820857cd8baf344b0d2018ff",
+      "simulator_sha256": "6c5a14883d4bf6644853e8cd5fc7ae361cafda9951f339150b4055e4d0b9c6d5",
+      "observation_dimension": 160,
+      "command_dimension": 6,
+      "deterministic_action": [
+        0.8472341299057007,
+        0.8412082195281982,
+        0.9706414937973022,
+        0.3549245595932007,
+        0.9915409088134766,
+        0.09305796027183533
+      ],
+      "zero_shot_bank_seconds": 40,
+      "mock_preparation_steps": 1500,
+      "mock_finetune_resets": 200,
+      "mock_finetune_hard_resets": 1,
+      "replay_buffer_required": false,
+      "hardware_io_performed": false,
+      "status": "passed"
+    },
+    {
+      "model": "261024_lib3_type2_HR_meanCAPS_t020_seed0",
+      "checkpoint_episode": 2000,
+      "checkpoint_sha256": "34d09fe7f2c86ffaaa53fd1d7b86d2402cc9e8921a97f9a5d2cc4bfc2d772f87",
+      "reference_sha256": "f0e1d9fc8855d06af04c19f3a1e5186ce2de8e2a820857cd8baf344b0d2018ff",
+      "simulator_sha256": "6c5a14883d4bf6644853e8cd5fc7ae361cafda9951f339150b4055e4d0b9c6d5",
+      "observation_dimension": 160,
+      "command_dimension": 6,
+      "deterministic_action": [
+        0.8238829970359802,
+        0.15862926840782166,
+        0.9869492650032043,
+        0.7696141004562378,
+        0.99808669090271,
+        0.47425195574760437
+      ],
+      "zero_shot_bank_seconds": 40,
+      "mock_preparation_steps": 1500,
+      "mock_finetune_resets": 200,
+      "mock_finetune_hard_resets": 1,
+      "replay_buffer_required": false,
+      "hardware_io_performed": false,
+      "status": "passed"
+    },
+    {
+      "model": "261026_lib3_pressurecal_type1_HR_smooth_seed0",
+      "checkpoint_episode": 2000,
+      "checkpoint_sha256": "b7cd42482f010b1dddebb54e8538ac98c6e4930d93205cfe11edfc778261d649",
+      "reference_sha256": "02f9e222106b1c07112e4050e01b2ce881985113074fd7be8906741c4f7ae075",
+      "simulator_sha256": "5c4235e763a8b583482225e53000e20895160aada382fcce461e2bb74c710796",
+      "observation_dimension": 160,
+      "command_dimension": 6,
+      "deterministic_action": [
+        0.9261261820793152,
+        0.9529436230659485,
+        0.947020411491394,
+        0.993765115737915,
+        0.8935891389846802,
+        0.9994361996650696
+      ],
+      "zero_shot_bank_seconds": 40,
+      "mock_preparation_steps": 1500,
+      "mock_finetune_resets": 200,
+      "mock_finetune_hard_resets": 1,
+      "replay_buffer_required": false,
+      "hardware_io_performed": false,
+      "status": "passed"
+    }
+  ]
+}
