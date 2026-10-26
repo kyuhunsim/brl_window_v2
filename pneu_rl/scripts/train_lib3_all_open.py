@@ -22,6 +22,31 @@ def sha256(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def apply_temporal_caps(parser, args, cfg):
+    """Opt into temporal mean-action CAPS without changing baseline settings."""
+    weight = args.caps_temporal_weight
+    if args.caps_ramp_episodes < 0:
+        parser.error('--caps-ramp-episodes must be non-negative')
+    if weight is None:
+        if args.caps_start_after_warmup or args.caps_ramp_episodes:
+            parser.error('CAPS scheduling requires --caps-temporal-weight')
+        return
+    if not np.isfinite(weight) or weight < 0:
+        parser.error('--caps-temporal-weight must be finite and non-negative')
+    if not cfg['model'].get('normalize_observation', False):
+        parser.error('temporal mean-action CAPS requires normalized observations')
+    model = cfg['model']
+    model.update(
+        caps_mode='mean_action',
+        temporal_weight=weight,
+        spatial_weight=0.0,
+        caps_spatial_noise_normalized=0.0,
+        caps_start_steps=(model['start_epi'] * model['horizon']
+                          if args.caps_start_after_warmup else 0),
+        caps_ramp_steps=args.caps_ramp_episodes * model['horizon'],
+    )
+
+
 def apply_plant_reference(parser, args, cfg):
     """Require matching simulator/reference provenance for a new plant run."""
     if (args.library_path is None) != (args.reference_profile is None):
@@ -88,6 +113,13 @@ def main():
     parser.add_argument('--name')
     parser.add_argument('--library-path',type=Path)
     parser.add_argument('--reference-profile',type=Path)
+    parser.add_argument('--caps-temporal-weight',type=float,default=None,
+        help='Opt into mean-action temporal CAPS; spatial weight/noise are zero. '
+             'Omit to preserve the source config exactly.')
+    parser.add_argument('--caps-start-after-warmup',action='store_true',
+        help='Start temporal CAPS after start_epi * horizon collected steps.')
+    parser.add_argument('--caps-ramp-episodes',type=int,default=0,
+        help='Ramp temporal CAPS over this many horizon-length blocks (default: 0).')
     parser.add_argument('--dry-run',action='store_true')
     args=parser.parse_args()
     if args.episodes<1 or args.threads<1: parser.error('episodes and threads must be positive')
@@ -102,6 +134,7 @@ def main():
     cfg['torch_threads']=args.threads
     cfg['model']['checkpoint_interval']=500
     cfg['env']['verbose']=False
+    apply_temporal_caps(parser,args,cfg)
     apply_plant_reference(parser,args,cfg)
     name=args.name or f'261015_lib3_allopen30_{args.policy}_smooth_seed0'
     if '/' in name or name in ('','.','..'): parser.error('name must be a model folder name')
@@ -114,6 +147,16 @@ def main():
         env.close()
         parser.error('physical baseline requires opening-dynamics simulator schema 2')
     model=SAC(env=env,**cfg['model'])  # Fresh actor/critics/optimizers/replay; no checkpoint loaded.
+    loss_settings=dict(
+        caps_mode=model.caps_mode,
+        temporal_weight=model.temporal_weight,
+        spatial_weight=model.spatial_weight,
+        caps_spatial_noise_normalized=model.caps_spatial_noise_normalized,
+        caps_start_steps=model.caps_start_steps,
+        caps_ramp_steps=model.caps_ramp_steps,
+        normalize_observation=cfg['model'].get('normalize_observation',False),
+        reward=cfg['env']['rwd_kwargs'],
+    )
     if args.dry_run:
         state,info=env.reset()
         if not np.isfinite(state).all() or np.any(env.curr_full_press <= 0):
@@ -129,9 +172,13 @@ def main():
             runtime_state_schema=env.obs.runtime_state_schema,
             plant_provenance=cfg.get('plant_provenance'),
             initial_reference_kpa=env._current_actuator_reference().tolist(),
+            observation_delay_seconds=env.obs.delay,
+            loss_settings=loss_settings,
             checkpoint_interval=500),indent=2))
         env.close()
         return
+    if args.caps_temporal_weight is not None:
+        print('[ INFO] Temporal-only CAPS: '+json.dumps(loss_settings),flush=True)
     model.set_logger(name)
     save_yaml(name,cfg)
     started=time.time()
