@@ -1,0 +1,13 @@
+enabled: true
+seed: 610260
+first_nominal: true
+interpretation: Diagnostic scenario distribution, not an identified Real parameter distribution.
+sampling: One weighted draw before each hard reset; fixed through preparation and four carried blocks.
+scenarios:
+  - {name: nominal, delay_seconds: 0.10, tau_scale: 1.0, flow3_scale: 1.0, flow4_scale: 1.0, weight: 3.0}
+  - {name: delay080, delay_seconds: 0.08, tau_scale: 1.0, flow3_scale: 1.0, flow4_scale: 1.0, weight: 1.0}
+  - {name: delay120, delay_seconds: 0.12, tau_scale: 1.0, flow3_scale: 1.0, flow4_scale: 1.0, weight: 1.0}
+  - {name: tau_half, delay_seconds: 0.10, tau_scale: 0.5, flow3_scale: 1.0, flow4_scale: 1.0, weight: 1.0}
+  - {name: tau_double, delay_seconds: 0.10, tau_scale: 2.0, flow3_scale: 1.0, flow4_scale: 1.0, weight: 1.0}
+  - {name: gain_in_plus, delay_seconds: 0.10, tau_scale: 1.0, flow3_scale: 1.1, flow4_scale: 0.9, weight: 1.0}
+  - {name: gain_in_minus, delay_seconds: 0.10, tau_scale: 1.0, flow3_scale: 0.9, flow4_scale: 1.1, weight: 1.0}
