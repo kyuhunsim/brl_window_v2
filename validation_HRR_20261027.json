@@ -1,0 +1,54 @@
+{
+  "status": "passed",
+  "hardware_io_performed": false,
+  "models": [
+    {
+      "model": "261026_lib3_pressurecal_type1_HRR_smooth_seed0",
+      "checkpoint_episode": 2000,
+      "checkpoint_sha256": "23f1ee8e525f72c0ef4a791f07b0a88ed3cdb8a53abbe3db6bf079cd40f46472",
+      "reference_sha256": "02f9e222106b1c07112e4050e01b2ce881985113074fd7be8906741c4f7ae075",
+      "simulator_sha256": "5c4235e763a8b583482225e53000e20895160aada382fcce461e2bb74c710796",
+      "observation_dimension": 162,
+      "command_dimension": 6,
+      "deterministic_action": [
+        0.975777268409729,
+        0.8808486461639404,
+        0.992131233215332,
+        0.9715262651443481,
+        0.1330767571926117,
+        0.5922070741653442
+      ],
+      "zero_shot_bank_seconds": 40,
+      "mock_preparation_steps": 1500,
+      "mock_finetune_resets": 200,
+      "mock_finetune_hard_resets": 1,
+      "replay_buffer_required": false,
+      "hardware_io_performed": false,
+      "status": "passed"
+    },
+    {
+      "model": "261026_lib3_pressurecal_type1_HRR_DR_smooth_seed0",
+      "checkpoint_episode": 2000,
+      "checkpoint_sha256": "2baefd11f1389744c3bc51fca8a7f309902e7152ad7926b4726270e4e7c28eb3",
+      "reference_sha256": "02f9e222106b1c07112e4050e01b2ce881985113074fd7be8906741c4f7ae075",
+      "simulator_sha256": "5c4235e763a8b583482225e53000e20895160aada382fcce461e2bb74c710796",
+      "observation_dimension": 162,
+      "command_dimension": 6,
+      "deterministic_action": [
+        0.9374834895133972,
+        0.49226221442222595,
+        0.9965871572494507,
+        0.955298900604248,
+        0.5072898864746094,
+        0.977123498916626
+      ],
+      "zero_shot_bank_seconds": 40,
+      "mock_preparation_steps": 1500,
+      "mock_finetune_resets": 200,
+      "mock_finetune_hard_resets": 1,
+      "replay_buffer_required": false,
+      "hardware_io_performed": false,
+      "status": "passed"
+    }
+  ]
+}

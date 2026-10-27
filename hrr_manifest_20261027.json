@@ -1,0 +1,52 @@
+{
+  "created_date": "2026-10-27",
+  "source_git_commit": "755a29328d6a5af9a6e01a3ad2e35642ed6b6a29",
+  "source_worktree_note": "HRR162 baseline and DR-trained frozen policies; deployment uses standard HRR. No production code changed for packaging.",
+  "purpose": "deterministic_zero_shot_and_fresh_replay_finetuning",
+  "checkpoint_episode": 2000,
+  "models": [
+    {
+      "name": "261026_lib3_pressurecal_type1_HRR_smooth_seed0",
+      "type": "type1",
+      "temporal_weight": 0.0,
+      "checkpoint_episode": 2000,
+      "files_sha256": {
+        "model.pth": "23f1ee8e525f72c0ef4a791f07b0a88ed3cdb8a53abbe3db6bf079cd40f46472",
+        "infos.pkl": "1a9774587f0e04296d978332d928f1d2fc05561e3b2bad81022418dd594f992d",
+        "reference.npz": "02f9e222106b1c07112e4050e01b2ce881985113074fd7be8906741c4f7ae075",
+        "simulator.so": "5c4235e763a8b583482225e53000e20895160aada382fcce461e2bb74c710796",
+        "cfg.training.yaml": "c1e043a9f8fbdc7ddc35f384e6704af5f24bb04dd59587a390573a111046e4be",
+        "reference_profile.yaml": "3bcb81be87861cdcabd552c13be0382a17be0ae883e2264290551304e671b798",
+        "cfg.yaml": "1e6cbfe8407d6a497e9ca2526679f8e896c3c0ee77c2ba2b4da155e8a5888c9f"
+      },
+      "source_checkpoint": "pneu_rl/models/261026_lib3_pressurecal_type1_HRR_smooth_seed0/model_epi_2000.pth"
+    },
+    {
+      "name": "261026_lib3_pressurecal_type1_HRR_DR_smooth_seed0",
+      "type": "type1",
+      "temporal_weight": 0.0,
+      "checkpoint_episode": 2000,
+      "files_sha256": {
+        "model.pth": "2baefd11f1389744c3bc51fca8a7f309902e7152ad7926b4726270e4e7c28eb3",
+        "infos.pkl": "ddac03d6558008511078323b1db2848a41794bf2f987d1d5e3f25f53d954792f",
+        "reference.npz": "02f9e222106b1c07112e4050e01b2ce881985113074fd7be8906741c4f7ae075",
+        "simulator.so": "5c4235e763a8b583482225e53000e20895160aada382fcce461e2bb74c710796",
+        "cfg.training.yaml": "41e3c8f0b1b7d354535c2e591912f5f4196dae8944f70450aa87f153f9dd9ca3",
+        "reference_profile.yaml": "3bcb81be87861cdcabd552c13be0382a17be0ae883e2264290551304e671b798",
+        "cfg.yaml": "16d449a3283bcb8d2ce2b2a4a0d2af540e8e50e12cca79f2c7f48e480b131306"
+      },
+      "source_checkpoint": "pneu_rl/models/261026_lib3_pressurecal_type1_HRR_DR_smooth_seed0/model_epi_2000.pth"
+    }
+  ],
+  "observation_dimension": 162,
+  "replay_included": false,
+  "deployment_policies": [
+    "HRR baseline",
+    "HRR trained with Dynamics Randomization"
+  ],
+  "helper_files_sha256": {
+    "configure_hrr_bundle_20261027.py": "ecd1097332bf81e7b838bda3f338d8d67d0e0b8c6ef0c20273eeb4ba2cd4ae91",
+    "README_HRR_20261027.txt": "2fbfc96f42234b5baee9f6705d677e295786debb3f271cf6a65f64a3d0f20867",
+    "validation_HRR_20261027.json": "2c9f8105fa76c210f8867ed8192cdefd3ad24498addf040d74fc0c7cff6bff6e"
+  }
+}
